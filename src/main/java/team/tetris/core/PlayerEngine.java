@@ -127,6 +127,13 @@ public final class PlayerEngine implements TetrisEnginePort {
     }
 
     private EngineStep lockActivePieceAndSpawnNext(DropResult dropResult) {
+        // 상단 밖에 걸친 블록은 일부만 보드에 저장하지 않고 최종 위치를 유지한 채 종료한다.
+        for (Position offset : activePiece.type().cellsAt(activePiece.rotation())) {
+            if (activePiece.origin().y() + offset.y() < 0) {
+                phase = EnginePhase.GAME_OVER;
+                return new EngineStep(snapshot(), dropResult, null, null);
+            }
+        }
         LockResult lockResult = new LockResult(activePiece.type(), activePiece.origin(), activePiece.rotation());
         board.place(activePiece.type(), activePiece.rotation(), activePiece.origin());
         ClearResult clearResult = board.clearFullLines();
