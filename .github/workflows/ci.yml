@@ -1,4 +1,4 @@
-name: Java CI
+name: Windows Java CI
 
 on:
   push:
@@ -14,8 +14,8 @@ concurrency:
 
 jobs:
   build-test:
-    name: Build and test (Java 21)
-    runs-on: ubuntu-latest
+    name: Build and test (Windows, Java 21)
+    runs-on: windows-latest
     timeout-minutes: 15
     steps:
       - name: Check out source
@@ -31,7 +31,8 @@ jobs:
           cache: gradle
 
       - name: Build, test and generate coverage
-        run: ./gradlew --no-daemon --stacktrace clean build jacocoTestReport
+        shell: pwsh
+        run: .\gradlew.bat --no-daemon --stacktrace clean build jacocoTestReport
 
       - name: Upload test and coverage reports
         if: ${{ always() }}

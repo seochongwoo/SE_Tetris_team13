@@ -27,7 +27,7 @@
 합의 후 API·코드와 이 문서를 함께 갱신.
 
 개발 환경은 Java 21, Gradle Wrapper 8.9. JUnit은 테스트에만 사용하며 실행 시 외부 라이브러리 없음.
-검증 명령은 `./gradlew --no-daemon clean build jacocoTestReport`.
+대상 OS는 Windows. PowerShell 검증 명령은 `.\gradlew.bat --no-daemon clean build jacocoTestReport`.
 2026-09-26 기준 전체 152개 테스트 통과. 실제 UI·대상 OS 배포 검증은 별도 수행 필요.
 
 
@@ -39,7 +39,7 @@
 | storage | 설정·기록 파일 읽기/쓰기, 데이터 검증, 저장 오류 전달 | 파일 형식 구현과 저장 경로를 UI에 노출하지 않음 |
 | bootstrap | 엔진·저장소·서비스·UI 조립, 새 세션 생성 | UI 구체 객체 생성 방식은 팀원 1과 연결 |
 | 테스트 | application/storage 단위·통합 테스트 | 성능 테스트는 팀원 1 담당, 팀원 3은 세션 연동 지원 |
-| 공용 기반 | 빌드·CI·배포에 필요한 요구 정리 및 협업 | 공용 파일 변경 담당과 대상 OS는 별도 확정 |
+| 공용 기반 | 빌드·CI·배포에 필요한 요구 정리 및 협업 | 대상 OS는 Windows, 공용 파일 변경 담당은 별도 확정 |
 
 코어의 `TetrisEnginePort`에 의존하고 `PlayerEngine` 생성은 `AppComposition`에서 수행한다. 세션은 충돌, 회전, 줄 삭제, 블록 생성 규칙을 중복 구현하지 않는다.
 
@@ -363,9 +363,9 @@ src/main/resources/META-INF/services/team.tetris.application.port.GameUi
 현재 등록된 제공자는 **테스트 리소스의 가짜 UI뿐**이며 배포 JAR에는 미포함.
 실제 UI 제공자 등록 이후 사용 가능한 실행 명령:
 
-```sh
-./gradlew run
-./gradlew run --args='--data-dir /path/to/data'
+```powershell
+.\gradlew.bat run
+.\gradlew.bat run --args='--data-dir C:/tetris-test-data'
 ```
 
 기본 데이터 디렉터리는 사용자 홈의 `.se-tetris-team13`.
@@ -378,11 +378,12 @@ Gradle application 플러그인으로 실행 스크립트와 zip/tar 배포물 �
 
 ### UI가 준비되기 전 자동 검증
 
-`.github/workflows/ci.yml`에서 push·PR·수동 실행 시 Java 21로 전체 빌드·테스트·커버리지 생성.
+`.github/workflows/ci.yml`에서 push·PR·수동 실행 시 Windows 러너(`windows-latest`)와 Java 21로 전체 빌드·테스트·커버리지 생성.
+PowerShell에서 `gradlew.bat` 사용. Linux·macOS 러너는 구성하지 않음.
 실패 시에도 생성된 JUnit XML, 테스트 HTML, JaCoCo 보고서를 `test-and-coverage-reports` 아티팩트로 14일 보관.
 화면을 여는 `run` 작업은 CI에 포함하지 않으며 가짜 UI를 사용하는 통합 테스트만 실행.
 2026-09-26 [첫 원격 CI 실행](https://github.com/seochongwoo/SE_Tetris_team13/actions/runs/36224562972) 성공과 보고서 업로드 확인.
-해당 실행은 CI 구성 커밋 `cb44a5d` 기준이며 이후 변경은 각 커밋의 CI 결과 확인 필요.
+해당 실행은 이전 Linux 구성 커밋 `cb44a5d`의 기록. Windows 전용 구성의 성공 여부는 변경 후 실행 결과로 별도 확인.
 
 ### 배포 사전 점검 결과
 
@@ -402,7 +403,7 @@ Gradle application 플러그인으로 실행 스크립트와 zip/tar 배포물 �
 실제 구현 클래스 이름을 확정한 뒤 제공자 파일 등록 및 다음 순서로 검증 필요.
 
 1. `src/main/resources/META-INF/services/team.tetris.application.port.GameUi`에 실제 public 기본 생성자를 가진 UI 구현 클래스 등록.
-2. 전체 빌드 후 사용자 데이터와 별도의 빈 디렉터리를 지정하여 `./gradlew run --args='--data-dir /path/to/test-data'` 실행.
+2. 전체 빌드 후 사용자 데이터와 별도의 빈 디렉터리를 지정하여 `.\gradlew.bat run --args='--data-dir C:/tetris-test-data'` 실행.
 3. 아래 시나리오를 확인하고 사용한 커밋·OS·Java 버전·테스트 데이터 경로·실제 결과 기록.
 
 | 시나리오 | 기대 결과 | 상태 |
@@ -435,7 +436,7 @@ Gradle application 플러그인으로 실행 스크립트와 zip/tar 배포물 �
 | 팀 전체 | 점수·속도 수치, 최대 5회 따라잡기, 블록 고정·정지 시 타이머 초기화 기준안 수용 |
 | 팀 전체 | 순위 보관 개수, 동점·이름 규칙, 중도 종료 기록 제외, 등록 이력 정리 정책 |
 | 팀 전체 | 운영 데이터 경로, 대상 OS의 원자적 파일 교체 지원, 복구 안내 방식 |
-| 팀 전체 | 공용 Gradle·CI 담당, 배포 OS·패키지 담당, 커버리지·성능 검증 기준 |
+| 팀 전체 | 공용 Gradle·CI 담당, Windows 패키지 담당, 커버리지·성능 검증 기준 |
 
 [아키텍처 결정 기록](architecture-decision.md)의 역할 표에는 점수·속도가 팀원 2로 남아 있으므로 최신 역할 합의와 동기화 필요.
 
