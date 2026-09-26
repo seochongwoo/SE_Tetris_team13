@@ -4,7 +4,7 @@ import java.util.Objects;
 import team.tetris.core.Cell;
 import team.tetris.core.EngineSnapshot;
 
-/** 보드 배열은 생성 시와 조회 시 복사한다. Cell과 나머지 코어 값은 불변 값이다. */
+/** 보드 배열은 생성 시와 조회 시 복사. Cell과 나머지 코어 값은 불변 값. */
 public record GameSnapshot(
         EngineSnapshot engine, long score, int level, int clearedLines,
         long gravityIntervalNanos, GameStatus status) {

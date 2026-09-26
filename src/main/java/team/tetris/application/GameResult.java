@@ -3,7 +3,7 @@ package team.tetris.application;
 import java.util.Objects;
 import java.util.UUID;
 
-/** 자연 종료 또는 중도 종료 시 확정되는 값. 기록 저장 여부는 종료 조율자가 판단한다. */
+/** 자연 종료 또는 중도 종료 시 확정되는 값. 기록 저장 여부는 종료 조율자가 판단. */
 public record GameResult(UUID gameId, long score, int level, int clearedLines, GameStatus reason) {
     public GameResult {
         Objects.requireNonNull(gameId, "gameId");

@@ -1,7 +1,8 @@
 package team.tetris.application;
 
-/** 삭제 10줄마다 레벨 상승, 초기 1초에서 최소 100ms까지 가속한다. */
-public final class SpeedPolicy {
+/** 삭제 10줄마다 레벨 상승, 초기 1초에서 최소 100ms까지 가속. */
+public final class SpeedPolicy implements SpeedRule {
+    @Override
     public int levelFor(int totalClearedLines) {
         if (totalClearedLines < 0) {
             throw new IllegalArgumentException("Cleared lines must be non-negative");
@@ -9,6 +10,7 @@ public final class SpeedPolicy {
         return totalClearedLines / 10;
     }
 
+    @Override
     public long gravityIntervalNanos(int level) {
         if (level < 0) {
             throw new IllegalArgumentException("Level must be non-negative");

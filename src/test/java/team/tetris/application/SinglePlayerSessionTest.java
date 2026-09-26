@@ -16,6 +16,101 @@ import team.tetris.core.result.*;
 class SinglePlayerSessionTest {
     private static final long SECOND = 1_000_000_000L;
 
+    private static SpeedRule fixedSpeed(int level, long interval) {
+        return new SpeedRule() {
+            public int levelFor(int lines) { return level; }
+            public long gravityIntervalNanos(int currentLevel) { return interval; }
+        };
+    }
+
+    @Test
+    void injectedRulesReceiveEachStepOnceAndUseLevelBeforeTransition() {
+        FakeEngine engine = new FakeEngine();
+        List<String> calls = new ArrayList<>();
+        ScoreRule scoring = (distance, lines, level) -> {
+            calls.add(distance + ":" + lines + ":" + level);
+            return distance * 7L + lines * 30L + level;
+        };
+        SpeedRule speed = new SpeedRule() {
+            public int levelFor(int lines) { return 2 + lines; }
+            public long gravityIntervalNanos(int level) { return SECOND / level; }
+        };
+        GameSession session = new SinglePlayerSession(engine, scoring, speed);
+        assertEquals(2, session.snapshot().level());
+        assertEquals(SECOND / 2, session.snapshot().gravityIntervalNanos());
+        engine.enqueue(3, 1, true, EnginePhase.RUNNING);
+        session.handle(GameCommand.HARD_DROP);
+        assertEquals(53, session.snapshot().score());
+        assertEquals(3, session.snapshot().level());
+        session.update(SECOND / 3 - 1);
+        assertEquals(0, engine.ticks);
+        session.update(1);
+        assertEquals(63, session.snapshot().score());
+        assertEquals(List.of("3:1:2", "1:0:3"), calls);
+        session.snapshot();
+        session.result();
+        assertEquals(2, calls.size());
+    }
+
+    @Test
+    void extremelyLongInjectedIntervalDoesNotOverflowCatchUpCap() {
+        FakeEngine engine = new FakeEngine();
+        GameSession session = new SinglePlayerSession(engine, new ScorePolicy(), fixedSpeed(0, Long.MAX_VALUE));
+        session.update(Long.MAX_VALUE - 1);
+        assertEquals(0, engine.ticks);
+        session.update(1);
+        assertEquals(1, engine.ticks);
+        assertEquals(1, session.snapshot().score());
+        session.update(Long.MAX_VALUE);
+        assertEquals(2, engine.ticks);
+    }
+
+    @Test
+    void rejectsMissingRulesAndInvalidSpeedOutputs() {
+        FakeEngine engine = new FakeEngine();
+        assertThrows(NullPointerException.class,
+                () -> new SinglePlayerSession(engine, null, new SpeedPolicy()));
+        assertThrows(NullPointerException.class,
+                () -> new SinglePlayerSession(engine, new ScorePolicy(), null));
+        assertThrows(IllegalStateException.class,
+                () -> new SinglePlayerSession(engine, new ScorePolicy(), fixedSpeed(-1, SECOND)));
+        for (long interval : new long[]{0, -1}) {
+            assertThrows(IllegalStateException.class,
+                    () -> new SinglePlayerSession(engine, new ScorePolicy(), fixedSpeed(0, interval)));
+        }
+    }
+
+    @Test
+    void rejectsNegativeScoreAndCumulativeOverflowWithoutPublishingPartialStatistics() {
+        GameSession negative = new SinglePlayerSession(new FakeEngine(), (d, c, l) -> -1, new SpeedPolicy());
+        assertThrows(IllegalStateException.class, () -> negative.update(SECOND));
+        assertEquals(0, negative.snapshot().score());
+        GameSession overflow = new SinglePlayerSession(new FakeEngine(),
+                (d, c, l) -> Long.MAX_VALUE, new SpeedPolicy());
+        overflow.update(SECOND);
+        assertEquals(Long.MAX_VALUE, overflow.snapshot().score());
+        GameSnapshot before = overflow.snapshot();
+        assertThrows(ArithmeticException.class, () -> overflow.update(SECOND));
+        assertSame(before, overflow.snapshot());
+        assertTrue(overflow.result().isEmpty());
+    }
+
+    @Test
+    void inputGameOverIncludesFinalBonusAndNeverReprocessesClearNone() {
+        FakeEngine engine = new FakeEngine();
+        GameSession session = new SinglePlayerSession(engine);
+        engine.steps.add(new EngineStep(engine.snapshot(), null, null, ClearResult.NONE));
+        session.handle(GameCommand.MOVE_LEFT);
+        assertEquals(0, session.snapshot().score());
+        assertEquals(0, session.snapshot().clearedLines());
+        engine.enqueue(2, 2, true, EnginePhase.GAME_OVER);
+        session.handle(GameCommand.HARD_DROP);
+        GameResult result = session.result().orElseThrow();
+        assertEquals(402, result.score());
+        assertEquals(2, result.clearedLines());
+        assertTerminalIsFrozen(session, engine, result);
+    }
+
     private static final class FakeEngine implements TetrisEnginePort {
         final Cell[][] board = {{Cell.EMPTY}};
         final Queue<EngineStep> steps = new ArrayDeque<>();

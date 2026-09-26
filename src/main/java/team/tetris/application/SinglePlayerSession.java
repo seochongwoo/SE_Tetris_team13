@@ -8,26 +8,35 @@ import team.tetris.core.GameAction;
 import team.tetris.core.port.TetrisEnginePort;
 import team.tetris.core.result.EngineStep;
 
-/** 코어 규칙을 호출하고 시간, 점수, 한 판의 수명을 관리한다. 스레드 안전하지 않다. */
+/** 코어 호출과 시간·점수·한 판의 수명 관리. 하나의 실행 흐름에서 호출 필요. */
 public final class SinglePlayerSession implements GameSession {
     private static final int MAX_TICKS_PER_UPDATE = 5;
 
     private final TetrisEnginePort engine;
     private final UUID gameId = UUID.randomUUID();
-    private final ScorePolicy scorePolicy = new ScorePolicy();
-    private final SpeedPolicy speedPolicy = new SpeedPolicy();
+    private final ScoreRule scorePolicy;
+    private final SpeedRule speedPolicy;
     private long score;
     private int level;
     private int clearedLines;
-    private long gravityIntervalNanos = speedPolicy.gravityIntervalNanos(0);
+    private long gravityIntervalNanos;
     private long accumulatedNanos;
     private GameStatus status = GameStatus.RUNNING;
     private GameSnapshot view;
     private GameResult result;
 
-    /** 새로 생성되어 RUNNING 상태인 엔진의 소유권을 세션에 전달한다. */
+    /** 기본 정책으로 새 RUNNING 엔진의 소유권을 세션에 전달. */
     public SinglePlayerSession(TetrisEnginePort engine) {
+        this(engine, new ScorePolicy(), new SpeedPolicy());
+    }
+
+    /** 점수·속도 규칙 주입. 엔진과 정책의 외부 변경 금지. */
+    public SinglePlayerSession(TetrisEnginePort engine, ScoreRule scorePolicy, SpeedRule speedPolicy) {
         this.engine = Objects.requireNonNull(engine, "engine");
+        this.scorePolicy = Objects.requireNonNull(scorePolicy, "scorePolicy");
+        this.speedPolicy = Objects.requireNonNull(speedPolicy, "speedPolicy");
+        level = checkedLevel(0);
+        gravityIntervalNanos = checkedInterval(level);
         var initial = engine.snapshot();
         if (initial.phase() != EnginePhase.RUNNING) {
             throw new IllegalArgumentException("A new session requires a running engine");
@@ -77,8 +86,9 @@ public final class SinglePlayerSession implements GameSession {
         if (status != GameStatus.RUNNING || elapsedNanos == 0) {
             return;
         }
-        long cap = gravityIntervalNanos * MAX_TICKS_PER_UPDATE;
-        // 덧셈 전에 제한하므로 Long.MAX_VALUE의 지연도 오버플로 없이 처리한다.
+        long cap = gravityIntervalNanos > Long.MAX_VALUE / MAX_TICKS_PER_UPDATE
+                ? Long.MAX_VALUE : gravityIntervalNanos * MAX_TICKS_PER_UPDATE;
+        // 곱셈·덧셈 전 상한 적용으로 긴 낙하 간격과 지연의 오버플로 방지.
         accumulatedNanos = Math.min(accumulatedNanos, cap);
         accumulatedNanos += Math.min(elapsedNanos, cap - accumulatedNanos);
         for (int ticks = 0; ticks < MAX_TICKS_PER_UPDATE
@@ -97,10 +107,18 @@ public final class SinglePlayerSession implements GameSession {
     private void accept(EngineStep step, int levelBeforeStep) {
         int distance = step.dropResult() == null ? 0 : step.dropResult().cellsDropped();
         int lines = step.clearResult() == null ? 0 : step.clearResult().lineCount();
-        score = Math.addExact(score, scorePolicy.scoreFor(distance, lines, levelBeforeStep));
-        clearedLines = Math.addExact(clearedLines, lines);
-        level = speedPolicy.levelFor(clearedLines);
-        gravityIntervalNanos = speedPolicy.gravityIntervalNanos(level);
+        long gained = scorePolicy.scoreFor(distance, lines, levelBeforeStep);
+        if (gained < 0) {
+            throw new IllegalStateException("Score rule must return a non-negative score");
+        }
+        long nextScore = Math.addExact(score, gained);
+        int nextLines = Math.addExact(clearedLines, lines);
+        int nextLevel = checkedLevel(nextLines);
+        long nextInterval = checkedInterval(nextLevel);
+        score = nextScore;
+        clearedLines = nextLines;
+        level = nextLevel;
+        gravityIntervalNanos = nextInterval;
         status = switch (step.snapshot().phase()) {
             case RUNNING -> GameStatus.RUNNING;
             case PAUSED -> GameStatus.PAUSED;
@@ -114,6 +132,18 @@ public final class SinglePlayerSession implements GameSession {
             finish(status);
         }
         view = new GameSnapshot(step.snapshot(), score, level, clearedLines, gravityIntervalNanos, status);
+    }
+
+    private int checkedLevel(int lines) {
+        int value = speedPolicy.levelFor(lines);
+        if (value < 0) throw new IllegalStateException("Speed rule must return a non-negative level");
+        return value;
+    }
+
+    private long checkedInterval(int currentLevel) {
+        long value = speedPolicy.gravityIntervalNanos(currentLevel);
+        if (value <= 0) throw new IllegalStateException("Speed rule must return a positive interval");
+        return value;
     }
 
     private void finish(GameStatus reason) {

@@ -15,6 +15,25 @@ class SinglePlayerSessionIntegrationTest {
     }
 
     @Test
+    void realEnginePauseResumePreservesPieceAndRestartsGravityInterval() {
+        GameSession session = newGame();
+        session.update(500_000_000L);
+        session.handle(GameCommand.PAUSE);
+        ActivePiece paused = session.snapshot().engine().activePiece();
+        session.update(Long.MAX_VALUE);
+        session.handle(GameCommand.HARD_DROP);
+        assertEquals(paused, session.snapshot().engine().activePiece());
+        assertEquals(0, session.snapshot().score());
+        assertEquals(EnginePhase.PAUSED, session.snapshot().engine().phase());
+        session.handle(GameCommand.RESUME);
+        session.update(999_999_999L);
+        assertEquals(paused, session.snapshot().engine().activePiece());
+        session.update(1);
+        assertEquals(paused.origin().translate(0, 1), session.snapshot().engine().activePiece().origin());
+        assertEquals(1, session.snapshot().score());
+    }
+
+    @Test
     void automaticSoftAndHardDropAwardSameDistanceScore() {
         GameSession automatic = newGame();
         GameSession soft = newGame();
@@ -54,7 +73,7 @@ class SinglePlayerSessionIntegrationTest {
     @Test
     void clearsRealRowsAndUpdatesBonus() {
         GameSession session = newGame();
-        // O 블록 다섯 개를 바닥에 나란히 놓아 두 줄을 동시에 삭제한다.
+        // O 블록 다섯 개를 바닥에 나란히 배치하여 두 줄 동시 삭제.
         for (int target : new int[]{0, 2, 4, 6, 8}) {
             for (int i = 0; i < 10; i++) session.handle(GameCommand.MOVE_LEFT);
             for (int i = 0; i < target; i++) session.handle(GameCommand.MOVE_RIGHT);
