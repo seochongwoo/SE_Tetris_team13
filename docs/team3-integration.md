@@ -28,7 +28,7 @@
 
 개발 환경은 Java 21, Gradle Wrapper 8.9. JUnit은 테스트에만 사용하며 실행 시 외부 라이브러리 없음.
 검증 명령은 `./gradlew --no-daemon clean build jacocoTestReport`.
-2026-09-26 기준 전체 146개 테스트 통과. 실제 UI·대상 OS 배포 검증은 별도 수행 필요.
+2026-09-26 기준 전체 152개 테스트 통과. 실제 UI·대상 OS 배포 검증은 별도 수행 필요.
 
 
 ## 2. 담당 범위와 협업 경계
@@ -381,7 +381,18 @@ Gradle application 플러그인으로 실행 스크립트와 zip/tar 배포물 �
 `.github/workflows/ci.yml`에서 push·PR·수동 실행 시 Java 21로 전체 빌드·테스트·커버리지 생성.
 실패 시에도 생성된 JUnit XML, 테스트 HTML, JaCoCo 보고서를 `test-and-coverage-reports` 아티팩트로 14일 보관.
 화면을 여는 `run` 작업은 CI에 포함하지 않으며 가짜 UI를 사용하는 통합 테스트만 실행.
-로컬 빌드 성공과 GitHub에서의 CI 성공은 별도 확인 대상.
+2026-09-26 [첫 원격 CI 실행](https://github.com/seochongwoo/SE_Tetris_team13/actions/runs/36224562972) 성공과 보고서 업로드 확인.
+해당 실행은 CI 구성 커밋 `cb44a5d` 기준이며 이후 변경은 각 커밋의 CI 결과 확인 필요.
+
+### 배포 사전 점검 결과
+
+2026-09-26 로컬 Linux/Java 21에서 ZIP을 공백이 있는 임시 경로에 풀어 확인.
+
+- Unix 실행 스크립트의 실행 권한 유지와 실행 성공 확인. 실제 UI 미등록 오류를 명확히 출력하고 비정상 종료.
+- 잘못된 인자의 사용법 안내 확인. 검사 중 데이터 디렉터리 생성 없음.
+- 배포 JAR에 테스트용 UI와 테스트용 ServiceLoader 등록 파일이 포함되지 않음.
+- Windows 실행 스크립트 포함 확인. Windows에서의 실제 실행은 미검증.
+- 실제 UI 제공자 연결과 아이콘 포함 배포물의 동작은 후속 검증 대상.
 
 구성 참고: [checkout](https://github.com/actions/checkout), [setup-java](https://github.com/actions/setup-java), [upload-artifact](https://github.com/actions/upload-artifact) 공식 문서.
 

@@ -101,6 +101,26 @@ class AppCompositionTest {
     }
 
     @Test
+    void missingProductionUiFailsClearlyWithoutCreatingDataDirectory() throws Exception {
+        Path data = directory.resolve("unused data");
+        var classes = TetrisApplication.class.getProtectionDomain().getCodeSource().getLocation();
+        ClassLoader previous = Thread.currentThread().getContextClassLoader();
+        try (var isolated = new java.net.URLClassLoader(new java.net.URL[]{classes},
+                ClassLoader.getPlatformClassLoader())) {
+            Thread.currentThread().setContextClassLoader(isolated);
+            var entry = isolated.loadClass(TetrisApplication.class.getName())
+                    .getMethod("main", String[].class);
+            var failure = assertThrows(java.lang.reflect.InvocationTargetException.class,
+                    () -> entry.invoke(null, (Object) new String[]{"--data-dir", data.toString()}));
+            assertInstanceOf(IllegalStateException.class, failure.getCause());
+            assertTrue(failure.getCause().getMessage().contains("No GameUi provider installed"));
+            assertFalse(Files.exists(data));
+        } finally {
+            Thread.currentThread().setContextClassLoader(previous);
+        }
+    }
+
+    @Test
     void entryPointLoadsUiProviderAndHonorsExplicitDataDirectory() {
         TetrisApplication.main(new String[]{"--data-dir", directory.toString()});
         assertNotNull(TestGameUi.application);
