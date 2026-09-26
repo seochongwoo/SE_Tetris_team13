@@ -32,6 +32,11 @@ public final class ScoreboardService {
 
     public List<ScoreEntry> list() throws StorageException { return ranked(repository.load().entries()); }
 
+    /** 재시작한 종료 조율자에서 기존 등록 결과 조회. */
+    public Optional<UUID> registeredRecordId(UUID gameId) throws StorageException {
+        return Optional.ofNullable(repository.load().registrations().get(Objects.requireNonNull(gameId, "gameId")));
+    }
+
     public LoadResult<List<ScoreEntry>> loadOrEmpty() {
         try { return new LoadResult<>(list(), Optional.empty()); }
         catch (StorageException error) { return new LoadResult<>(List.of(), Optional.of(error)); }
