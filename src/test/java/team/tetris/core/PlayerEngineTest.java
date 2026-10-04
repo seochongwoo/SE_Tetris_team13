@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import team.tetris.core.result.ClearedRow;
 import team.tetris.core.result.EngineStep;
@@ -45,7 +46,7 @@ class PlayerEngineTest {
         EngineSnapshot snapshot = engine.snapshot();
 
         assertEquals(EnginePhase.RUNNING, snapshot.phase());
-        assertEquals(new ActivePiece(TetrominoType.I, 0, new Position(0, -1)), snapshot.activePiece());
+        assertEquals(new ActivePiece(TetrominoType.I, 0, new Position(0, 0)), snapshot.activePiece());
     }
 
     @Test
@@ -56,8 +57,8 @@ class PlayerEngineTest {
         EngineStep left = engine.apply(GameAction.MOVE_LEFT);
         EngineStep right = engine.apply(GameAction.MOVE_RIGHT);
 
-        assertEquals(new Position(0, -1), left.snapshot().activePiece().origin());
-        assertEquals(new Position(0, -1), right.snapshot().activePiece().origin());
+        assertEquals(new Position(0, 0), left.snapshot().activePiece().origin());
+        assertEquals(new Position(0, 0), right.snapshot().activePiece().origin());
         assertNull(left.dropResult());
         assertNull(left.lockResult());
         assertNull(left.clearResult());
@@ -112,7 +113,8 @@ class PlayerEngineTest {
 
         EngineStep step = engine.apply(GameAction.HARD_DROP);
 
-        assertEquals(5, step.dropResult().cellsDropped());
+        // I(회전0)는 origin (0,0)에서 시작해 한 줄 아래 칸들이 바닥(5행)까지 4칸 내려간다.
+        assertEquals(4, step.dropResult().cellsDropped());
         assertEquals(new Position(0, 4), step.lockResult().origin());
         assertEquals(1, step.clearResult().lineCount());
         assertEquals(List.of(new ClearedRow(5)), step.clearResult().clearedRows());
@@ -124,92 +126,117 @@ class PlayerEngineTest {
             }
         }
         // 다음 블록이 같은 스폰 위치에 다시 나타남
-        assertEquals(new Position(0, -1), step.snapshot().activePiece().origin());
+        assertEquals(new Position(0, 0), step.snapshot().activePiece().origin());
+    }
+
+    /** 호출 횟수를 세는 고정 블록 생성기. 게임오버 뒤 불필요한 스폰이 없는지 확인할 때 쓴다. */
+    private static final class CountingGenerator implements PieceGenerator {
+        private final TetrominoType type;
+        private int nextCalls;
+
+        CountingGenerator(TetrominoType type) {
+            this.type = type;
+        }
+
+        @Override
+        public TetrominoType next() {
+            nextCalls++;
+            return type;
+        }
+
+        @Override
+        public TetrominoType peek() {
+            return type;
+        }
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"HARD_DROP", "SOFT_DROP", "TICK"})
-    void lockingAboveTheTopEndsTheGameWithoutDiscardingCellsOrSpawning(String input) {
-        class StackGenerator implements PieceGenerator {
-            private int nextCalls;
-
-            @Override
-            public TetrominoType next() {
-                TetrominoType type = peek();
-                nextCalls++;
-                return type;
-            }
-
-            @Override
-            public TetrominoType peek() {
-                return nextCalls == 9 ? TetrominoType.J : TetrominoType.O;
-            }
-        }
-        StackGenerator generator = new StackGenerator();
+    void stackingUpToTheSpawnAreaEndsTheGameAndFreezesFurtherActions(String input) {
+        CountingGenerator generator = new CountingGenerator(TetrominoType.O);
         PlayerEngine engine = new PlayerEngine(10, 20, generator);
-        // 왼쪽 두 열에 O 9개를 쌓고, 상단에서 J를 회전해 벽 위로 옮긴다.
+        // 가운데 두 열에 O 9개를 쌓으면 2행까지 차오르고, 열 번째 O는 0~1행에서 스폰되어
+        // 바로 그 위에 얹힌 채 더는 내려갈 수 없다.
         for (int i = 0; i < 9; i++) {
-            for (int move = 0; move < 5; move++) {
-                engine.apply(GameAction.MOVE_LEFT);
-            }
             engine.apply(GameAction.HARD_DROP);
         }
-        engine.apply(GameAction.ROTATE_CW);
-        for (int move = 0; move < 3; move++) {
-            engine.apply(GameAction.MOVE_LEFT);
-        }
         EngineSnapshot before = engine.snapshot();
-        assertEquals(new ActivePiece(TetrominoType.J, 1, new Position(0, -1)), before.activePiece());
+        assertEquals(new ActivePiece(TetrominoType.O, 0, new Position(3, 0)), before.activePiece());
         assertEquals(EnginePhase.RUNNING, before.phase());
+        assertEquals(10, generator.nextCalls);
 
         EngineStep step = input.equals("TICK") ? engine.tick() : engine.apply(GameAction.valueOf(input));
 
+        // 마지막 블록은 정상적으로 고정되고, 다음 블록을 놓을 곳이 없어 게임이 끝난다.
         assertEquals(EnginePhase.GAME_OVER, step.snapshot().phase());
-        assertEquals(before.activePiece(), step.snapshot().activePiece());
-        assertNull(step.lockResult());
-        assertNull(step.clearResult());
+        assertNull(step.snapshot().activePiece());
+        assertEquals(new Position(3, 0), step.lockResult().origin());
+        assertTrue(step.clearResult().isEmpty());
         if (input.equals("HARD_DROP")) {
             assertEquals(0, step.dropResult().cellsDropped());
         } else {
             assertNull(step.dropResult());
         }
-        assertEquals(10, generator.nextCalls);
-        assertBoardEquals(before.board(), step.snapshot().board());
+        assertEquals(11, generator.nextCalls);
+        Cell[][] finalBoard = step.snapshot().board();
+        for (int row = 0; row < 20; row++) {
+            assertEquals(Cell.occupiedBy(TetrominoType.O), finalBoard[row][4]);
+            assertEquals(Cell.occupiedBy(TetrominoType.O), finalBoard[row][5]);
+        }
 
         // 종료 후 재개를 포함한 모든 입력과 자동 하강은 상태를 바꾸지 않는다.
         for (GameAction action : GameAction.values()) {
             EngineStep ignored = engine.apply(action);
             assertEquals(EnginePhase.GAME_OVER, ignored.snapshot().phase());
-            assertEquals(before.activePiece(), ignored.snapshot().activePiece());
+            assertNull(ignored.snapshot().activePiece());
             assertNull(ignored.dropResult());
             assertNull(ignored.lockResult());
             assertNull(ignored.clearResult());
         }
         EngineStep tick = engine.tick();
         assertEquals(EnginePhase.GAME_OVER, tick.snapshot().phase());
-        assertEquals(before.activePiece(), tick.snapshot().activePiece());
+        assertNull(tick.snapshot().activePiece());
         assertNull(tick.dropResult());
         assertNull(tick.lockResult());
         assertNull(tick.clearResult());
-        assertBoardEquals(before.board(), tick.snapshot().board());
-        assertEquals(10, generator.nextCalls);
+        assertBoardEquals(finalBoard, tick.snapshot().board());
+        assertEquals(11, generator.nextCalls);
+    }
+
+    @ParameterizedTest
+    @EnumSource(TetrominoType.class)
+    void spawnAndEveryRotationAfterSpawnStayFullyInsideTheBoard(TetrominoType type) {
+        PlayerEngine engine = new PlayerEngine(10, 20, new ConstantGenerator(type));
+        assertFullyVisible(engine.snapshot().activePiece());
+
+        for (int turn = 1; turn <= TetrominoType.ROTATION_STATES; turn++) {
+            ActivePiece piece = engine.apply(GameAction.ROTATE_CW).snapshot().activePiece();
+            assertEquals(turn % TetrominoType.ROTATION_STATES, piece.rotation());
+            assertFullyVisible(piece);
+        }
     }
 
     @Test
-    void hardDropCanBringARotatedPieceAboveTheTopBackInsideBeforeLocking() {
+    void hardDropOfARotatedPieceLocksItOnTheBottom() {
         PlayerEngine engine = new PlayerEngine(10, 20, new ConstantGenerator(TetrominoType.I));
         EngineStep rotation = engine.apply(GameAction.ROTATE_CW);
-        assertEquals(new ActivePiece(TetrominoType.I, 1, new Position(3, -1)),
+        assertEquals(new ActivePiece(TetrominoType.I, 1, new Position(3, 0)),
                 rotation.snapshot().activePiece());
         assertEquals(EnginePhase.RUNNING, rotation.snapshot().phase());
 
         EngineStep drop = engine.apply(GameAction.HARD_DROP);
 
-        assertEquals(17, drop.dropResult().cellsDropped());
+        assertEquals(16, drop.dropResult().cellsDropped());
         assertEquals(new Position(3, 16), drop.lockResult().origin());
         assertEquals(EnginePhase.RUNNING, drop.snapshot().phase());
         for (int row = 16; row < 20; row++) {
             assertEquals(Cell.occupiedBy(TetrominoType.I), drop.snapshot().board()[row][5]);
+        }
+    }
+
+    private static void assertFullyVisible(ActivePiece piece) {
+        for (Position offset : piece.type().cellsAt(piece.rotation())) {
+            assertTrue(piece.origin().y() + offset.y() >= 0, piece + " has a cell above the board");
         }
     }
 

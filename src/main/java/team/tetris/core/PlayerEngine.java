@@ -128,6 +128,7 @@ public final class PlayerEngine implements TetrisEnginePort {
 
     private EngineStep lockActivePieceAndSpawnNext(DropResult dropResult) {
         // 상단 밖에 걸친 블록은 일부만 보드에 저장하지 않고 최종 위치를 유지한 채 종료한다.
+        // 스폰과 회전이 항상 화면 안에서만 일어나므로 정상 진행에서는 닿지 않는 방어 코드다.
         for (Position offset : activePiece.type().cellsAt(activePiece.rotation())) {
             if (activePiece.origin().y() + offset.y() < 0) {
                 phase = EnginePhase.GAME_OVER;
@@ -158,19 +159,28 @@ public final class PlayerEngine implements TetrisEnginePort {
     }
 
     /**
-     * type의 스폰(회전0) 모양을 보드 가로 중앙에 오도록, 맨 위 칸이 보드 0행에 오도록
-     * origin을 계산한다. 블록별 상대좌표의 바운딩 박스가 서로 달라도(예: O는 x=1~2, I는
-     * x=0~3) 항상 같은 방식으로 중앙 정렬되도록 실제 바운딩 박스를 계산해서 보정한다.
+     * type의 스폰(회전0) 모양이 보드 가로 중앙에 오도록, 그리고 네 회전 상태 중 가장 위쪽
+     * 칸이 보드 0행에 오도록 origin을 계산한다. 블록별 상대좌표의 바운딩 박스가 서로 달라도
+     * (예: O는 x=1~2, I는 x=0~3) 항상 같은 방식으로 중앙 정렬되도록 실제 바운딩 박스를
+     * 계산해서 보정한다.
+     *
+     * <p>세로 위치를 회전0이 아니라 모든 회전 상태 기준으로 맞추기 때문에, 스폰 직후 어느
+     * 방향으로 회전해도 칸이 보드 위로 잘려 나가지 않는다. 대신 회전0 모양의 맨 윗줄이 비어 있는
+     * 블록(I/J/L)은 O/T/S/Z보다 한 줄 아래에서 시작한다.
      */
     private Position spawnOrigin(TetrominoType type) {
         Position[] cells = type.cellsAt(0);
         int minX = Integer.MAX_VALUE;
         int maxX = Integer.MIN_VALUE;
-        int minY = Integer.MAX_VALUE;
         for (Position cell : cells) {
             minX = Math.min(minX, cell.x());
             maxX = Math.max(maxX, cell.x());
-            minY = Math.min(minY, cell.y());
+        }
+        int minY = Integer.MAX_VALUE;
+        for (int rotation = 0; rotation < TetrominoType.ROTATION_STATES; rotation++) {
+            for (Position cell : type.cellsAt(rotation)) {
+                minY = Math.min(minY, cell.y());
+            }
         }
         int boxWidth = maxX - minX + 1;
         int originX = (board.width() - boxWidth) / 2 - minX;

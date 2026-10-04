@@ -65,6 +65,21 @@ class RotationSystemTest {
     }
 
     @Test
+    void rejectsRotationThatWouldPushCellsAboveTheBoard() {
+        Board board = new Board(6, 6);
+        // I(rotation 0, 가로)의 상대좌표는 y=1 고정이라 origin(1,-1)이면 0행에 걸쳐 있다.
+        // rotation 1(세로)은 y=0~3을 쓰므로 제자리 회전 시 -1행으로 칸이 나가고,
+        // 벽차기 후보는 모두 같은 높이이거나 더 위라서 전부 거절되어야 한다.
+        Position origin = new Position(1, -1);
+
+        RotationResult result = rotationSystem.tryRotate(board, TetrominoType.I, 0, origin, true);
+
+        assertFalse(result.rotated());
+        assertEquals(0, result.rotation());
+        assertEquals(origin, result.origin());
+    }
+
+    @Test
     void doesNotRotateThroughAnAlreadyOccupiedCell() {
         Board board = new Board(6, 6);
         Position tOrigin = new Position(2, 2);
