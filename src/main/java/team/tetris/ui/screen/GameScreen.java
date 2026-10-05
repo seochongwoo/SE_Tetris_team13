@@ -36,6 +36,9 @@ public final class GameScreen implements Screen {
     private final ScreenRouter router;
     private final GameSession session;
     private final InputMapper keys;
+    private final String pauseUpKey;
+    private final String pauseDownKey;
+    private final String pauseSelectKey;
     private final RepeatController repeats;
     private final Renderer renderer;
     private final ColorPalette palette;
@@ -55,6 +58,9 @@ public final class GameScreen implements Screen {
         this.session = started.session();
         Settings settings = started.settings().value();
         this.keys = new InputMapper(settings);
+        this.pauseUpKey = findPauseMenuKey(KeyNames.UP, "W", "F2");
+        this.pauseDownKey = findPauseMenuKey(KeyNames.DOWN, "S", "F3");
+        this.pauseSelectKey = findPauseMenuKey(KeyNames.ENTER, "SPACE", "F1");
         this.repeats = repeats;
         this.palette = ColorPalette.of(settings.colorBlindMode());
         this.renderer = new TextRenderer(palette, keys);
@@ -102,13 +108,33 @@ public final class GameScreen implements Screen {
     }
 
     private void pressInPauseMenu(String key) {
-        switch (key) {
-            case KeyNames.UP -> pauseCursor = Math.floorMod(pauseCursor - 1, PAUSE_ITEMS.length);
-            case KeyNames.DOWN -> pauseCursor = Math.floorMod(pauseCursor + 1, PAUSE_ITEMS.length);
-            case KeyNames.ENTER -> choosePauseItem();
-            // 재개 키(기본 P)나 게임 메뉴 키(기본 Esc)는 메뉴를 닫고 이어서 한다.
-            default -> keys.commandFor(key, GameStatus.PAUSED).ifPresent(command -> pending.add(GameCommand.RESUME));
+        if (!repeats.press(key, clockNanos, false)) {
+            return;
         }
+        if (pauseSelectKey.equals(key)) {
+            choosePauseItem();
+            return;
+        }
+        // 사용자 지정 재개 키는 고정 메뉴 키보다 우선한다. 게임 메뉴 키도 재개로 처리한다.
+        if (keys.commandFor(key, GameStatus.PAUSED).isPresent()) {
+            pending.add(GameCommand.RESUME);
+            return;
+        }
+        if (pauseUpKey.equals(key)) {
+            pauseCursor = Math.floorMod(pauseCursor - 1, PAUSE_ITEMS.length);
+        } else if (pauseDownKey.equals(key)) {
+            pauseCursor = Math.floorMod(pauseCursor + 1, PAUSE_ITEMS.length);
+        }
+    }
+
+    private String findPauseMenuKey(String... candidates) {
+        // 일시정지 중 매핑되는 명령은 두 개이므로 세 후보 중 하나는 항상 비어 있다.
+        for (String key : candidates) {
+            if (keys.commandFor(key, GameStatus.PAUSED).isEmpty()) {
+                return key;
+            }
+        }
+        throw new IllegalStateException("일시정지 메뉴 조작 키가 없습니다");
     }
 
     private void choosePauseItem() {
@@ -197,8 +223,9 @@ public final class GameScreen implements Screen {
                 frame.putCentered(left, left + width, row, PAUSE_ITEMS[i], palette.base());
             }
         }
-        frame.putCentered(left, left + width, top + 7, "↑↓ 이동", palette.dimStyle());
-        frame.putCentered(left, left + width, top + 8, "Enter 선택", palette.dimStyle());
+        frame.putCentered(left, left + width, top + 7,
+                KeyNames.display(pauseUpKey) + "/" + KeyNames.display(pauseDownKey) + " 이동", palette.dimStyle());
+        frame.putCentered(left, left + width, top + 8, KeyNames.display(pauseSelectKey) + " 선택", palette.dimStyle());
     }
 
     private void drawGameOver(TextFrame frame, long score) {

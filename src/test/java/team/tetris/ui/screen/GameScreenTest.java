@@ -6,8 +6,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static team.tetris.ui.TestApplication.FRAME;
 
 import java.nio.file.Path;
+import java.util.EnumMap;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import team.tetris.application.GameCommand;
 import team.tetris.application.GameStatus;
 import team.tetris.application.model.Settings;
 import team.tetris.application.port.SettingsRepository;
@@ -91,6 +96,8 @@ class GameScreenTest {
         assertTrue(text.contains("재개"));
         assertTrue(text.contains("메뉴로"));
         assertTrue(text.contains("프로그램 종료"));
+        assertTrue(text.contains("Enter 선택"));
+        assertTrue(text.contains("↑/↓ 이동"));
     }
 
     @Test
@@ -105,6 +112,159 @@ class GameScreenTest {
         router.keyPressed("ESCAPE");
         router.update(FRAME);
         assertEquals(GameStatus.RUNNING, status(game));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"P", "ESCAPE"})
+    void pauseAndResumeRequireReleaseBeforeAnotherPress(String key) {
+        GameScreen game = start();
+        router.keyPressed(key);
+        router.update(FRAME);
+        assertEquals(GameStatus.PAUSED, status(game));
+
+        router.keyPressed(key);
+        router.update(FRAME);
+        assertEquals(GameStatus.PAUSED, status(game));
+
+        router.keyReleased(key);
+        router.keyPressed(key);
+        router.update(FRAME);
+        assertEquals(GameStatus.RUNNING, status(game));
+
+        router.keyPressed(key);
+        router.update(FRAME);
+        assertEquals(GameStatus.RUNNING, status(game));
+
+        router.keyReleased(key);
+        router.keyPressed(key);
+        router.update(FRAME);
+        assertEquals(GameStatus.PAUSED, status(game));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"UP", "DOWN", "ENTER"})
+    void customResumeKeyTakesPriorityOverPauseMenuControls(String key) throws StorageException {
+        Settings defaults = Settings.defaults();
+        var bindings = new EnumMap<>(defaults.keyBindings());
+        bindings.put(GameCommand.RESUME, key);
+        app.settings().update(new Settings(defaults.screenSize(), bindings, defaults.colorBlindMode()));
+        GameScreen game = start();
+        router.keyPressed("P");
+        router.keyReleased("P");
+        router.update(FRAME);
+
+        // Enter도 현재 선택 항목(프로그램 종료) 대신 사용자 지정 재개를 실행해야 한다.
+        if (key.equals("ENTER")) {
+            router.keyPressed("UP");
+            router.keyReleased("UP");
+        }
+        int cursor = game.pauseCursor();
+        router.keyPressed(key);
+        assertEquals(cursor, game.pauseCursor());
+        router.update(FRAME);
+
+        assertEquals(GameStatus.RUNNING, status(game));
+        assertEquals(0, app.exits());
+        assertEquals(game, router.current());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "ENTER, ESCAPE, SPACE, Space, DOWN",
+            "ENTER, ESCAPE, SPACE, Space, UP",
+            "P, ENTER, SPACE, Space, DOWN",
+            "P, ENTER, SPACE, Space, UP",
+            "ENTER, SPACE, F1, F1, DOWN",
+            "ENTER, SPACE, F1, F1, UP",
+            "SPACE, ENTER, F1, F1, DOWN",
+            "SPACE, ENTER, F1, F1, UP"
+    })
+    void alternateSelectionKeyKeepsExitMenusAccessible(String resumeKey, String quitKey,
+            String selectKey, String displayKey, String direction) throws StorageException {
+        Settings defaults = Settings.defaults();
+        var bindings = new EnumMap<>(defaults.keyBindings());
+        bindings.put(GameCommand.RESUME, resumeKey);
+        bindings.put(GameCommand.QUIT_GAME, quitKey);
+        if (quitKey.equals("SPACE")) {
+            bindings.put(GameCommand.HARD_DROP, "H");
+        }
+        app.settings().update(new Settings(defaults.screenSize(), bindings, defaults.colorBlindMode()));
+        GameScreen game = start();
+        router.keyPressed("P");
+        router.keyReleased("P");
+        router.update(FRAME);
+
+        assertTrue(router.render().text().contains(displayKey + " 선택"));
+        router.keyPressed(direction);
+        router.keyReleased(direction);
+        router.keyPressed(selectKey);
+        router.keyReleased(selectKey);
+        router.update(FRAME);
+
+        if (direction.equals("DOWN")) {
+            assertEquals(GameStatus.ABORTED, status(game));
+            assertInstanceOf(MenuScreen.class, router.current());
+            assertEquals(0, app.exits());
+        } else {
+            assertEquals(1, app.exits());
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "UP, DOWN, W, S, W/S, 1",
+            "UP, DOWN, W, S, W/S, 2",
+            "DOWN, UP, W, S, W/S, 1",
+            "DOWN, UP, W, S, W/S, 2",
+            "UP, W, F2, DOWN, F2/↓, 1",
+            "UP, W, F2, DOWN, F2/↓, 2",
+            "DOWN, S, UP, F3, ↑/F3, 1",
+            "DOWN, S, UP, F3, ↑/F3, 2",
+            "ENTER, UP, W, DOWN, W/↓, 1",
+            "ENTER, UP, W, DOWN, W/↓, 2",
+            "DOWN, ENTER, UP, S, ↑/S, 1",
+            "DOWN, ENTER, UP, S, ↑/S, 2"
+    })
+    void alternateMovementKeysKeepBothExitItemsAccessible(String resumeKey, String quitKey,
+            String upKey, String downKey, String hint, int target) throws StorageException {
+        Settings defaults = Settings.defaults();
+        var bindings = new EnumMap<>(defaults.keyBindings());
+        bindings.put(GameCommand.ROTATE_CW, "R");
+        bindings.put(GameCommand.SOFT_DROP, "D");
+        bindings.put(GameCommand.RESUME, resumeKey);
+        bindings.put(GameCommand.QUIT_GAME, quitKey);
+        app.settings().update(new Settings(defaults.screenSize(), bindings, defaults.colorBlindMode()));
+        GameScreen game = start();
+        router.keyPressed("P");
+        router.keyReleased("P");
+        router.update(FRAME);
+        assertTrue(router.render().text().contains(hint + " 이동"));
+
+        // 양방향 이동과 누른 채 발생한 OS 반복 억제를 함께 확인한다.
+        router.keyPressed(upKey);
+        router.keyPressed(upKey);
+        router.update(FRAME);
+        assertEquals(GameStatus.PAUSED, status(game));
+        assertEquals(2, game.pauseCursor());
+        router.keyReleased(upKey);
+        router.keyPressed(downKey);
+        router.keyReleased(downKey);
+        assertEquals(0, game.pauseCursor());
+        for (int i = 0; i < target; i++) {
+            router.keyPressed(downKey);
+            router.keyReleased(downKey);
+        }
+        String selectKey = resumeKey.equals("ENTER") || quitKey.equals("ENTER") ? "SPACE" : "ENTER";
+        router.keyPressed(selectKey);
+        router.update(FRAME);
+
+        if (target == 1) {
+            assertEquals(GameStatus.ABORTED, status(game));
+            assertInstanceOf(MenuScreen.class, router.current());
+            assertEquals(0, app.exits());
+        } else {
+            assertEquals(1, app.exits());
+        }
     }
 
     @Test
