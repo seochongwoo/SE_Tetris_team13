@@ -1,15 +1,18 @@
 package team.tetris.ui;
 
-import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.Image;
+import java.awt.RenderingHints;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 import java.util.Objects;
+import javax.imageio.ImageIO;
 import javax.swing.JFrame;
 import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
@@ -117,29 +120,29 @@ public final class TetrisUi implements GameUi {
         loop[0].start();
     }
 
-    /** 창·작업 표시줄 아이콘: T 블록을 그린 그림. */
+    /**
+     * 창·작업 표시줄 아이콘. 배포 실행 파일의 {@code icon.ico}와 같은 그림인 {@code icon.png}(256px)를
+     * 읽어 여러 크기로 넘긴다. 읽지 못하면 기본 아이콘을 그대로 쓴다.
+     */
     private static List<Image> icons() {
-        return List.of(icon(16), icon(32), icon(64));
+        try (InputStream in = TetrisUi.class.getResourceAsStream("/icon.png")) {
+            BufferedImage source = in == null ? null : ImageIO.read(in);
+            if (source == null) {
+                return List.of();
+            }
+            return List.of(scaled(source, 16), scaled(source, 32), scaled(source, 64), source);
+        } catch (IOException e) {
+            return List.of();
+        }
     }
 
-    private static Image icon(int size) {
+    private static Image scaled(BufferedImage source, int size) {
         BufferedImage image = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = image.createGraphics();
         try {
-            g.setColor(Color.BLACK);
-            g.fillRect(0, 0, size, size);
-            int cell = size / 4;
-            int left = (size - cell * 3) / 2;
-            int top = (size - cell * 2) / 2;
-            int[][] cells = {{1, 0}, {0, 1}, {1, 1}, {2, 1}};
-            for (int[] c : cells) {
-                int x = left + c[0] * cell;
-                int y = top + c[1] * cell;
-                g.setColor(new Color(255, 0, 255));
-                g.fillRect(x, y, cell, cell);
-                g.setColor(Color.WHITE);
-                g.drawRect(x, y, cell - 1, cell - 1);
-            }
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+            g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+            g.drawImage(source, 0, 0, size, size, null);
         } finally {
             g.dispose();
         }

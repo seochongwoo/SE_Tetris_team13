@@ -411,6 +411,21 @@ JDK 21과 Gradle Wrapper를 사용합니다. 저장소 루트의 Windows PowerSh
 
 커버리지 최소값은 현재 빌드에서 강제하지 않습니다. 테스트 개수와 커버리지는 해당 실행의 보고서에서 확인합니다.
 
+### 배포 패키지 (실행 파일)
+
+`jpackage`로 JRE를 포함한 Windows 실행 폴더를 만듭니다. Java가 설치되지 않은 PC에서도 `SETetris.exe`를 더블클릭하면 실행되며, exe와 창에는 `src/main/resources/icon.ico`·`icon.png` 아이콘이 들어갑니다. 설치 프로그램 방식(`--type exe`)이 아니므로 WiX가 필요 없습니다.
+
+```powershell
+.\gradlew.bat packageZip
+```
+
+| 결과                  | 경로                                              |
+| --------------------- | ------------------------------------------------- |
+| 실행 폴더             | `build/jpackage/SETetris/` (`SETetris.exe`, `app/`, `runtime/`) |
+| 배포용 zip            | `build/distributions/SETetris-<version>-windows.zip` |
+
+zip을 풀고 `SETetris\SETetris.exe`를 실행합니다. `runtime\`·`app\` 폴더가 exe와 같은 위치에 있어야 합니다. 실행 폴더만 필요하면 `.\gradlew.bat packageApp`을 씁니다. 포함 모듈은 jdeps 결과(`java.base`, `java.desktop`)로 줄였고, 최소 사양(RAM 1GB)을 고려해 힙 상한을 256MB로 둡니다. 저장 데이터는 exe 위치가 아니라 사용자 홈의 `.se-tetris-team13/`에 남습니다.
+
 ### CI와 화면 검증
 
 [Windows Java CI](../.github/workflows/ci.yml)는 push·pull request·수동 실행 시 Windows와 Java 21에서 빌드·테스트·커버리지를 생성합니다. 생성된 보고서는 `test-and-coverage-reports` 아티팩트로 14일 보관합니다. 원격 성공 여부는 해당 커밋의 Actions 결과로 확인합니다.
