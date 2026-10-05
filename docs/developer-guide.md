@@ -21,7 +21,7 @@
 
 | 패키지        | 역할                                          | 사용 경계                                                 |
 | ------------- | --------------------------------------------- | --------------------------------------------------------- |
-| `ui`          | 입력, 프레임 루프, 렌더링, 화면 전환          | `ApplicationContext`로 서비스·세션을 받음. 현재 골격 상태 |
+| `ui`          | 입력, 프레임 루프, 렌더링, 화면 전환          | `ApplicationContext`로 서비스·세션을 받는 Swing 텍스트 UI |
 | `application` | 한 판의 진행, 점수·속도, 설정·기록, 종료 흐름 | 엔진과 저장소의 인터페이스 사용                           |
 | `core`        | 보드, 블록 생성·이동·회전·고정·줄 삭제        | UI·파일·시계에 의존하지 않음                              |
 | `storage`     | 설정·기록 읽기와 쓰기                         | application의 저장소 인터페이스 구현                      |
@@ -50,7 +50,7 @@ UI는 엔진·파일 저장소를 직접 생성하지 않습니다. 새 게임, 
 
 ## 2. 빠른 시작과 UI 연결
 
-다음은 실제 공개 API를 사용하는 최소 연결 예제입니다. 화면을 표시하는 완성 UI는 아니며, `open`에서 컨텍스트를 보관하고 메뉴의 새 게임 이벤트에 해당 코드를 연결하면 됩니다.
+현재 `TetrisUi`가 Swing 창과 키 이벤트를 연결하고, `ScreenRouter`가 시작·게임·설정·이름 입력·순위 화면을 전환합니다. `TextFramePanel`은 문자 격자를 그립니다. 아래는 별도 UI를 연결할 때 참고할 공개 API 예제입니다.
 
 ```java
 import java.nio.file.Path;
@@ -75,15 +75,15 @@ TetrisApplication.launch(Path.of("tetris-test-data"), application -> {
 
 `newGame()`은 매번 독립적인 엔진·세션과 최신 저장 설정을 반환합니다. 설정 읽기에 실패해도 기본 설정으로 세션을 생성하며 `started.settings().error()`로 오류를 함께 알립니다. UI는 기본값 사용 사실을 표시해야 합니다. 보드는 10×20이며 화면 크기 설정과 무관합니다.
 
-표준 `main`으로 실행하려면 `GameUi`를 구현하고 `open(ApplicationContext)`에서 UI를 시작합니다. public 기본 생성자가 있는 구현 클래스의 전체 이름을 다음 파일에 한 줄로 등록합니다.
+표준 `main`은 ServiceLoader로 `GameUi` 구현을 찾습니다. 현재 public 기본 생성자를 가진 `team.tetris.ui.TetrisUi`가 다음 파일에 등록되어 있습니다. UI를 교체하려면 이 등록도 변경합니다.
 
 ```text
 src/main/resources/META-INF/services/team.tetris.application.port.GameUi
 ```
 
-예를 들어 구현 클래스가 `team.tetris.ui.TetrisUi`라면 파일 내용도 `team.tetris.ui.TetrisUi`입니다. 이 클래스는 예시이며 현재 저장소에는 실제 제공자가 없습니다. 테스트 리소스의 가짜 UI는 배포 JAR에 포함되지 않습니다.
+파일 내용은 `team.tetris.ui.TetrisUi`입니다. 테스트 리소스의 가짜 UI는 배포 JAR에 포함되지 않습니다.
 
-개발 환경은 JDK 21과 Gradle Wrapper 8.9이며, 배포 대상은 Windows입니다. 빌드·테스트 명령은 [빌드·테스트](#10-빌드테스트)를 참고하세요. 실제 UI 제공자 등록 후 저장소 루트의 PowerShell에서 실행합니다.
+개발 환경은 JDK 21과 Gradle Wrapper 8.9이며, 배포 대상은 Windows입니다. 빌드·테스트 명령은 [빌드·테스트](#10-빌드테스트)를 참고하세요. 저장소 루트의 PowerShell에서 실행합니다.
 
 ```powershell
 .\gradlew.bat run
@@ -133,6 +133,22 @@ public record GameSnapshot(
 - `QUIT_GAME`은 현재 판을 ABORTED로 종료한다. 프로그램 종료와 메뉴 복귀는 UI 라우터가 구분한다.
 - RUNNING에서는 조작·PAUSE·QUIT_GAME을 허용한다. PAUSED에서는 RESUME·QUIT_GAME만 허용한다. 종료 상태에서는 모든 명령과 시간 갱신이 상태를 바꾸지 않는다.
 - null 명령과 음수 경과 시간은 프로그래밍 오류로 거부한다. `update(0)`은 진행하지 않는다.
+
+### 일시정지 메뉴와 키 충돌
+
+게임 중 PAUSE 또는 게임 메뉴 키(기본 P/Esc)를 누르면 `재개 / 메뉴로 / 프로그램 종료` 메뉴를 엽니다. 정지 중 사용자 지정 RESUME·QUIT_GAME 키는 메뉴를 닫고 재개합니다. `메뉴로`는 세션을 ABORTED로 종료하고, `프로그램 종료`는 앱을 종료합니다.
+
+사용자 지정 재개 동작을 유지하면서 모든 메뉴 항목에 접근하도록, 게임 시작 시 각 후보에서 PAUSED 명령과 충돌하지 않는 첫 키를 선택합니다.
+
+| 메뉴 조작 | 후보 순서 |
+| --------- | --------- |
+| 위로 이동 | ↑ → W → F2 |
+| 아래로 이동 | ↓ → S → F3 |
+| 선택 | Enter → Space → F1 |
+
+각 조작의 후보는 서로 겹치지 않습니다. PAUSED에 매핑되는 명령은 RESUME·QUIT_GAME 두 개이므로 세 후보 중 하나는 항상 사용할 수 있습니다. RUNNING에서만 쓰는 키와는 겹쳐도 됩니다. 실제 이동·선택 키는 일시정지 메뉴 하단에 표시합니다. 예를 들어 RESUME=↑, QUIT_GAME=↓이면 `W/S 이동`, `Enter 선택`을 표시합니다.
+
+게임 화면은 키를 떼기 전의 OS 반복 입력을 무시합니다. 메뉴 이동·선택도 다시 실행하려면 키를 떼었다 눌러야 하며, 게임 중 좌우·아래 이동의 누르기 유지는 `RepeatController`가 반복을 생성합니다.
 
 ### 시간·스레드 계약
 
@@ -243,7 +259,7 @@ settings.reset();
 
 기본값은 `Settings.defaults()` 한 곳에서 정의. 기존 빈 `default_config.json`은 로드하지 않음.
 화면 크기는 SMALL/MEDIUM/LARGE 중 선택, 기본 MEDIUM. 색맹 모드는 기본 false.
-실제 창·폰트·셀 크기와 색상/무늬 표현은 UI 책임.
+SMALL/MEDIUM/LARGE는 각각 14/18/24px 글꼴을 사용하며 창 크기도 다시 계산합니다. 색맹 모드는 별도 팔레트를 적용하고, 블록별 문자 무늬는 두 모드 모두 표시합니다.
 
 | 명령                   | 기본 키 식별자 |
 | ---------------------- | -------------- |
@@ -254,12 +270,12 @@ settings.reset();
 | QUIT_GAME              | ESCAPE         |
 
 모든 `GameCommand`의 키 지정 필수. 식별자는 `[A-Z][A-Z0-9_]*` 형식으로 제한.
-허용되는 실제 키 목록과 이벤트 변환은 UI와 추가 확인 필요.
+`KeyNames`가 AWT `VK_*` 키 코드를 식별자로 변환하며 숫자 키는 `DIGIT0`~`DIGIT9`로 저장합니다. 설정에서 키 항목을 Enter로 선택하고 새 키를 누릅니다. Backspace는 변경 취소입니다.
 RUNNING 명령끼리의 키 충돌 및 PAUSED에서 RESUME과 QUIT_GAME의 충돌 거부.
 PAUSE와 RESUME은 문맥이 달라 같은 키 사용 가능.
 키 매핑은 방어 복사 후 수정 불가능한 형태로 제공.
 
-설정 화면에서 읽기 실패를 표시하면서 기본값을 보여주려면 `application.settings().loadOrDefault()`의 `value()`와 `error()`를 함께 사용합니다. 저장 버튼에서는 새 `Settings` 생성 시 검증 오류와 `update()`의 저장 오류를 처리한 뒤, 정상 반환했을 때만 화면에 적용합니다. 기존 판의 설정이 자동 갱신되지는 않으며, 다음 `newGame()`은 최신 저장값을 읽습니다.
+별도 설정 UI에서 읽기 실패를 표시하면서 기본값을 보여주려면 `application.settings().loadOrDefault()`의 `value()`와 `error()`를 함께 사용합니다. 현재 `SettingsScreen`은 변경 즉시 저장합니다. 새 `Settings` 생성 시 검증 오류와 `update()`의 저장 오류를 처리한 뒤, 정상 반환했을 때만 화면에 적용합니다. 기존 판의 설정이 자동 갱신되지는 않으며, 다음 `newGame()`은 최신 저장값을 읽습니다.
 
 ## 6. 순위 화면
 
@@ -336,6 +352,8 @@ lineBonus = 100 × clearedLinesInThisStep²
 - 초기 칸당 1점, 가속 이후 추가 점수를 부여한다. 줄 삭제 보너스는 별도의 추가 점수 방식이다.
 - 점수는 long으로 누적한다. 레벨 9 이상에서도 낙하 주기는 최소 100ms를 유지한다.
 
+블록 추첨은 현재 7-bag 방식입니다. 일곱 종류를 한 번씩 담아 섞으므로 전체 출현 비율은 같지만, 매 추첨이 독립적인 1/7 확률은 아닙니다. Req1 9쪽의 동일 확률 조건이 독립 추첨을 뜻하는지는 [미확정 사항](open-questions.md)에서 추적합니다.
+
 ### 정책 교체 계약
 
 - `ScoreRule.scoreFor(droppedCells, clearedLines, levelBeforeStep)`: 동작 1회의 음이 아닌 점수 반환.
@@ -395,7 +413,7 @@ JDK 21과 Gradle Wrapper를 사용합니다. 저장소 루트의 Windows PowerSh
 .\gradlew.bat --no-daemon clean build jacocoTestReport
 ```
 
-`build`는 테스트와 배포물 생성을 포함합니다. 의존성이 캐시되어 있으면 `--offline`을 추가할 수 있습니다. 특정 테스트만 확인할 때는 다음과 같이 실행합니다.
+`build`는 테스트와 기본 ZIP/TAR 배포물 생성을 포함합니다. 아이콘과 JRE를 포함한 Windows 실행파일 패키지는 별도의 `packageZip`으로 생성합니다. 의존성이 캐시되어 있으면 `--offline`을 추가할 수 있습니다. 특정 테스트만 확인할 때는 다음과 같이 실행합니다.
 
 ```powershell
 .\gradlew.bat test --tests 'team.tetris.application.SinglePlayerSessionTest'
@@ -430,9 +448,9 @@ zip을 풀고 `SETetris\SETetris.exe`를 실행합니다. `runtime\`·`app\` 폴
 
 [Windows Java CI](../.github/workflows/ci.yml)는 push·pull request·수동 실행 시 Windows와 Java 21에서 빌드·테스트·커버리지를 생성합니다. 생성된 보고서는 `test-and-coverage-reports` 아티팩트로 14일 보관합니다. 원격 성공 여부는 해당 커밋의 Actions 결과로 확인합니다.
 
-CI에는 화면을 여는 `run`이 포함되지 않습니다. 현재 가짜 UI 통합 테스트가 통과해도 실제 화면·키 입력·배포 검증이 끝난 것은 아닙니다. 실제 `GameUi` 제공자를 등록하기 전에는 표준 `run`이 제공자 미등록 오류로 종료합니다.
+CI에는 화면을 여는 `run`이나 `packageZip` 실행이 포함되지 않습니다. 화면 로직 테스트가 통과해도 실제 Swing 화면·키 입력·Windows 실행파일 검증이 끝난 것은 아닙니다. `ResponsivenessTest`는 빠른 반복 입력, 키 누르기 유지, 업데이트와 문자 프레임 생성의 평균 4ms 미만을 검사하지만, 실제 Swing 그리기와 최소 사양 PC의 성능을 검증하지는 않습니다.
 
-UI 연결 후 사용자 데이터와 분리된 경로에서 실행하고 아래 항목을 확인합니다. 이 목록은 검증 절차이며 통과 기록이 아닙니다.
+사용자 데이터와 분리된 경로에서 실행하고 아래 항목을 확인합니다. 이 목록은 검증 절차이며 통과 기록이 아닙니다.
 
 ```powershell
 .\gradlew.bat run --args='--data-dir C:/tetris-test-data'
@@ -444,7 +462,9 @@ UI 연결 후 사용자 데이터와 분리된 경로에서 실행하고 아래 
 | 정지·재개·하드드롭       | 정지 중 진행 없음, 재개·새 블록의 낙하 주기 보장               |
 | 자연 종료·이름 입력·순위 | 이름 오류 후 재입력, 최종 점수 저장, 기록 강조, 중복 저장 방지 |
 | 중도 종료                | 이름 입력 없이 메뉴 복귀, 기록 추가 없음                       |
+| 일시정지 키 충돌          | RESUME=↑·QUIT_GAME=↓일 때 W/S 이동과 Enter 선택, ↑/W 또는 ↓/S 충돌 시 F2/F3 이동, Enter/Space 충돌 시 F1 선택, 재개 키 동작 유지 |
+| Windows 배포·최소 사양    | Windows 11에서 ZIP 해제 후 exe 더블클릭 실행·아이콘, 1.2GHz CPU·1GB RAM에서 조작·그리기 성능, 500MB 여유 공간에서 설치·실행 가능 여부 |
 | 설정·기록 초기화·재실행  | 설정과 기록의 독립성, 저장값 복원                              |
 | 읽기·쓰기 실패와 재시도  | 오류 표시, 원본 보존, 결과 유지, 저장 성공 후 조회만 재시도    |
 
-검증 결과에는 커밋, OS·Java 버전, 실행 명령, 실제 결과와 남은 항목을 기록합니다. 상세 오류 재현·배포 절차는 실제 UI와 패키지 방식이 준비되면 보강합니다.
+검증 결과에는 커밋, OS·Java 버전, 실행 명령, 실제 결과와 남은 항목을 기록합니다. Windows 실제 실행, 최소 사양 플레이와 배포물 디스크 사용량의 검증 결과는 아직 기록되지 않았습니다.
