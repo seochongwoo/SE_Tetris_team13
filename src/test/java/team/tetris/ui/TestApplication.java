@@ -98,15 +98,21 @@ public final class TestApplication implements ApplicationContext {
         };
     }
 
+    /** 키를 한 번 눌렀다 뗀다. 실제 사용자처럼 떼야 다음 화면에서 같은 키가 다시 인식된다. */
+    public static void tap(ScreenRouter router, String key) {
+        router.keyPressed(key);
+        router.keyReleased(key);
+    }
+
     /** 게임 화면에서 하드드롭만 반복해 게임을 끝내고, GAME OVER 대기를 Enter로 넘긴다. */
     public static void playUntilGameOver(ScreenRouter router) {
         GameScreen game = (GameScreen) router.current();
         for (int i = 0; i < 200 && game.session().result().isEmpty(); i++) {
-            router.keyPressed("SPACE");
-            router.keyReleased("SPACE");
+            tap(router, "SPACE");
             router.update(FRAME);
         }
         router.keyPressed(KeyNames.ENTER);
-        router.update(FRAME);
+        router.update(FRAME); // 다음 화면으로 넘어간 뒤에 Enter를 뗀다
+        router.keyReleased(KeyNames.ENTER);
     }
 }

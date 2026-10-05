@@ -31,6 +31,11 @@ class SettingsScreenTest {
 
     private final TestApplication app = new TestApplication();
     private final ScreenRouter router = app.router();
+
+    /** 키를 한 번 눌렀다 뗀다. */
+    private void tap(String key) {
+        TestApplication.tap(router, key);
+    }
     private SettingsScreen screen;
 
     @BeforeEach
@@ -41,7 +46,7 @@ class SettingsScreenTest {
 
     private void moveTo(int row) {
         while (screen.cursor() != row) {
-            router.keyPressed("DOWN");
+            tap("DOWN");
         }
     }
 
@@ -51,13 +56,13 @@ class SettingsScreenTest {
 
     @Test
     void arrowKeysChangeTheScreenSizeAndSaveIt() throws Exception {
-        router.keyPressed("RIGHT");
+        tap("RIGHT");
         assertEquals(ScreenSize.LARGE, saved().screenSize());
         assertEquals(ScreenSize.LARGE, app.applied().screenSize());
         assertTrue(screen.message().contains("저장했습니다"));
 
-        router.keyPressed("LEFT");
-        router.keyPressed("LEFT");
+        tap("LEFT");
+        tap("LEFT");
         assertEquals(ScreenSize.SMALL, saved().screenSize());
         assertTrue(router.render().text().contains("◄ 작게 ►"));
     }
@@ -65,7 +70,7 @@ class SettingsScreenTest {
     @Test
     void enterTogglesColorBlindModeAndSwitchesThePalette() throws Exception {
         moveTo(1);
-        router.keyPressed("ENTER");
+        tap("ENTER");
 
         assertTrue(saved().colorBlindMode());
         assertTrue(router.palette().colorBlind());
@@ -75,22 +80,50 @@ class SettingsScreenTest {
     @Test
     void selectingAKeyRowThenPressingAKeyRebindsIt() throws Exception {
         moveTo(FIRST_KEY_ROW);
-        router.keyPressed("ENTER");
+        tap("ENTER");
         assertTrue(screen.isWaitingForKey());
         assertTrue(router.render().text().contains("키를 누르세요"));
 
-        router.keyPressed("A");
+        tap("A");
 
         assertFalse(screen.isWaitingForKey());
         assertEquals("A", saved().keyBindings().get(GameCommand.MOVE_LEFT));
     }
 
     @Test
-    void conflictingKeyIsRejectedAndNothingIsSaved() throws Exception {
-        moveTo(FIRST_KEY_ROW + 1);
+    void holdingTheEnterThatOpenedTheKeyPromptDoesNotBindEnter() throws Exception {
+        moveTo(FIRST_KEY_ROW);
+        router.keyPressed("ENTER");
+        router.keyPressed("ENTER"); // 떼지 않은 채 OS 자동 반복
+
+        assertTrue(screen.isWaitingForKey());
+        assertEquals("LEFT", saved().keyBindings().get(GameCommand.MOVE_LEFT));
+
+        router.keyReleased("ENTER");
+        tap("ENTER"); // 떼었다가 다시 누르면 Enter도 의도적으로 지정할 수 있다
+
+        assertFalse(screen.isWaitingForKey());
+        assertEquals("ENTER", saved().keyBindings().get(GameCommand.MOVE_LEFT));
+    }
+
+    @Test
+    void holdingEnterOnClearDoesNotSkipTheConfirmation() throws Exception {
+        app.scores().register(new GameResult(UUID.randomUUID(), 100, 0, 0, GameStatus.GAME_OVER), "KEEP");
+        moveTo(CLEAR_ROW);
+
+        router.keyPressed("ENTER");
         router.keyPressed("ENTER");
 
-        router.keyPressed("LEFT");
+        assertEquals(1, app.scores().list().size());
+        assertTrue(router.render().text().contains("초기화할까요?"));
+    }
+
+    @Test
+    void conflictingKeyIsRejectedAndNothingIsSaved() throws Exception {
+        moveTo(FIRST_KEY_ROW + 1);
+        tap("ENTER");
+
+        tap("LEFT");
 
         assertEquals("RIGHT", saved().keyBindings().get(GameCommand.MOVE_RIGHT));
         assertTrue(screen.message().contains("겹치는"));
@@ -99,9 +132,9 @@ class SettingsScreenTest {
     @Test
     void backspaceCancelsWaitingForAKey() throws Exception {
         moveTo(FIRST_KEY_ROW);
-        router.keyPressed("ENTER");
+        tap("ENTER");
 
-        router.keyPressed("BACK_SPACE");
+        tap("BACK_SPACE");
 
         assertFalse(screen.isWaitingForKey());
         assertEquals(Settings.defaults(), saved());
@@ -112,23 +145,23 @@ class SettingsScreenTest {
         app.scores().register(new GameResult(UUID.randomUUID(), 100, 0, 0, GameStatus.GAME_OVER), "KEEP");
         moveTo(CLEAR_ROW);
 
-        router.keyPressed("ENTER");
+        tap("ENTER");
         assertTrue(router.render().text().contains("초기화할까요?"));
-        router.keyPressed("ESCAPE");
+        tap("ESCAPE");
         assertEquals(1, app.scores().list().size());
 
-        router.keyPressed("ENTER");
-        router.keyPressed("ENTER");
+        tap("ENTER");
+        tap("ENTER");
         assertTrue(app.scores().list().isEmpty());
     }
 
     @Test
     void resetRestoresTheDefaultSettings() throws Exception {
-        router.keyPressed("RIGHT");
+        tap("RIGHT");
         moveTo(RESET_ROW);
 
-        router.keyPressed("ENTER");
-        router.keyPressed("ENTER");
+        tap("ENTER");
+        tap("ENTER");
 
         assertEquals(Settings.defaults(), saved());
         assertEquals(Settings.defaults(), router.settings());
@@ -136,19 +169,19 @@ class SettingsScreenTest {
 
     @Test
     void escapeAndTheBackRowReturnToTheMenu() {
-        router.keyPressed("ESCAPE");
+        tap("ESCAPE");
         assertInstanceOf(MenuScreen.class, router.current());
 
         router.showSettings();
         screen = (SettingsScreen) router.current();
         moveTo(BACK_ROW);
-        router.keyPressed("ENTER");
+        tap("ENTER");
         assertInstanceOf(MenuScreen.class, router.current());
     }
 
     @Test
     void unknownKeysExplainWhichKeysWork() {
-        router.keyPressed("Q");
+        tap("Q");
 
         assertTrue(screen.message().contains("사용할 수 있는 키"));
     }

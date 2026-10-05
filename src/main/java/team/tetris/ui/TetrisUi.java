@@ -1,8 +1,13 @@
 package team.tetris.ui;
 
+import java.awt.Dimension;
 import java.awt.Graphics2D;
+import java.awt.GraphicsConfiguration;
 import java.awt.Image;
+import java.awt.Insets;
+import java.awt.Rectangle;
 import java.awt.RenderingHints;
+import java.awt.Toolkit;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.WindowAdapter;
@@ -19,6 +24,7 @@ import javax.swing.WindowConstants;
 import team.tetris.application.ApplicationContext;
 import team.tetris.application.model.LoadResult;
 import team.tetris.application.model.Settings;
+import team.tetris.application.model.Settings.ScreenSize;
 import team.tetris.application.port.GameUi;
 import team.tetris.ui.input.KeyNames;
 import team.tetris.ui.input.NanoClock;
@@ -60,13 +66,12 @@ public final class TetrisUi implements GameUi {
                     loop[0].stop();
                     window.dispose();
                 },
-                settings -> {
-                    panel.setScreenSize(settings.screenSize());
-                    window.pack();
-                });
+                settings -> fitToScreen(window, panel, settings.screenSize()));
         loop[0] = new GameLoop(NanoClock.system(), elapsed -> {
             router.update(elapsed);
             if (!router.hasExited()) {
+                // 이름 입력 화면에서만 입력기를 켠다 (화면은 키 입력이나 게임 종료로 바뀌므로 매 프레임 맞춘다).
+                panel.setTextInput(router.acceptsTextInput());
                 panel.show(router.render());
             }
         });
@@ -113,11 +118,35 @@ public final class TetrisUi implements GameUi {
         window.setResizable(false);
         window.add(panel);
         panel.show(router.render());
-        window.pack();
+        window.pack(); // 창 테두리(제목 표시줄) 크기를 알아야 화면에 맞출 수 있다.
+        fitToScreen(window, panel, initial.screenSize());
         window.setLocationRelativeTo(null);
         window.setVisible(true);
         panel.requestFocusInWindow();
         loop[0].start();
+    }
+
+    /**
+     * 화면 크기 설정을 적용하되, 창이 작업 표시줄을 뺀 화면보다 크면 글자 크기를 줄여 맞추고 창을 화면
+     * 안으로 옮긴다. 창 크기는 바꿀 수 없게 해 두었으므로 넘치는 부분은 볼 방법이 없기 때문이다.
+     */
+    private static void fitToScreen(JFrame window, TextFramePanel panel, ScreenSize size) {
+        Rectangle usable = usableArea(window.getGraphicsConfiguration());
+        Insets border = window.getInsets();
+        panel.setScreenSize(size, new Dimension(
+                usable.width - border.left - border.right,
+                usable.height - border.top - border.bottom));
+        window.pack();
+        int x = Math.max(usable.x, Math.min(window.getX(), usable.x + usable.width - window.getWidth()));
+        int y = Math.max(usable.y, Math.min(window.getY(), usable.y + usable.height - window.getHeight()));
+        window.setLocation(x, y);
+    }
+
+    private static Rectangle usableArea(GraphicsConfiguration screen) {
+        Rectangle bounds = screen.getBounds();
+        Insets taskbar = Toolkit.getDefaultToolkit().getScreenInsets(screen);
+        return new Rectangle(bounds.x + taskbar.left, bounds.y + taskbar.top,
+                bounds.width - taskbar.left - taskbar.right, bounds.height - taskbar.top - taskbar.bottom);
     }
 
     /**

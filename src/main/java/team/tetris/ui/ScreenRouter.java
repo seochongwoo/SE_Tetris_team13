@@ -1,8 +1,10 @@
 package team.tetris.ui;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 import team.tetris.application.ApplicationContext;
 import team.tetris.application.EndGameView;
@@ -26,12 +28,19 @@ import team.tetris.ui.screen.SettingsScreen;
  *
  * <p>게임 종료 뒤의 흐름은 {@code EndGameCoordinator}가 돌려주는 단계를 그대로 따른다:
  * RETURN_MENU → 메뉴, NAME_REQUIRED/CHECKING → 이름 입력, SHOW_SCOREBOARD → 순위표.
+ *
+ * <p>화면이 바뀔 때 누르고 있던 키는 한 번 뗄 때까지 새 화면에 전달하지 않는다. 그렇지 않으면
+ * Enter를 조금 길게 누른 것만으로 OS 자동 반복이 이름 입력 → 순위표 → 메뉴 → 새 게임까지 이어진다.
  */
 public final class ScreenRouter {
 
     private final ApplicationContext application;
     private final Runnable exitAction;
     private final Consumer<Settings> settingsListener;
+    /** 지금 눌려 있는 키. */
+    private final Set<String> heldKeys = new HashSet<>();
+    /** 뗄 때까지 무시할 키 (화면 전환 전부터 누르고 있던 키). */
+    private final Set<String> ignoredUntilRelease = new HashSet<>();
     private Settings settings;
     private String notice;
     private Screen current;
@@ -154,10 +163,16 @@ public final class ScreenRouter {
     }
 
     public void keyPressed(String key) {
+        if (ignoredUntilRelease.contains(key)) {
+            return; // 전환 전부터 누르고 있던 키의 OS 자동 반복
+        }
+        heldKeys.add(key);
         current.onKeyPressed(key);
     }
 
     public void keyReleased(String key) {
+        heldKeys.remove(key);
+        ignoredUntilRelease.remove(key);
         current.onKeyReleased(key);
     }
 
@@ -166,7 +181,23 @@ public final class ScreenRouter {
     }
 
     public void focusLost() {
+        // 포커스가 없는 동안의 키 떼기는 전달되지 않으므로 눌림 상태를 모두 비운다.
+        heldKeys.clear();
+        ignoredUntilRelease.clear();
         current.onFocusLost();
+    }
+
+    /**
+     * 지금 눌려 있는 키를 뗄 때까지 무시한다. 화면 전환 때 자동으로 부르며, 화면 안에서 확인 창처럼
+     * 같은 키(Enter)로 다음 단계가 열리는 경우에도 부른다.
+     */
+    public void ignoreHeldKeys() {
+        ignoredUntilRelease.addAll(heldKeys);
+    }
+
+    /** 현재 화면이 한글 등 조합 문자를 입력받는가 (OS 입력기를 켤지 결정). */
+    public boolean acceptsTextInput() {
+        return current.acceptsTextInput();
     }
 
     // ---- 종료 ----
@@ -189,6 +220,7 @@ public final class ScreenRouter {
     }
 
     private void show(Screen next) {
+        ignoreHeldKeys();
         current = next;
         next.onEnter();
     }

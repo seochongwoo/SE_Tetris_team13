@@ -16,6 +16,11 @@ class NameEntryScreenTest {
 
     private final TestApplication app = new TestApplication().withPieces(TetrominoType.O);
     private final ScreenRouter router = app.router();
+
+    /** 키를 한 번 눌렀다 뗀다. */
+    private void tap(String key) {
+        TestApplication.tap(router, key);
+    }
     private NameEntryScreen entry;
 
     @BeforeEach
@@ -34,7 +39,7 @@ class NameEntryScreenTest {
     @Test
     void enteringANameSavesItAndHighlightsItOnTheScoreboard() throws Exception {
         type("ABC");
-        router.keyPressed("ENTER");
+        tap("ENTER");
 
         ScoreboardScreen board = assertInstanceOf(ScoreboardScreen.class, router.current());
         assertTrue(board.isAfterGame());
@@ -48,7 +53,7 @@ class NameEntryScreenTest {
         type("홍길동");
         assertTrue(router.render().text().contains("홍길동"));
 
-        router.keyPressed("ENTER");
+        tap("ENTER");
 
         assertEquals("홍길동", app.scores().list().get(0).name());
     }
@@ -56,7 +61,7 @@ class NameEntryScreenTest {
     @Test
     void blankNameIsRejectedWithAMessage() {
         type("   ");
-        router.keyPressed("ENTER");
+        tap("ENTER");
 
         assertEquals(Stage.NAME_REQUIRED, entry.view().stage());
         assertTrue(entry.view().nameError().isPresent());
@@ -66,9 +71,22 @@ class NameEntryScreenTest {
     @Test
     void backspaceRemovesTheLastCharacterAndControlCharactersAreIgnored() {
         type("AB\nC");
-        router.keyPressed("BACK_SPACE");
+        tap("BACK_SPACE");
 
         assertEquals("AB", entry.name());
+    }
+
+    @Test
+    void leadingSpacesFromAHeldSpaceBarAreIgnored() {
+        type("   A B");
+
+        assertEquals("A B", entry.name());
+    }
+
+    @Test
+    void explainsHowToTypeKorean() {
+        assertTrue(entry.acceptsTextInput());
+        assertTrue(router.render().text().contains("한/영 키로 한글 입력"));
     }
 
     @Test
@@ -85,11 +103,11 @@ class NameEntryScreenTest {
         assertEquals(0, app.exits());
         assertTrue(router.render().text().contains("기록하지 않고 종료할까요?"));
 
-        router.keyPressed("ESCAPE");
+        tap("ESCAPE");
         assertFalse(entry.isConfirmingExit());
 
         router.requestExit();
-        router.keyPressed("ENTER");
+        tap("ENTER");
         assertEquals(1, app.exits());
     }
 }

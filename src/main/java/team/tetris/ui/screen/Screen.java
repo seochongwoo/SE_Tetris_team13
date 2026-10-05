@@ -22,6 +22,16 @@ public interface Screen {
     default void onCharTyped(char character) {
     }
 
+    /**
+     * 한글 같은 조합 문자를 입력받는 화면인가. true인 동안만 OS 입력기(IME)를 켠다.
+     *
+     * <p>입력기가 켜진 채 한글 모드이면 글자 키(P 등)의 눌림 이벤트가 입력기에 먹혀 게임 조작이
+     * 무시되므로, 문자를 받지 않는 화면은 입력기를 끈다.
+     */
+    default boolean acceptsTextInput() {
+        return false;
+    }
+
     /** 창이 포커스를 잃었다. */
     default void onFocusLost() {
     }

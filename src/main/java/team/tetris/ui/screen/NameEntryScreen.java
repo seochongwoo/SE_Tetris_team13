@@ -50,6 +50,10 @@ public final class NameEntryScreen implements Screen {
         if (Character.isISOControl(character) || Character.isSurrogate(character)) {
             return;
         }
+        // 게임 중 누르고 있던 Space 등이 반복 입력돼 이름 앞에 공백이 쌓이지 않게 한다.
+        if (name.isEmpty() && Character.isWhitespace(character)) {
+            return;
+        }
         if (name.codePointCount(0, name.length()) < MAX_NAME_LENGTH) {
             name.append(character);
         }
@@ -90,6 +94,11 @@ public final class NameEntryScreen implements Screen {
     }
 
     @Override
+    public boolean acceptsTextInput() {
+        return true;
+    }
+
+    @Override
     public boolean allowsImmediateExit() {
         return false;
     }
@@ -116,7 +125,7 @@ public final class NameEntryScreen implements Screen {
             frame.box(boxLeft, 10, boxWidth, 3, palette.borderStyle(), palette.base());
             int next = frame.put(boxLeft + 1, 11, name.toString(), palette.base().asBold());
             frame.put(next, 11, "_", palette.accentStyle());
-            frame.putCentered(13, "최대 " + MAX_NAME_LENGTH + "자", palette.dimStyle());
+            frame.putCentered(13, "최대 " + MAX_NAME_LENGTH + "자 · 한/영 키로 한글 입력", palette.dimStyle());
             view.nameError().ifPresent(error ->
                     frame.putCentered(15, "이름은 공백만 빼고 1~" + MAX_NAME_LENGTH + "자로 입력하세요", palette.warningStyle()));
             view.storageError().ifPresent(error ->

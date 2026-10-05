@@ -24,6 +24,11 @@ class ScoreboardScreenTest {
     private final TestApplication app = new TestApplication().withPieces(TetrominoType.O);
     private final ScreenRouter router = app.router();
 
+    /** 키를 한 번 눌렀다 뗀다. */
+    private void tap(String key) {
+        TestApplication.tap(router, key);
+    }
+
     private void record(String name, long score) throws Exception {
         app.scores().register(new GameResult(UUID.randomUUID(), score, 0, 0, GameStatus.GAME_OVER), name);
     }
@@ -54,11 +59,11 @@ class ScoreboardScreenTest {
     @Test
     void fromTheMenuBothEnterAndEscapeGoBack() {
         router.showScoreboard();
-        router.keyPressed("ESCAPE");
+        tap("ESCAPE");
         assertInstanceOf(MenuScreen.class, router.current());
 
         router.showScoreboard();
-        router.keyPressed("ENTER");
+        tap("ENTER");
         assertInstanceOf(MenuScreen.class, router.current());
         assertEquals(0, app.exits());
     }
@@ -68,10 +73,10 @@ class ScoreboardScreenTest {
         router.startGame();
         TestApplication.playUntilGameOver(router);
         router.charTyped('Z');
-        router.keyPressed("ENTER");
+        tap("ENTER");
         assertTrue(router.render().text().contains("이번 점수"));
 
-        router.keyPressed("ESCAPE");
+        tap("ESCAPE");
 
         assertEquals(1, app.exits());
     }
@@ -79,8 +84,8 @@ class ScoreboardScreenTest {
     @Test
     void unknownKeysShowTheUsableKeys() {
         router.showScoreboard();
-        router.keyPressed("Q");
-        router.keyPressed("R");
+        tap("Q");
+        tap("R");
 
         assertTrue(router.render().text().contains("사용할 수 있는 키"));
     }

@@ -22,6 +22,11 @@ class MenuScreenTest {
     private final TestApplication app = new TestApplication();
     private final ScreenRouter router = app.router();
 
+    /** 키를 한 번 눌렀다 뗀다. */
+    private void tap(String key) {
+        TestApplication.tap(router, key);
+    }
+
     private MenuScreen menu() {
         return (MenuScreen) router.current();
     }
@@ -40,33 +45,33 @@ class MenuScreenTest {
 
     @Test
     void arrowKeysMoveTheCursorAndWrapAround() {
-        router.keyPressed("DOWN");
+        tap("DOWN");
         assertEquals(1, menu().cursor());
 
-        router.keyPressed("UP");
-        router.keyPressed("UP");
+        tap("UP");
+        tap("UP");
         assertEquals(menu().items().size() - 1, menu().cursor());
     }
 
     @Test
     void enterRunsTheSelectedItem() {
-        router.keyPressed("ENTER");
+        tap("ENTER");
         assertInstanceOf(GameScreen.class, router.current());
 
         router.showMenu();
-        router.keyPressed("DOWN");
-        router.keyPressed("ENTER");
+        tap("DOWN");
+        tap("ENTER");
         assertInstanceOf(SettingsScreen.class, router.current());
 
         router.showMenu();
-        router.keyPressed("DOWN");
-        router.keyPressed("DOWN");
-        router.keyPressed("ENTER");
+        tap("DOWN");
+        tap("DOWN");
+        tap("ENTER");
         assertInstanceOf(ScoreboardScreen.class, router.current());
 
         router.showMenu();
-        router.keyPressed("UP");
-        router.keyPressed("ENTER");
+        tap("UP");
+        tap("ENTER");
         assertEquals(1, app.exits());
     }
 
@@ -74,7 +79,7 @@ class MenuScreenTest {
     void otherKeysShowTheKeysThatCanBeUsed() {
         assertFalse(router.render().text().contains("사용할 수 있는 키"));
 
-        router.keyPressed("A");
+        tap("A");
 
         assertTrue(router.render().text().contains("사용할 수 있는 키"));
     }

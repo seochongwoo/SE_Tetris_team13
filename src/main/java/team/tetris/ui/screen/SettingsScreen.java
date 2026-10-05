@@ -131,13 +131,17 @@ public final class SettingsScreen implements Screen {
         Row row = ROWS.get(cursor);
         switch (row.kind()) {
             case SCREEN_SIZE, COLOR_BLIND -> adjust(1);
+            // 이 단계를 연 Enter를 누르고 있으면 자동 반복이 곧바로 새 키(ENTER)나 "예"로 처리되므로,
+            // 한 번 뗄 때까지 무시한다.
             case KEY -> {
                 waitingFor = row.command();
                 message = null;
+                router.ignoreHeldKeys();
             }
             case CLEAR_SCORES, RESET -> {
                 confirming = row.kind();
                 message = null;
+                router.ignoreHeldKeys();
             }
             case BACK -> router.showMenu();
         }
