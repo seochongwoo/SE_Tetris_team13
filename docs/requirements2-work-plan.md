@@ -72,8 +72,19 @@
 | 카드 | 브랜치 | 최초 PR base | 구현·로컬 검증 |
 | --- | --- | --- | --- |
 | 2 | `feat/difficulty-settings` | `main` | 설정 화면·v1→v2 호환 읽기·저장·초기화, 284개 테스트 통과·라인 91.3% |
-| 4 | `feat/difficulty-speed` | `feat/difficulty-settings` | 레벨당 감소량 80/100/120ms, 시작 시 난이도 고정·실제 엔진 가속, 299개 테스트 통과 |
-| 5 | `feat/scoreboard-mode-difficulty` | `feat/difficulty-speed` | 예정 |
+| 4 | `feat/difficulty-speed` | `feat/difficulty-settings` | 레벨당 감소량 80/100/120ms, 시작 시 난이도 고정·실제 엔진 가속, 298개 테스트 통과·라인 91.4% |
+| 5 | `feat/scoreboard-mode-difficulty` | `feat/difficulty-speed` | 조합별 상위 10개·화면 필터·v1→v2 호환 읽기·게임 결과 분류, 308개 테스트 통과·라인 91.6% |
 
 브랜치 시작점 `ff7b68a`는 main에 계획 문서만 추가된 커밋입니다. 4·5번의 기능상 선행 카드는 2번이며, 위 브랜치 연결은 순차 구현과 리뷰를 위한 것입니다.
 로컬 구현·검증과 카드 완료는 구분합니다. GitHub Issue 연결(`Closes #번호`), PR 생성, 상대방 리뷰 및 Trello 상태 갱신은 별도로 필요합니다.
+
+### 구현 범위와 연결 지점
+
+- 난이도 기본값은 NORMAL. 기존 설정·점수는 읽을 때 보존하고 저장할 때 버전 2로 전환합니다.
+- 가속 기준은 레벨당 낙하 간격 감소량 EASY 80ms / NORMAL 100ms / HARD 120ms입니다. 초기 1초·최소 100ms·10줄마다 레벨 상승은 동일합니다. 추가 점수 배율은 적용하지 않습니다.
+- 스코어보드는 일반/아이템 × EASY/NORMAL/HARD의 여섯 조합별로 상위 10개를 보관합니다. ←/→는 난이도, ↑/↓는 모드를 전환합니다.
+- 3번은 `Settings.difficulty()`를 블록 생성기에 연결하면 됩니다. 현재 생성기는 기존 7-bag입니다.
+- 6번은 아이템 엔진을 조립한 뒤 `SinglePlayerSession(engine, scoring, speed, GameMode.ITEM, difficulty)`로 생성하면 결과·저장·순위 화면에 분류가 전달됩니다. 아이템 메뉴·규칙 자체는 이번 범위에 포함하지 않습니다.
+- core 소스는 변경하지 않았습니다. A의 리팩터링과 통합할 때 세션의 엔진 결과 해석 부분은 별도로 맞춰야 합니다.
+
+최종 로컬 검증(2026-10-07, Linux / Java 21): `./gradlew --offline --no-daemon build jacocoTestReport` 성공. 테스트와 기본 ZIP/TAR 빌드를 확인했으며, 실제 Swing 창 조작·Windows 실행파일 검증은 별도입니다. 테스트 보고서는 `build/reports/tests/test/index.html`, 커버리지 보고서는 `build/reports/jacoco/test/html/index.html`에 있습니다.

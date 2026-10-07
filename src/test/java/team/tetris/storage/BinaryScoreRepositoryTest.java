@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.io.IOException;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
@@ -96,8 +98,8 @@ class BinaryScoreRepositoryTest {
         invalid[46] = '\n';
         assertInvalid(repository, file, invalid);
         // 등록 이력 없이 종료되는 파일 구성으로 모델 무결성 검증.
-        invalid = Arrays.copyOf(original, 74);
-        ByteBuffer.wrap(invalid).putInt(70, 0);
+        invalid = Arrays.copyOf(original, original.length - 32);
+        ByteBuffer.wrap(invalid).putInt(invalid.length - 4, 0);
         assertInvalid(repository, file, invalid);
         var fallback = new ScoreboardService(repository).loadOrEmpty();
         assertTrue(fallback.value().isEmpty());
@@ -112,12 +114,12 @@ class BinaryScoreRepositoryTest {
         new ScoreboardService(repository).register(game(20), "name");
         byte[] original = Files.readAllBytes(file);
         byte[] version = original.clone();
-        ByteBuffer.wrap(version).putInt(4, 2);
+        ByteBuffer.wrap(version).putInt(4, 3);
         Files.write(file, version);
         assertEquals(Kind.UNSUPPORTED_VERSION, assertThrows(StorageException.class, repository::load).kind());
         byte[] duplicate = Arrays.copyOf(original, original.length + 32);
-        ByteBuffer.wrap(duplicate).putInt(70, 2);
-        System.arraycopy(original, 74, duplicate, original.length, 32);
+        ByteBuffer.wrap(duplicate).putInt(original.length - 36, 2);
+        System.arraycopy(original, original.length - 32, duplicate, original.length, 32);
         assertInvalid(repository, file, duplicate);
     }
 
@@ -138,6 +140,86 @@ class BinaryScoreRepositoryTest {
         assertEquals(id, new ScoreboardService(new BinaryScoreRepository(file)).register(result, "retry").orElseThrow());
         assertEquals(2, reopened.list().size());
         try (var files = Files.list(directory)) { assertEquals(1, files.count()); }
+    }
+
+    @Test
+    void allSixCategoriesSurviveRestart() throws Exception {
+        Path file = directory.resolve("scores.bin");
+        var scores = new ScoreboardService(new BinaryScoreRepository(file));
+        for (GameMode mode : GameMode.values()) {
+            for (Difficulty difficulty : Difficulty.values()) {
+                var result = new GameResult(UUID.randomUUID(), 100, 0, 0, GameStatus.GAME_OVER, mode, difficulty);
+                UUID id = scores.register(result, "player").orElseThrow();
+                var reopened = new ScoreboardService(new BinaryScoreRepository(file));
+                ScoreEntry entry = reopened.list(mode, difficulty).getFirst();
+                assertEquals(mode, entry.mode());
+                assertEquals(difficulty, entry.difficulty());
+                assertEquals(id, entry.recordId());
+                assertEquals(id, reopened.register(result, "retry").orElseThrow());
+            }
+        }
+        assertEquals(6, scores.list().size());
+        assertEquals(2, ByteBuffer.wrap(Files.readAllBytes(file)).getInt(4));
+    }
+
+    @Test
+    void legacyRecordAndEvictedReceiptArePreservedUntilExplicitV2Save() throws Exception {
+        Path file = directory.resolve("scores.bin");
+        UUID record = UUID.randomUUID(), game = UUID.randomUUID();
+        UUID evictedGame = UUID.randomUUID(), evictedRecord = UUID.randomUUID();
+        var bytes = new ByteArrayOutputStream();
+        try (var out = new DataOutputStream(bytes)) {
+            out.writeInt(0x54545343);
+            out.writeInt(1);
+            out.writeInt(1);
+            writeId(out, record);
+            writeId(out, game);
+            out.writeUTF("기존😀");
+            out.writeLong(Long.MAX_VALUE);
+            out.writeLong(1234);
+            out.writeInt(123);
+            out.writeInt(2);
+            writeId(out, game);
+            writeId(out, record);
+            writeId(out, evictedGame);
+            writeId(out, evictedRecord);
+        }
+        byte[] legacy = bytes.toByteArray();
+        Files.write(file, legacy);
+        var repository = new BinaryScoreRepository(file);
+        ScoreStore loaded = repository.load();
+        assertEquals(new ScoreEntry(record, game, "기존😀", Long.MAX_VALUE, Instant.ofEpochSecond(1234, 123)),
+                loaded.entries().getFirst());
+        assertEquals(evictedRecord, loaded.registrations().get(evictedGame));
+        assertArrayEquals(legacy, Files.readAllBytes(file));
+        var scores = new ScoreboardService(repository);
+        scores.register(new GameResult(UUID.randomUUID(), 1, 0, 0, GameStatus.GAME_OVER,
+                GameMode.ITEM, Difficulty.HARD), "new");
+        assertEquals(2, ByteBuffer.wrap(Files.readAllBytes(file)).getInt(4));
+        assertEquals(loaded.entries(), scores.list(GameMode.NORMAL, Difficulty.NORMAL));
+        assertEquals(evictedRecord, repository.load().registrations().get(evictedGame));
+    }
+
+    @Test
+    void invalidModeAndDifficultyAreReportedWithoutOverwriting() throws Exception {
+        Path file = directory.resolve("scores.bin");
+        var repository = new BinaryScoreRepository(file);
+        new ScoreboardService(repository).register(game(10), "name");
+        byte[] original = Files.readAllBytes(file);
+        // timestamp 다음 UTF NORMAL(길이 2 + 값 6), 그 다음 difficulty UTF NORMAL.
+        for (int offset : new int[]{72, 80}) {
+            byte[] invalid = original.clone();
+            invalid[offset] = 'X';
+            assertInvalid(repository, file, invalid);
+            assertTrue(new ScoreboardService(repository).loadOrEmpty(GameMode.NORMAL, Difficulty.NORMAL)
+                    .error().isPresent());
+            assertArrayEquals(invalid, Files.readAllBytes(file));
+        }
+    }
+
+    private static void writeId(DataOutputStream out, UUID id) throws IOException {
+        out.writeLong(id.getMostSignificantBits());
+        out.writeLong(id.getLeastSignificantBits());
     }
 
     private static void assertInvalid(BinaryScoreRepository repository, Path file, byte[] bytes) throws Exception {

@@ -12,10 +12,14 @@ import org.junit.jupiter.api.Test;
 import team.tetris.application.GameResult;
 import team.tetris.application.GameStatus;
 import team.tetris.application.model.ScoreStore;
+import team.tetris.application.model.GameMode;
+import team.tetris.application.model.Difficulty;
+import team.tetris.application.model.Settings;
 import team.tetris.application.port.ScoreRepository;
 import team.tetris.application.port.StorageException;
 import team.tetris.core.TetrominoType;
 import team.tetris.storage.memory.InMemorySettingsRepository;
+import team.tetris.storage.memory.InMemoryScoreRepository;
 import team.tetris.ui.ScreenRouter;
 import team.tetris.ui.TestApplication;
 
@@ -57,6 +61,55 @@ class ScoreboardScreenTest {
     }
 
     @Test
+    void filtersAllSixCategoriesAndStartsAtConfiguredDifficulty() throws Exception {
+        for (GameMode mode : GameMode.values()) {
+            for (Difficulty difficulty : Difficulty.values()) {
+                app.scores().register(new GameResult(UUID.randomUUID(), 100, 0, 0, GameStatus.GAME_OVER,
+                        mode, difficulty), "player");
+            }
+        }
+        router.updateSettings(new Settings(Settings.ScreenSize.MEDIUM, Settings.defaults().keyBindings(), false,
+                Difficulty.HARD));
+        router.showScoreboard();
+        var screen = (ScoreboardScreen) router.current();
+        assertEquals(Difficulty.HARD, screen.entries().getFirst().difficulty());
+        for (GameMode mode : GameMode.values()) {
+            for (Difficulty difficulty : Difficulty.values()) {
+                tap("RIGHT");
+                assertEquals(1, screen.entries().size());
+                assertEquals(mode, screen.entries().getFirst().mode());
+                assertEquals(difficulty, screen.entries().getFirst().difficulty());
+                assertTrue(router.render().text().contains(difficulty.name()));
+                assertTrue(router.render().text().contains(mode == GameMode.NORMAL ? "일반" : "아이템"));
+            }
+            tap("DOWN");
+        }
+        tap("LEFT");
+        assertEquals(Difficulty.NORMAL, screen.entries().getFirst().difficulty());
+        tap("UP");
+        assertEquals(GameMode.ITEM, screen.entries().getFirst().mode());
+        assertEquals(Difficulty.HARD, router.settings().difficulty());
+    }
+
+    @Test
+    void endingUsesFinishedDifficultyAndKeepsHighlightWhenSwitchingBack() throws Exception {
+        record("other", 1000);
+        var result = new GameResult(UUID.randomUUID(), 10, 0, 0, GameStatus.GAME_OVER,
+                GameMode.ITEM, Difficulty.EASY);
+        router.finishGame(result);
+        router.charTyped('X');
+        tap("ENTER");
+        var screen = (ScoreboardScreen) router.current();
+        UUID id = screen.highlightedRecordId().orElseThrow();
+        assertEquals(id, screen.entries().getFirst().recordId());
+        assertTrue(router.render().text().contains("아이템 / EASY"));
+        tap("RIGHT");
+        assertTrue(screen.entries().isEmpty());
+        tap("LEFT");
+        assertEquals(id, screen.entries().getFirst().recordId());
+    }
+
+    @Test
     void fromTheMenuBothEnterAndEscapeGoBack() {
         router.showScoreboard();
         tap("ESCAPE");
@@ -88,6 +141,35 @@ class ScoreboardScreenTest {
         tap("R");
 
         assertTrue(router.render().text().contains("사용할 수 있는 키"));
+    }
+
+    @Test
+    void failedCategoryReadCanRetryWithoutChangingSettingsOrWritingScores() throws Exception {
+        var backing = new InMemoryScoreRepository();
+        boolean[] fail = {false};
+        ScoreRepository repository = new ScoreRepository() {
+            public ScoreStore load() throws StorageException {
+                if (fail[0]) throw new StorageException(StorageException.Kind.READ_FAILED, Path.of("scores.bin"), null);
+                return backing.load();
+            }
+            public void save(ScoreStore store) { backing.save(store); }
+        };
+        var application = new TestApplication(new InMemorySettingsRepository(), repository);
+        var result = new GameResult(UUID.randomUUID(), 50, 0, 0, GameStatus.GAME_OVER,
+                GameMode.NORMAL, Difficulty.HARD);
+        application.scores().register(result, "hard");
+        var screenRouter = application.router();
+        screenRouter.showScoreboard();
+        fail[0] = true;
+        TestApplication.tap(screenRouter, "RIGHT");
+        assertTrue(screenRouter.render().text().contains("기록을 불러오지 못했습니다"));
+        assertTrue(((ScoreboardScreen) screenRouter.current()).entries().isEmpty());
+        fail[0] = false;
+        TestApplication.tap(screenRouter, "R");
+        assertEquals("hard", ((ScoreboardScreen) screenRouter.current()).entries().getFirst().name());
+        assertFalse(screenRouter.render().text().contains("기록을 불러오지 못했습니다"));
+        assertEquals(Difficulty.NORMAL, screenRouter.settings().difficulty());
+        assertEquals(1, backing.load().registrations().size());
     }
 
     @Test

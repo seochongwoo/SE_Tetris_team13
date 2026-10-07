@@ -59,7 +59,7 @@ public final class EndGameCoordinator {
 
     private EndGameView scoreboard(Flow flow) {
         try {
-            var entries = scores.list();
+            var entries = scores.list(flow.result.mode(), flow.result.difficulty());
             var highlight = flow.recordId.filter(id -> entries.stream().anyMatch(e -> e.recordId().equals(id)));
             flow.view = new EndGameView(flow.result.gameId(), Stage.SHOW_SCOREBOARD, entries,
                     highlight, Optional.empty(), Optional.empty());

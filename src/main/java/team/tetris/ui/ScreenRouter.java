@@ -10,6 +10,9 @@ import team.tetris.application.ApplicationContext;
 import team.tetris.application.EndGameView;
 import team.tetris.application.GameResult;
 import team.tetris.application.model.LoadResult;
+import team.tetris.application.model.ScoreEntry;
+import team.tetris.application.model.GameMode;
+import team.tetris.application.model.Difficulty;
 import team.tetris.application.model.Settings;
 import team.tetris.application.port.StorageException;
 import team.tetris.ui.render.TextFrame;
@@ -105,7 +108,7 @@ public final class ScreenRouter {
     }
 
     public void showScoreboard() {
-        show(ScoreboardScreen.fromMenu(this, application.scores().loadOrEmpty()));
+        show(ScoreboardScreen.fromMenu(this, loadScores(GameMode.NORMAL, settings.difficulty())));
     }
 
     /** 게임 화면이 끝난 판의 결과를 넘긴다. */
@@ -140,6 +143,10 @@ public final class ScreenRouter {
     public void resetSettings() throws StorageException {
         application.settings().reset();
         applySettings(application.settings().get());
+    }
+
+    public LoadResult<List<ScoreEntry>> loadScores(GameMode mode, Difficulty difficulty) {
+        return application.scores().loadOrEmpty(mode, difficulty);
     }
 
     public void clearScores() throws StorageException {
