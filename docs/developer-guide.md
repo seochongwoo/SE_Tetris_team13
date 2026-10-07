@@ -247,7 +247,7 @@ NAME_REQUIRED에서 begin을 반복해도 이름 입력을 자동 완료하지 �
 ```java
 var settings = application.settings();
 Settings current = settings.get();
-settings.update(new Settings(Settings.ScreenSize.LARGE, current.keyBindings(), true));
+settings.update(new Settings(Settings.ScreenSize.LARGE, current.keyBindings(), true, current.difficulty()));
 settings.reset();
 ```
 
@@ -259,6 +259,8 @@ settings.reset();
 
 기본값은 `Settings.defaults()` 한 곳에서 정의. 기존 빈 `default_config.json`은 로드하지 않음.
 화면 크기는 SMALL/MEDIUM/LARGE 중 선택, 기본 MEDIUM. 색맹 모드는 기본 false.
+난이도는 `Difficulty.EASY/NORMAL/HARD`이며 기본 NORMAL입니다. 설정 화면에서 ←/→ 또는 Enter로 변경하고 즉시 저장합니다. 다른 설정을 바꿀 때도 현재 난이도를 전달해야 합니다.
+설정 파일은 schemaVersion 2로 저장합니다. 버전 1은 기존 값을 유지하고 난이도를 NORMAL로 읽으며, 명시적으로 저장할 때 버전 2로 전환합니다.
 SMALL/MEDIUM/LARGE는 각각 14/18/24px 글꼴을 사용하며 창 크기도 다시 계산합니다. 색맹 모드는 별도 팔레트를 적용하고, 블록별 문자 무늬는 두 모드 모두 표시합니다.
 
 | 명령                   | 기본 키 식별자 |
@@ -390,7 +392,7 @@ lineBonus = 100 × clearedLinesInThisStep²
 - 저장 방식: `SettingsRepository` 또는 `ScoreRepository`를 구현해 서비스 생성자에 전달합니다. 앱 전체에 적용하려면 bootstrap 조립도 변경합니다. 테스트용 메모리 구현은 `storage.memory`에 있습니다.
 - 순위 정책: `ScoreboardService(repository, policy, clock)`으로 보관 개수·이름 제한 등을 주입합니다. 현재 종료 조율자는 ABORTED를 항상 메뉴로 보내므로, 중도 종료 등록 정책을 바꿀 경우 종료 흐름도 함께 검토해야 합니다.
 
-현재 파일 저장소는 Java 기본 API로 설정을 Properties, 기록을 바이너리 형식에 저장합니다. 이전 파일 형식의 자동 변환은 제공하지 않습니다. 기존 파일을 보존하기 위해 같은 디렉터리의 임시 파일을 원자적으로 교체합니다. 원자적 교체가 지원되지 않으면 `WRITE_FAILED`이며 비원자적 덮어쓰기로 전환하지 않습니다. 여러 프로세스의 동시 쓰기는 보장하지 않습니다.
+현재 파일 저장소는 Java 기본 API로 설정을 Properties, 기록을 바이너리 형식에 저장합니다. 설정 파일 버전 1은 NORMAL 난이도로 읽으며 저장 시 버전 2로 전환합니다. 기존 파일을 보존하기 위해 같은 디렉터리의 임시 파일을 원자적으로 교체합니다. 원자적 교체가 지원되지 않으면 `WRITE_FAILED`이며 비원자적 덮어쓰기로 전환하지 않습니다. 여러 프로세스의 동시 쓰기는 보장하지 않습니다.
 
 ## 9. 주요 소스와 API 참고
 

@@ -31,7 +31,7 @@ public final class BinaryScoreRepository extends AtomicFileRepository<ScoreStore
     ScoreStore decode(byte[] contents) throws IOException {
         try (var input = new DataInputStream(new ByteArrayInputStream(contents))) {
             if (input.readInt() != MAGIC) throw new IOException("Invalid score file signature");
-            requireVersion(input.readInt());
+            requireVersion(input.readInt(), 1);
             int size = count(input);
             var entries = new ArrayList<ScoreEntry>();
             for (int i = 0; i < size; i++) {

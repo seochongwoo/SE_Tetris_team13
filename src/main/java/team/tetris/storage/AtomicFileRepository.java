@@ -68,8 +68,11 @@ abstract class AtomicFileRepository<T> {
         }
     }
 
-    final void requireVersion(int version) throws StorageException {
-        if (version != 1) throw new StorageException(Kind.UNSUPPORTED_VERSION, path, null);
+    final void requireVersion(int version, int... supported) throws StorageException {
+        for (int candidate : supported) {
+            if (version == candidate) return;
+        }
+        throw new StorageException(Kind.UNSUPPORTED_VERSION, path, null);
     }
 
     abstract T decode(byte[] contents) throws IOException;
