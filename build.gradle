@@ -46,3 +46,64 @@ jacocoTestReport {
         csv.required = true
     }
 }
+
+// ---------------------------------------------------------------------------
+// 배포: jpackage로 JRE를 포함한 Windows 실행 폴더(SETetris\SETetris.exe)를 만든다.
+// Java가 설치되지 않은 PC에서도 exe 더블클릭만으로 실행된다. 설치 프로그램(--type exe)과 달리
+// WiX가 필요 없다.
+//   gradlew packageApp   → build\jpackage\SETetris\SETetris.exe
+//   gradlew packageZip   → build\distributions\SETetris-<version>-windows.zip (배포용)
+// ---------------------------------------------------------------------------
+version = '1.0.0'
+
+def appName = 'SETetris'
+def jpackageInput = layout.buildDirectory.dir('jpackage-input')
+def jpackageOutput = layout.buildDirectory.dir('jpackage')
+def jdkLauncher = javaToolchains.launcherFor {
+    languageVersion = JavaLanguageVersion.of(21)
+}
+
+tasks.register('prepareJpackageInput', Sync) {
+    from tasks.named('jar')
+    into jpackageInput
+}
+
+tasks.register('packageApp', Exec) {
+    group = 'distribution'
+    description = 'JRE를 포함한 실행 폴더를 만든다 (아이콘이 들어간 SETetris.exe).'
+    dependsOn 'prepareJpackageInput'
+    def icon = file('src/main/resources/icon.ico')
+    inputs.dir(jpackageInput)
+    inputs.file(icon)
+    outputs.dir(jpackageOutput)
+    doFirst {
+        delete jpackageOutput
+        def jdk = jdkLauncher.get().metadata.installationPath
+        def isWindows = System.getProperty('os.name').toLowerCase().contains('win')
+        executable = jdk.file("bin/${isWindows ? 'jpackage.exe' : 'jpackage'}").asFile.absolutePath
+        args '--type', 'app-image',
+                '--name', appName,
+                '--app-version', project.version,
+                '--vendor', 'SeoulTech SE Team 13',
+                '--description', 'SE Tetris (Team 13)',
+                '--input', jpackageInput.get().asFile.absolutePath,
+                '--main-jar', tasks.named('jar').get().archiveFileName.get(),
+                '--main-class', application.mainClass.get(),
+                '--icon', icon.absolutePath,
+                // jdeps 기준 필요한 모듈만 넣어 크기를 줄인다.
+                '--add-modules', 'java.base,java.desktop',
+                '--jlink-options', '--strip-debug --no-man-pages --no-header-files',
+                // 최소 사양(RAM 1GB)에서도 여유 있게 돌도록 힙 상한을 둔다.
+                '--java-options', '-Xmx256m',
+                '--dest', jpackageOutput.get().asFile.absolutePath
+    }
+}
+
+tasks.register('packageZip', Zip) {
+    group = 'distribution'
+    description = '실행 폴더를 배포용 zip으로 묶는다.'
+    dependsOn 'packageApp'
+    from(jpackageOutput)
+    archiveFileName = "${appName}-${project.version}-windows.zip"
+    destinationDirectory = layout.buildDirectory.dir('distributions')
+}
