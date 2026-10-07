@@ -344,7 +344,8 @@ List<ScoreEntry> entries = scores.list();
 
 ```text
 level = totalClearedLines / 10                 // 초기 0
-gravityIntervalMs = max(100, 1000 - level × 100)
+decreaseMs = EASY: 80, NORMAL: 100, HARD: 120
+gravityIntervalMs = max(100, 1000 - level × decreaseMs)
 dropScore = actualDroppedCells × (levelBeforeStep + 1)
 lineBonus = 100 × clearedLinesInThisStep²
 ```
@@ -352,9 +353,11 @@ lineBonus = 100 × clearedLinesInThisStep²
 - 자동 낙하, 소프트드롭, 하드드롭 모두 실제 하강 칸 수만큼 점수를 얻는다.
 - 이동 실패·회전·좌우 이동·하강 거리 0에는 낙하 점수가 없다.
 - 초기 칸당 1점, 가속 이후 추가 점수를 부여한다. 줄 삭제 보너스는 별도의 추가 점수 방식이다.
-- 점수는 long으로 누적한다. 레벨 9 이상에서도 낙하 주기는 최소 100ms를 유지한다.
+- 점수는 long으로 누적한다. 모든 난이도에서 낙하 주기는 최소 100ms를 유지한다.
 
 블록 추첨은 현재 7-bag 방식입니다. 일곱 종류를 한 번씩 담아 섞으므로 전체 출현 비율은 같지만, 매 추첨이 독립적인 1/7 확률은 아닙니다. Req1 9쪽의 동일 확률 조건이 독립 추첨을 뜻하는지는 [미확정 사항](open-questions.md)에서 추적합니다.
+
+난이도별 가속은 기존 레벨당 간격 감소량 100ms의 ±20%로 정의합니다. 초기 간격(1초)과 레벨 경계(10줄)는 동일합니다. 기본 `AppComposition`은 새 게임 시작 시 저장된 난이도로 `SpeedPolicy`를 만들며, 진행 중인 판의 규칙은 고정됩니다. 난이도에 따른 추가 점수 배율은 적용하지 않습니다.
 
 ### 정책 교체 계약
 
@@ -383,7 +386,7 @@ lineBonus = 100 × clearedLinesInThisStep²
 
 ### 확장 지점
 
-- 점수·속도: `ScoreRule`과 `SpeedRule`을 구현하고 `AppComposition(Path, Supplier<? extends PieceGenerator>, ScoreRule, SpeedRule)`에 전달합니다. 순수 계산으로 구현하며 실행 중 외부에서 변경하지 않습니다.
+- 점수·속도: `ScoreRule`과 `SpeedRule`을 구현하고 `AppComposition(Path, Supplier<? extends PieceGenerator>, ScoreRule, SpeedRule)`에 전달합니다. 순수 계산으로 구현하며 실행 중 외부에서 변경하지 않습니다. 이 생성자의 명시적 `SpeedRule`은 난이도와 무관하게 그대로 사용합니다. 난이도에 맞춰 만들려면 마지막 인자에 `Function<Difficulty, ? extends SpeedRule>` (예: `SpeedPolicy::new`)을 전달합니다.
 - 블록 생성: `PieceGenerator`를 구현하고 위 생성자에 팩터리를 전달합니다. 새 게임마다 독립된 생성기를 반환해야 합니다.
 - 코어: `TetrisEnginePort`는 `snapshot()`, `apply(GameAction)`, `tick()`을 제공합니다. 세션은 이 포트에 의존하며 실제 엔진 생성은 bootstrap에서 수행합니다. `EngineStep`의 drop/lock/clear 결과는 없으면 null일 수 있고, `itemActivations()`는 아이템이 발동하지 않으면 빈 목록입니다. `ClearedRow.cells()`에 지워지기 직전 칸 내용이 있어 삭제 애니메이션에 쓸 수 있습니다.
 - 블록 모양: 테트로미노가 아닌 블록은 `core.Shape`를 구현합니다. 회전해도 같은 인덱스가 같은 칸을 가리키도록 좌표를 정렬하고, 회전하지 않는 블록은 `rotationStates()`를 1로 둡니다.
