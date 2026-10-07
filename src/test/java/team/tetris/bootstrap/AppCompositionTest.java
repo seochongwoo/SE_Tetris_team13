@@ -9,6 +9,7 @@ import org.junit.jupiter.api.io.TempDir;
 import team.tetris.application.*;
 import team.tetris.application.EndGameView.Stage;
 import team.tetris.application.model.Settings;
+import team.tetris.application.model.Difficulty;
 import team.tetris.core.TetrominoType;
 import team.tetris.core.rule.PieceGenerator;
 
@@ -68,6 +69,36 @@ class AppCompositionTest {
         second.session().handle(GameCommand.QUIT_GAME);
         assertNotEquals(first.session().result().orElseThrow().gameId(), second.session().result().orElseThrow().gameId());
         assertEquals(2, generators.get());
+    }
+
+    @Test
+    void difficultyIsAppliedAtGameStartAndChangesOnlyTheNextGame() throws Exception {
+        var app = new AppComposition(directory, AppCompositionTest::squares, new ScorePolicy(), SpeedPolicy::new);
+        app.settings().update(new Settings(Settings.ScreenSize.MEDIUM, Settings.defaults().keyBindings(), false,
+                Difficulty.EASY));
+        GameSession easy = app.newGame().session();
+        app.settings().update(new Settings(Settings.ScreenSize.MEDIUM, Settings.defaults().keyBindings(), false,
+                Difficulty.HARD));
+        GameSession hard = app.newGame().session();
+        for (GameSession session : new GameSession[]{easy, hard}) {
+            // 25개의 O 블록으로 10줄을 삭제해 첫 가속을 실제 엔진에서 확인한다.
+            for (int pair = 0; pair < 5; pair++) {
+                for (int target : new int[]{0, 2, 4, 6, 8}) {
+                    for (int i = 0; i < 10; i++) session.handle(GameCommand.MOVE_LEFT);
+                    for (int i = 0; i < target; i++) session.handle(GameCommand.MOVE_RIGHT);
+                    session.handle(GameCommand.HARD_DROP);
+                }
+            }
+            assertEquals(10, session.snapshot().clearedLines());
+            assertEquals(1, session.snapshot().level());
+        }
+        assertEquals(920_000_000L, easy.snapshot().gravityIntervalNanos());
+        assertEquals(880_000_000L, hard.snapshot().gravityIntervalNanos());
+        var before = hard.snapshot().engine().activePiece().origin();
+        hard.update(879_999_999L);
+        assertEquals(before, hard.snapshot().engine().activePiece().origin());
+        hard.update(1);
+        assertEquals(before.translate(0, 1), hard.snapshot().engine().activePiece().origin());
     }
 
     @Test

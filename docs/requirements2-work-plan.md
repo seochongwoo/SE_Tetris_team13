@@ -70,8 +70,8 @@
 
 | 카드 | 브랜치 | 최초 PR base | 구현·로컬 검증 |
 | --- | --- | --- | --- |
-| 2 | `feat/difficulty-settings` | `main` | 설정 화면·v1→v2 호환 읽기·저장·초기화, 전체 테스트 통과 |
-| 4 | `feat/difficulty-speed` | `feat/difficulty-settings` | 예정 |
+| 2 | `feat/difficulty-settings` | `main` | 설정 화면·v1→v2 호환 읽기·저장·초기화, 284개 테스트 통과·라인 91.3% |
+| 4 | `feat/difficulty-speed` | `feat/difficulty-settings` | 레벨당 감소량 80/100/120ms, 시작 시 난이도 고정·실제 엔진 가속, 299개 테스트 통과 |
 | 5 | `feat/scoreboard-mode-difficulty` | `feat/difficulty-speed` | 예정 |
 
 브랜치 시작점 `ff7b68a`는 main에 계획 문서만 추가된 커밋입니다. 4·5번의 기능상 선행 카드는 2번이며, 위 브랜치 연결은 순차 구현과 리뷰를 위한 것입니다.
