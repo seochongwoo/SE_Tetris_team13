@@ -228,6 +228,49 @@ class PersistenceServicesTest {
                 () -> new ScoreStore(List.of(), Map.of(game, id, UUID.randomUUID(), id)));
     }
 
+    @Test
+    void eachModeAndDifficultyHasItsOwnCapacityCutoffAndEvictionReceipts() throws Exception {
+        var repository = new InMemoryScoreRepository();
+        var scores = new ScoreboardService(repository);
+        for (GameMode mode : GameMode.values()) {
+            for (Difficulty difficulty : Difficulty.values()) {
+                var first = new GameResult(UUID.randomUUID(), 0, 0, 0, GameStatus.GAME_OVER, mode, difficulty);
+                assertTrue(scores.qualifies(first));
+                UUID evicted = scores.register(first, "first").orElseThrow();
+                for (int i = 1; i <= 10; i++) {
+                    var result = new GameResult(UUID.randomUUID(), i, 0, 0, GameStatus.GAME_OVER, mode, difficulty);
+                    scores.register(result, "player" + i);
+                }
+                assertEquals(List.of(10L,9L,8L,7L,6L,5L,4L,3L,2L,1L),
+                        scores.list(mode, difficulty).stream().map(ScoreEntry::score).toList());
+                var tied = new GameResult(UUID.randomUUID(), 1, 0, 0, GameStatus.GAME_OVER, mode, difficulty);
+                assertFalse(scores.qualifies(tied));
+                assertTrue(scores.register(tied, "tie").isEmpty());
+                assertEquals(evicted, new ScoreboardService(repository).register(first, "retry").orElseThrow());
+            }
+        }
+        assertEquals(60, scores.list().size());
+        assertEquals(66, repository.load().registrations().size());
+        scores.clear();
+        assertEquals(ScoreStore.empty(), repository.load());
+    }
+
+    @Test
+    void endingShowsOnlyFinishedCategoryAndHighlightsSavedRecord() throws Exception {
+        var scores = new ScoreboardService(new InMemoryScoreRepository());
+        scores.register(game(10000), "other");
+        var result = new GameResult(UUID.randomUUID(), 10, 0, 0, GameStatus.GAME_OVER,
+                GameMode.ITEM, Difficulty.EASY);
+        var endings = new EndGameCoordinator(scores);
+        assertEquals(EndGameView.Stage.NAME_REQUIRED, endings.begin(result).stage());
+        EndGameView view = endings.submitName(result.gameId(), "item");
+        assertEquals(1, view.scores().size());
+        assertEquals(GameMode.ITEM, view.scores().getFirst().mode());
+        assertEquals(Difficulty.EASY, view.scores().getFirst().difficulty());
+        assertEquals(view.scores().getFirst().recordId(), view.highlightedRecordId().orElseThrow());
+        assertEquals(view, new EndGameCoordinator(scores).begin(result));
+    }
+
     private static StorageException failure(StorageException.Kind kind) {
         return new StorageException(kind, java.nio.file.Path.of("test.json"), null);
     }

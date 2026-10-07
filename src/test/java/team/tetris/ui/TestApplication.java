@@ -7,6 +7,9 @@ import team.tetris.application.ScoreboardService;
 import team.tetris.application.SettingsService;
 import team.tetris.application.SinglePlayerSession;
 import team.tetris.application.StartedGame;
+import team.tetris.application.ScorePolicy;
+import team.tetris.application.SpeedPolicy;
+import team.tetris.application.model.GameMode;
 import team.tetris.application.model.Settings;
 import team.tetris.application.port.ScoreRepository;
 import team.tetris.application.port.SettingsRepository;
@@ -68,8 +71,10 @@ public final class TestApplication implements ApplicationContext {
 
     @Override
     public StartedGame newGame() {
-        return new StartedGame(new SinglePlayerSession(new PlayerEngine(10, 20, generators.get())),
-                settings.loadOrDefault());
+        var loaded = settings.loadOrDefault();
+        var difficulty = loaded.value().difficulty();
+        return new StartedGame(new SinglePlayerSession(new PlayerEngine(10, 20, generators.get()),
+                new ScorePolicy(), new SpeedPolicy(difficulty), GameMode.NORMAL, difficulty), loaded);
     }
 
     public ScreenRouter router() {

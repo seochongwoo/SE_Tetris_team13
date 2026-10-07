@@ -6,6 +6,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Supplier;
 import java.util.function.Function;
 import team.tetris.application.model.Difficulty;
+import team.tetris.application.model.GameMode;
 import team.tetris.application.*;
 import team.tetris.core.PlayerEngine;
 import team.tetris.core.rule.PieceGenerator;
@@ -58,6 +59,7 @@ public final class AppComposition implements ApplicationContext {
         var loaded = settings.loadOrDefault();
         var speed = Objects.requireNonNull(speeds.apply(loaded.value().difficulty()), "speed");
         var engine = new PlayerEngine(10, 20, Objects.requireNonNull(generators.get(), "generator"));
-        return new StartedGame(new SinglePlayerSession(engine, scoring, speed), loaded);
+        var session = new SinglePlayerSession(engine, scoring, speed, GameMode.NORMAL, loaded.value().difficulty());
+        return new StartedGame(session, loaded);
     }
 }

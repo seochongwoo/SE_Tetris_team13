@@ -10,6 +10,7 @@ import team.tetris.application.*;
 import team.tetris.application.EndGameView.Stage;
 import team.tetris.application.model.Settings;
 import team.tetris.application.model.Difficulty;
+import team.tetris.application.model.GameMode;
 import team.tetris.core.TetrominoType;
 import team.tetris.core.rule.PieceGenerator;
 
@@ -99,6 +100,17 @@ class AppCompositionTest {
         assertEquals(before, hard.snapshot().engine().activePiece().origin());
         hard.update(1);
         assertEquals(before.translate(0, 1), hard.snapshot().engine().activePiece().origin());
+        easy.handle(GameCommand.QUIT_GAME);
+        assertEquals(Difficulty.EASY, easy.result().orElseThrow().difficulty());
+        for (int i = 0; i < 20 && hard.result().isEmpty(); i++) hard.handle(GameCommand.HARD_DROP);
+        GameResult result = hard.result().orElseThrow();
+        assertEquals(Difficulty.HARD, result.difficulty());
+        assertEquals(GameMode.NORMAL, result.mode());
+        app.endings().begin(result);
+        app.endings().submitName(result.gameId(), "hard");
+        var reopened = new AppComposition(directory);
+        assertEquals(result.score(), reopened.scores().list(GameMode.NORMAL, Difficulty.HARD).getFirst().score());
+        assertTrue(reopened.scores().list(GameMode.NORMAL, Difficulty.NORMAL).isEmpty());
     }
 
     @Test

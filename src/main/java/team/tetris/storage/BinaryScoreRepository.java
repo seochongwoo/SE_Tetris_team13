@@ -11,6 +11,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.UUID;
 import team.tetris.application.model.ScoreEntry;
+import team.tetris.application.model.GameMode;
+import team.tetris.application.model.Difficulty;
 import team.tetris.application.model.ScoreStore;
 import team.tetris.application.port.ScoreRepository;
 import team.tetris.application.port.StorageException;
@@ -31,7 +33,8 @@ public final class BinaryScoreRepository extends AtomicFileRepository<ScoreStore
     ScoreStore decode(byte[] contents) throws IOException {
         try (var input = new DataInputStream(new ByteArrayInputStream(contents))) {
             if (input.readInt() != MAGIC) throw new IOException("Invalid score file signature");
-            requireVersion(input.readInt(), 1);
+            int version = input.readInt();
+            requireVersion(version, 1, 2);
             int size = count(input);
             var entries = new ArrayList<ScoreEntry>();
             for (int i = 0; i < size; i++) {
@@ -42,7 +45,10 @@ public final class BinaryScoreRepository extends AtomicFileRepository<ScoreStore
                 long seconds = input.readLong();
                 int nanos = input.readInt();
                 if (nanos < 0 || nanos > 999_999_999) throw new IOException("Invalid timestamp");
-                entries.add(new ScoreEntry(recordId, gameId, name, score, Instant.ofEpochSecond(seconds, nanos)));
+                GameMode mode = version == 1 ? GameMode.NORMAL : GameMode.valueOf(input.readUTF());
+                Difficulty difficulty = version == 1 ? Difficulty.NORMAL : Difficulty.valueOf(input.readUTF());
+                entries.add(new ScoreEntry(recordId, gameId, name, score, Instant.ofEpochSecond(seconds, nanos),
+                        mode, difficulty));
             }
             int receipts = count(input);
             var registrations = new HashMap<UUID, UUID>();
@@ -74,7 +80,7 @@ public final class BinaryScoreRepository extends AtomicFileRepository<ScoreStore
         var bytes = new ByteArrayOutputStream();
         try (var output = new DataOutputStream(bytes)) {
             output.writeInt(MAGIC);
-            output.writeInt(1);
+            output.writeInt(2);
             output.writeInt(store.entries().size());
             for (ScoreEntry entry : store.entries()) {
                 uuid(output, entry.recordId());
@@ -83,6 +89,8 @@ public final class BinaryScoreRepository extends AtomicFileRepository<ScoreStore
                 output.writeLong(entry.score());
                 output.writeLong(entry.registeredAt().getEpochSecond());
                 output.writeInt(entry.registeredAt().getNano());
+                output.writeUTF(entry.mode().name());
+                output.writeUTF(entry.difficulty().name());
             }
             output.writeInt(store.registrations().size());
             for (var registration : store.registrations().entrySet()) {
