@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import team.tetris.application.GameCommand;
 import team.tetris.application.model.Settings;
+import team.tetris.application.model.Difficulty;
 import team.tetris.application.model.Settings.ScreenSize;
 import team.tetris.application.port.StorageException;
 import team.tetris.ui.ScreenRouter;
@@ -15,7 +16,7 @@ import team.tetris.ui.render.TextStyle;
 import team.tetris.ui.render.palette.ColorPalette;
 
 /**
- * 설정 화면: 화면 크기, 색맹 모드, 조작 키 변경, 스코어보드 초기화, 기본 설정 복원.
+ * 설정 화면: 화면 크기, 색맹 모드, 난이도, 조작 키 변경, 스코어보드 초기화, 기본 설정 복원.
  * 바꾼 값은 그 자리에서 저장되고, 저장에 성공했을 때만 화면에 적용된다.
  *
  * <p>키를 바꿀 때는 해당 줄에서 Enter를 누른 뒤 새 키를 누른다 (Backspace는 취소). 다른 조작과
@@ -23,7 +24,7 @@ import team.tetris.ui.render.palette.ColorPalette;
  */
 public final class SettingsScreen implements Screen {
 
-    private enum Kind { SCREEN_SIZE, COLOR_BLIND, KEY, CLEAR_SCORES, RESET, BACK }
+    private enum Kind { SCREEN_SIZE, COLOR_BLIND, DIFFICULTY, KEY, CLEAR_SCORES, RESET, BACK }
 
     private record Row(Kind kind, GameCommand command, String label) {
     }
@@ -58,6 +59,7 @@ public final class SettingsScreen implements Screen {
         List<Row> rows = new ArrayList<>();
         rows.add(new Row(Kind.SCREEN_SIZE, null, "화면 크기"));
         rows.add(new Row(Kind.COLOR_BLIND, null, "색맹 모드"));
+        rows.add(new Row(Kind.DIFFICULTY, null, "난이도"));
         for (GameCommand command : GameCommand.values()) {
             rows.add(new Row(Kind.KEY, command, COMMAND_LABELS.get(command)));
         }
@@ -116,11 +118,17 @@ public final class SettingsScreen implements Screen {
             case SCREEN_SIZE -> {
                 ScreenSize[] sizes = ScreenSize.values();
                 ScreenSize next = sizes[Math.floorMod(current.screenSize().ordinal() + direction, sizes.length)];
-                save(new Settings(next, current.keyBindings(), current.colorBlindMode()), "화면 크기 " + sizeLabel(next));
+                save(new Settings(next, current.keyBindings(), current.colorBlindMode(), current.difficulty()), "화면 크기 " + sizeLabel(next));
             }
             case COLOR_BLIND -> {
                 boolean next = !current.colorBlindMode();
-                save(new Settings(current.screenSize(), current.keyBindings(), next), "색맹 모드 " + onOff(next));
+                save(new Settings(current.screenSize(), current.keyBindings(), next, current.difficulty()), "색맹 모드 " + onOff(next));
+            }
+            case DIFFICULTY -> {
+                Difficulty[] choices = Difficulty.values();
+                Difficulty next = choices[Math.floorMod(current.difficulty().ordinal() + direction, choices.length)];
+                save(new Settings(current.screenSize(), current.keyBindings(), current.colorBlindMode(), next),
+                        "난이도 " + next.name());
             }
             default -> {
             }
@@ -130,7 +138,7 @@ public final class SettingsScreen implements Screen {
     private void activate() {
         Row row = ROWS.get(cursor);
         switch (row.kind()) {
-            case SCREEN_SIZE, COLOR_BLIND -> adjust(1);
+            case SCREEN_SIZE, COLOR_BLIND, DIFFICULTY -> adjust(1);
             // 이 단계를 연 Enter를 누르고 있으면 자동 반복이 곧바로 새 키(ENTER)나 "예"로 처리되므로,
             // 한 번 뗄 때까지 무시한다.
             case KEY -> {
@@ -154,7 +162,7 @@ public final class SettingsScreen implements Screen {
         waitingFor = null;
         Settings candidate;
         try {
-            candidate = new Settings(current.screenSize(), keys, current.colorBlindMode());
+            candidate = new Settings(current.screenSize(), keys, current.colorBlindMode(), current.difficulty());
         } catch (IllegalArgumentException conflict) {
             error(KeyNames.display(key) + ": 다른 조작과 겹치는 키입니다");
             return;
@@ -241,6 +249,7 @@ public final class SettingsScreen implements Screen {
         return switch (row.kind()) {
             case SCREEN_SIZE -> selected ? "◄ " + sizeLabel(settings.screenSize()) + " ►" : sizeLabel(settings.screenSize());
             case COLOR_BLIND -> onOff(settings.colorBlindMode());
+            case DIFFICULTY -> settings.difficulty().name();
             case KEY -> waitingFor == row.command() ? "..." : KeyNames.display(settings.keyBindings().get(row.command()));
             default -> "";
         };

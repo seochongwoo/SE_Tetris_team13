@@ -63,3 +63,16 @@
 - [ ] 브랜치 이름 규칙 (예: `feat/...`, `fix/...`, `refactor/...`)과 PR 머지 방식
 - [ ] 난이도에 따른 추가 규칙·점수 부여 (요구사항에서 자유롭게 정하도록 함)
 - [ ] 팀 아이템 3개의 아이디어
+
+## 6. B 담당 구현 브랜치와 검증
+
+카드별 브랜치를 사용합니다. 선행 PR이 아직 머지되지 않았다면 앞 브랜치에서 다음 브랜치를 만들고, PR의 base도 앞 브랜치로 지정합니다. 머지 후에는 다음 PR의 base를 main으로 바꿉니다. Squash 머지를 쓴 경우 이미 머지된 변경이 다시 보이지 않도록 후속 브랜치를 rebase합니다.
+
+| 카드 | 브랜치 | 최초 PR base | 구현·로컬 검증 |
+| --- | --- | --- | --- |
+| 2 | `feat/difficulty-settings` | `main` | 설정 화면·v1→v2 호환 읽기·저장·초기화, 전체 테스트 통과 |
+| 4 | `feat/difficulty-speed` | `feat/difficulty-settings` | 예정 |
+| 5 | `feat/scoreboard-mode-difficulty` | `feat/difficulty-speed` | 예정 |
+
+브랜치 시작점 `ff7b68a`는 main에 계획 문서만 추가된 커밋입니다. 4·5번의 기능상 선행 카드는 2번이며, 위 브랜치 연결은 순차 구현과 리뷰를 위한 것입니다.
+로컬 구현·검증과 카드 완료는 구분합니다. GitHub Issue 연결(`Closes #번호`), PR 생성, 상대방 리뷰 및 Trello 상태 갱신은 별도로 필요합니다.

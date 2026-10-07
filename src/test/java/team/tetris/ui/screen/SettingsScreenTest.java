@@ -15,6 +15,7 @@ import team.tetris.application.GameCommand;
 import team.tetris.application.GameResult;
 import team.tetris.application.GameStatus;
 import team.tetris.application.model.Settings;
+import team.tetris.application.model.Difficulty;
 import team.tetris.application.model.Settings.ScreenSize;
 import team.tetris.application.port.SettingsRepository;
 import team.tetris.application.port.StorageException;
@@ -24,10 +25,10 @@ import team.tetris.ui.TestApplication;
 
 class SettingsScreenTest {
 
-    private static final int FIRST_KEY_ROW = 2;
-    private static final int CLEAR_ROW = 10;
-    private static final int RESET_ROW = 11;
-    private static final int BACK_ROW = 12;
+    private static final int FIRST_KEY_ROW = 3;
+    private static final int CLEAR_ROW = 11;
+    private static final int RESET_ROW = 12;
+    private static final int BACK_ROW = 13;
 
     private final TestApplication app = new TestApplication();
     private final ScreenRouter router = app.router();
@@ -52,6 +53,31 @@ class SettingsScreenTest {
 
     private Settings saved() throws Exception {
         return app.settings().get();
+    }
+
+    @Test
+    void difficultyCyclesAndSurvivesOtherSettingsEditsAndReset() throws Exception {
+        moveTo(2);
+        tap("LEFT");
+        assertEquals(Difficulty.EASY, saved().difficulty());
+        tap("LEFT");
+        assertEquals(Difficulty.HARD, saved().difficulty());
+        assertTrue(router.render().text().contains("HARD"));
+        moveTo(0);
+        tap("RIGHT");
+        moveTo(1);
+        tap("ENTER");
+        moveTo(FIRST_KEY_ROW);
+        tap("ENTER");
+        tap("A");
+        assertEquals(Difficulty.HARD, saved().difficulty());
+        moveTo(2);
+        tap("ENTER");
+        assertEquals(Difficulty.EASY, saved().difficulty());
+        moveTo(RESET_ROW);
+        tap("ENTER");
+        tap("ENTER");
+        assertEquals(Difficulty.NORMAL, saved().difficulty());
     }
 
     @Test
@@ -206,6 +232,10 @@ class SettingsScreenTest {
         brokenRouter.keyPressed("RIGHT");
 
         assertEquals(ScreenSize.MEDIUM, brokenRouter.settings().screenSize());
+        TestApplication.tap(brokenRouter, "DOWN");
+        TestApplication.tap(brokenRouter, "DOWN");
+        TestApplication.tap(brokenRouter, "LEFT");
+        assertEquals(Difficulty.NORMAL, brokenRouter.settings().difficulty());
         assertNull(brokenApp.applied());
         assertTrue(((SettingsScreen) brokenRouter.current()).message().contains("저장하지 못했습니다"));
     }
