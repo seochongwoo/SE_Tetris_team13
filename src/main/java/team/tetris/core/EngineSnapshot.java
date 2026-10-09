@@ -6,8 +6,8 @@ package team.tetris.core;
  *
  * @param board        읽기 전용 보드 스냅샷 (Board.snapshot() 결과)
  * @param activePiece  현재 낙하 중인 블록. phase가 READY/GAME_OVER면 null일 수 있다.
- * @param nextType     다음에 나올 블록 (PieceGenerator.peek() 결과) - 미리보기 표시용
+ * @param nextPiece    다음에 나올 블록 (PieceSource.peek() 결과, 아이템 포함) - 미리보기 표시용
  * @param phase        현재 엔진 상태
  */
-public record EngineSnapshot(Cell[][] board, ActivePiece activePiece, TetrominoType nextType, EnginePhase phase) {
+public record EngineSnapshot(Cell[][] board, ActivePiece activePiece, Piece nextPiece, EnginePhase phase) {
 }

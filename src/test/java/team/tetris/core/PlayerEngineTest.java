@@ -2,17 +2,27 @@ package team.tetris.core;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Deque;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import team.tetris.core.item.Item;
+import team.tetris.core.item.ItemContext;
 import team.tetris.core.result.ClearedRow;
 import team.tetris.core.result.EngineStep;
+import team.tetris.core.result.ItemActivation;
 import team.tetris.core.rule.PieceGenerator;
+import team.tetris.core.rule.PieceSource;
 
 /**
  * PlayerEngine 통합 테스트. 랜덤 생성기 대신 항상 같은 블록만 내놓는 테스트 더블을 써서
@@ -104,7 +114,7 @@ class PlayerEngineTest {
 
         EngineStep secondTick = engine.tick();
         assertNull(secondTick.dropResult());
-        assertEquals(TetrominoType.O, secondTick.lockResult().type());
+        assertEquals(TetrominoType.O, secondTick.lockResult().shape());
     }
 
     @Test
@@ -117,7 +127,8 @@ class PlayerEngineTest {
         assertEquals(4, step.dropResult().cellsDropped());
         assertEquals(new Position(0, 4), step.lockResult().origin());
         assertEquals(1, step.clearResult().lineCount());
-        assertEquals(List.of(new ClearedRow(5)), step.clearResult().clearedRows());
+        assertEquals(List.of(new ClearedRow(5, Collections.nCopies(4, Cell.occupiedBy(TetrominoType.I)))),
+                step.clearResult().clearedRows());
         assertEquals(EnginePhase.RUNNING, step.snapshot().phase());
         // 지워지고 나면 보드가 다시 완전히 비어있어야 함 (이 보드엔 이 줄 하나만 채워져 있었으므로)
         for (Cell[] row : step.snapshot().board()) {
@@ -235,8 +246,8 @@ class PlayerEngineTest {
     }
 
     private static void assertFullyVisible(ActivePiece piece) {
-        for (Position offset : piece.type().cellsAt(piece.rotation())) {
-            assertTrue(piece.origin().y() + offset.y() >= 0, piece + " has a cell above the board");
+        for (Position cell : piece.cells()) {
+            assertTrue(cell.y() >= 0, piece + " has a cell above the board");
         }
     }
 
@@ -269,5 +280,229 @@ class PlayerEngineTest {
 
         EngineStep tickAfterGameOver = engine.tick();
         assertNull(tickAfterGameOver.dropResult());
+    }
+
+    /** 정해 둔 블록을 차례로 내놓고, 다 쓰면 fallback만 내놓는 공급자. 지운 줄 수 알림을 기록한다. */
+    private static final class ScriptedSource implements PieceSource {
+        private final Deque<Piece> queue = new ArrayDeque<>();
+        private final Piece fallback;
+        final List<Integer> clearedReports = new ArrayList<>();
+
+        ScriptedSource(Piece fallback, Piece... first) {
+            this.fallback = fallback;
+            queue.addAll(List.of(first));
+        }
+
+        @Override
+        public Piece next() {
+            return queue.isEmpty() ? fallback : queue.poll();
+        }
+
+        @Override
+        public Piece peek() {
+            return queue.isEmpty() ? fallback : queue.peek();
+        }
+
+        @Override
+        public void onLinesCleared(int lines) {
+            clearedReports.add(lines);
+        }
+    }
+
+    @Test
+    void anItemFiresOnceWhereItsCellLocksAndIsConsumedBeforeItsEffect() {
+        TestItems.Recording item = new TestItems.Recording();
+        // O(회전0)의 0번 칸은 (1,0). 폭6 보드에서 O는 origin (1,0)으로 스폰되고 바닥까지 떨어지면 origin (1,4).
+        PlayerEngine engine = new PlayerEngine(6, 6,
+                new ScriptedSource(Piece.of(TetrominoType.O), Piece.of(TetrominoType.O).withItem(0, item)));
+
+        EngineStep step = engine.apply(GameAction.HARD_DROP);
+
+        Position locked = new Position(2, 4);
+        assertEquals(List.of(new ItemActivation(item, locked)), step.itemActivations());
+        assertEquals(List.of(locked), item.positions);
+        assertEquals(Cell.occupiedBy(TetrominoType.O), item.cellsSeen.get(0));
+        assertEquals(Cell.occupiedBy(TetrominoType.O), step.snapshot().board()[4][2]);
+        assertTrue(step.clearResult().isEmpty());
+    }
+
+    @Test
+    void piecesWithoutItemsReportNoActivations() {
+        PlayerEngine engine = new PlayerEngine(6, 6, new ConstantGenerator(TetrominoType.T));
+
+        assertTrue(engine.apply(GameAction.HARD_DROP).itemActivations().isEmpty());
+        assertTrue(engine.apply(GameAction.MOVE_LEFT).itemActivations().isEmpty());
+    }
+
+    @Test
+    void anItemCanClearItsRowEvenWhenTheRowIsNotFull() {
+        // 폭6 보드에 가로 I(4칸)만 놓이면 줄이 차지 않지만, 줄을 지우는 아이템이 실려 있으면 지워진다.
+        ScriptedSource source = new ScriptedSource(Piece.of(TetrominoType.O),
+                Piece.of(TetrominoType.I).withItem(0, TestItems.clearsItsRow()));
+        PlayerEngine engine = new PlayerEngine(6, 6, source);
+
+        EngineStep step = engine.apply(GameAction.HARD_DROP);
+
+        assertEquals(1, step.clearResult().lineCount());
+        assertEquals(5, step.clearResult().clearedRows().get(0).rowIndex());
+        for (Cell[] row : step.snapshot().board()) {
+            for (Cell cell : row) {
+                assertTrue(cell.isEmpty());
+            }
+        }
+        assertEquals(List.of(1), source.clearedReports);
+    }
+
+    @Test
+    void aRowThatIsBothFullAndMarkedByAnItemIsClearedAndCountedOnce() {
+        ScriptedSource source = new ScriptedSource(Piece.of(TetrominoType.O),
+                Piece.of(TetrominoType.I).withItem(2, TestItems.clearsItsRow()));
+        PlayerEngine engine = new PlayerEngine(4, 6, source);
+
+        EngineStep step = engine.apply(GameAction.HARD_DROP);
+
+        assertEquals(1, step.clearResult().lineCount());
+        assertEquals(List.of(1), source.clearedReports);
+    }
+
+    @Test
+    void theSourceHearsAboutClearedLinesBeforeTheNextPreviewIsDrawn() {
+        // 줄이 지워졌다는 알림을 받은 뒤 새로 나오는 미리보기 블록에 아이템을 싣는 공급자 (아이템 모드의 축소판).
+        Piece itemPiece = Piece.of(TetrominoType.O).withItem(0, TestItems.marker('M'));
+        PieceSource source = new PieceSource() {
+            private Piece upcoming = Piece.of(TetrominoType.I);
+            private boolean itemDue;
+
+            @Override
+            public Piece next() {
+                Piece current = upcoming;
+                upcoming = itemDue ? itemPiece : Piece.of(TetrominoType.I);
+                itemDue = false;
+                return current;
+            }
+
+            @Override
+            public Piece peek() {
+                return upcoming;
+            }
+
+            @Override
+            public void onLinesCleared(int lines) {
+                itemDue = true;
+            }
+        };
+        PlayerEngine engine = new PlayerEngine(4, 6, source);
+
+        EngineStep step = engine.apply(GameAction.HARD_DROP); // 가로 I가 폭4 보드의 맨 아래 줄을 채워 지운다
+
+        assertEquals(1, step.clearResult().lineCount());
+        assertFalse(step.snapshot().activePiece().piece().hasItems());
+        assertEquals(itemPiece, step.snapshot().nextPiece());
+    }
+
+    @Test
+    void theSourceIsNotNotifiedWhenNoLineIsCleared() {
+        ScriptedSource source = new ScriptedSource(Piece.of(TetrominoType.T));
+        PlayerEngine engine = new PlayerEngine(6, 6, source);
+
+        engine.apply(GameAction.HARD_DROP);
+
+        assertTrue(source.clearedReports.isEmpty());
+    }
+
+    /** 테트로미노가 아닌 블록: 가로 2칸, 회전하지 않음 (무게추 같은 특수 블록의 축소판). */
+    private enum Bar implements Shape {
+        INSTANCE;
+
+        @Override
+        public Position[] cellsAt(int rotation) {
+            return new Position[] {new Position(0, 0), new Position(1, 0)};
+        }
+
+        @Override
+        public int rotationStates() {
+            return 1;
+        }
+    }
+
+    @Test
+    void aNonTetrominoShapeSpawnsCentredIgnoresRotationAndLocks() {
+        PlayerEngine engine = new PlayerEngine(6, 4, new ScriptedSource(Piece.of(Bar.INSTANCE)));
+        assertEquals(new ActivePiece(Bar.INSTANCE, 0, new Position(2, 0)), engine.snapshot().activePiece());
+
+        EngineStep rotate = engine.apply(GameAction.ROTATE_CW);
+        assertEquals(0, rotate.snapshot().activePiece().rotation());
+
+        EngineStep drop = engine.apply(GameAction.HARD_DROP);
+        assertEquals(3, drop.dropResult().cellsDropped());
+        assertEquals(Cell.occupiedBy(Bar.INSTANCE), drop.snapshot().board()[3][2]);
+        assertEquals(Cell.occupiedBy(Bar.INSTANCE), drop.snapshot().board()[3][3]);
+    }
+
+    @Test
+    void anItemRotatesWithItsPieceAndFiresWhereThatCellEndsUp() {
+        TestItems.Recording item = new TestItems.Recording();
+        // T의 0번 칸(위로 튀어나온 칸)에 아이템. 한 번 돌리면 오른쪽으로 튀어나온 칸이 된다.
+        PlayerEngine engine = new PlayerEngine(6, 6,
+                new ScriptedSource(Piece.of(TetrominoType.O), Piece.of(TetrominoType.T).withItem(0, item)));
+        ActivePiece turned = engine.apply(GameAction.ROTATE_CW).snapshot().activePiece();
+        Position expected = turned.origin().translate(2, 1);
+        assertEquals(expected, turned.cells()[0]);
+
+        EngineStep drop = engine.apply(GameAction.HARD_DROP);
+
+        int dropped = drop.dropResult().cellsDropped();
+        assertEquals(List.of(expected.translate(0, dropped)), item.positions);
+    }
+    @Test
+    void anItemCanRemoveSingleCellsWithoutShiftingRowsAndSeesTheBoardSize() {
+        int[] seenSize = new int[2];
+        // 아이템이 실린 칸 바로 아래 칸 하나를 지우는 아이템 (폭탄·무게추가 쓰는 칸 단위 삭제의 축소판).
+        Item removesCellBelow = new Item() {
+            @Override
+            public char symbol() {
+                return 'D';
+            }
+
+            @Override
+            public void onLock(ItemContext context, Position position) {
+                seenSize[0] = context.width();
+                seenSize[1] = context.height();
+                context.removeCell(position.translate(0, 1));
+            }
+        };
+        // 첫 O는 바닥(4~5행, 2~3열)에, 두 번째 O는 그 위(2~3행)에 쌓인다. 두 번째 O의 2번 칸은 왼쪽 아래 (2,3).
+        PlayerEngine engine = new PlayerEngine(6, 6, new ScriptedSource(Piece.of(TetrominoType.O),
+                Piece.of(TetrominoType.O), Piece.of(TetrominoType.O).withItem(2, removesCellBelow)));
+        engine.apply(GameAction.HARD_DROP);
+
+        EngineStep step = engine.apply(GameAction.HARD_DROP);
+
+        Cell[][] board = step.snapshot().board();
+        assertTrue(board[4][2].isEmpty());
+        assertEquals(Cell.occupiedBy(TetrominoType.O), board[4][3]);
+        assertEquals(Cell.occupiedBy(TetrominoType.O), board[3][2]);
+        assertEquals(Cell.occupiedBy(TetrominoType.O), board[5][2]);
+        assertTrue(step.clearResult().isEmpty());
+        assertArrayEquals(new int[] {6, 6}, seenSize);
+    }
+
+    @Test
+    void anItemAskingToClearARowOutsideTheBoardIsAProgrammingError() {
+        Item broken = new Item() {
+            @Override
+            public char symbol() {
+                return 'X';
+            }
+
+            @Override
+            public void onLock(ItemContext context, Position position) {
+                context.clearRow(context.height());
+            }
+        };
+        PlayerEngine engine = new PlayerEngine(6, 6,
+                new ScriptedSource(Piece.of(TetrominoType.O), Piece.of(TetrominoType.O).withItem(0, broken)));
+
+        assertThrows(IllegalArgumentException.class, () -> engine.apply(GameAction.HARD_DROP));
     }
 }

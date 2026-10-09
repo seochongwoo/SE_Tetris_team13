@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 import team.tetris.core.Board;
 import team.tetris.core.Position;
+import team.tetris.core.Shape;
 import team.tetris.core.TetrominoType;
 
 class RotationSystemTest {
@@ -96,5 +97,26 @@ class RotationSystemTest {
             assertEquals(0, result.rotation());
             assertEquals(tOrigin, result.origin());
         }
+    }
+    @Test
+    void aShapeWithASingleRotationStateNeverRotates() {
+        Shape bar = new Shape() {
+            @Override
+            public Position[] cellsAt(int rotation) {
+                return new Position[] {new Position(0, 0), new Position(1, 0)};
+            }
+
+            @Override
+            public int rotationStates() {
+                return 1;
+            }
+        };
+        Position origin = new Position(2, 2);
+
+        RotationResult result = rotationSystem.tryRotate(new Board(6, 6), bar, 0, origin, true);
+
+        assertFalse(result.rotated());
+        assertEquals(0, result.rotation());
+        assertEquals(origin, result.origin());
     }
 }

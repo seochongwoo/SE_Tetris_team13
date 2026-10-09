@@ -3,36 +3,51 @@ package team.tetris.core;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
+import team.tetris.core.item.Item;
 
 class CellTest {
 
+    static final Item MARK = TestItems.marker('M');
+
     @Test
-    void emptyConstantIsEmptyAndHasNoOccupant() {
+    void emptyConstantIsEmptyAndHasNoOccupantOrItem() {
         assertTrue(Cell.EMPTY.isEmpty());
-        assertEquals(CellKind.EMPTY, Cell.EMPTY.kind());
         assertNull(Cell.EMPTY.occupiedBy());
+        assertFalse(Cell.EMPTY.hasItem());
     }
 
     @Test
-    void occupiedByStoresTheGivenTetrominoType() {
+    void occupiedByStoresTheGivenShapeWithoutAnItem() {
         Cell cell = Cell.occupiedBy(TetrominoType.T);
 
         assertFalse(cell.isEmpty());
-        assertEquals(CellKind.OCCUPIED, cell.kind());
         assertEquals(TetrominoType.T, cell.occupiedBy());
+        assertFalse(cell.hasItem());
     }
 
     @Test
-    void occupiedCellWithoutTypeIsRejected() {
-        assertThrows(IllegalArgumentException.class, () -> new Cell(CellKind.OCCUPIED, null));
+    void occupiedCellWithoutShapeIsRejected() {
+        assertThrows(IllegalArgumentException.class, () -> Cell.occupiedBy(null));
+        assertThrows(IllegalArgumentException.class, () -> Cell.withItem(null, MARK));
     }
 
     @Test
-    void emptyCellWithTypeIsRejected() {
-        assertThrows(IllegalArgumentException.class, () -> new Cell(CellKind.EMPTY, TetrominoType.I));
+    void emptyCellCannotHoldAnItem() {
+        assertThrows(IllegalArgumentException.class, () -> new Cell(null, MARK));
+    }
+
+    @Test
+    void itemCanBeRemovedLeavingTheBlock() {
+        Cell cell = Cell.withItem(TetrominoType.I, MARK);
+        assertTrue(cell.hasItem());
+
+        assertEquals(Cell.occupiedBy(TetrominoType.I), cell.withoutItem());
+        Cell plain = Cell.occupiedBy(TetrominoType.I);
+        assertSame(plain, plain.withoutItem());
     }
 }

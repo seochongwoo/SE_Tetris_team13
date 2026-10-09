@@ -5,8 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import team.tetris.core.item.Item;
 import team.tetris.core.result.ClearResult;
 import team.tetris.core.result.ClearedRow;
 
@@ -151,7 +153,7 @@ class BoardTest {
         ClearResult result = board.clearFullLines();
 
         assertEquals(1, result.lineCount());
-        assertEquals(List.of(new ClearedRow(3)), result.clearedRows());
+        assertEquals(List.of(new ClearedRow(3, filledRow(TetrominoType.I, 4))), result.clearedRows());
 
         Cell[][] snapshot = board.snapshot();
         // row0은 새로 채워진 빈 행
@@ -187,7 +189,8 @@ class BoardTest {
         ClearResult result = board.clearFullLines();
 
         assertEquals(2, result.lineCount());
-        assertEquals(List.of(new ClearedRow(2), new ClearedRow(3)), result.clearedRows());
+        assertEquals(List.of(new ClearedRow(2, filledRow(TetrominoType.O, 4)), new ClearedRow(3, filledRow(TetrominoType.O, 4))),
+                result.clearedRows());
 
         Cell[][] snapshot = board.snapshot();
         for (Cell cell : snapshot[0]) {
@@ -218,5 +221,85 @@ class BoardTest {
         Cell[][] second = board.snapshot();
 
         assertTrue(second[0][0].isEmpty());
+    }
+    private static List<Cell> filledRow(Shape shape, int width) {
+        return Collections.nCopies(width, Cell.occupiedBy(shape));
+    }
+
+    @Test
+    void placeRecordsItemsOnTheCellsThatCarryThem() {
+        Board board = new Board(4, 4);
+        Item item = TestItems.marker('M');
+        // T(회전0) 칸 순서: (1,0) (0,1) (1,1) (2,1) -> 1번 칸에 아이템
+        board.place(new ActivePiece(Piece.of(TetrominoType.T).withItem(1, item), 0, new Position(0, 0)));
+
+        assertEquals(Cell.withItem(TetrominoType.T, item), board.cellAt(new Position(0, 1)));
+        assertEquals(Cell.occupiedBy(TetrominoType.T), board.cellAt(new Position(1, 0)));
+    }
+
+    @Test
+    void clearRowsRemovesRequestedRowsTogetherWithFullRowsAndReportsTheirContents() {
+        Board board = new Board(4, 5);
+        board.place(TetrominoType.T, 0, new Position(0, 0)); // row0 col1, row1 col0~2 (꽉 차지 않음)
+        board.place(TetrominoType.I, 0, new Position(0, 3)); // row4를 꽉 채움
+
+        ClearResult result = board.clearRows(List.of(0));
+
+        assertEquals(2, result.lineCount());
+        assertEquals(0, result.clearedRows().get(0).rowIndex());
+        assertEquals(Cell.occupiedBy(TetrominoType.T), result.clearedRows().get(0).cells().get(1));
+        assertTrue(result.clearedRows().get(0).cells().get(0).isEmpty());
+        assertEquals(new ClearedRow(4, filledRow(TetrominoType.I, 4)), result.clearedRows().get(1));
+        // 두 줄이 지워져 남은 세 줄(원래 row1~3)이 row2~4로 내려온다. T의 아랫부분은 row2가 된다.
+        Cell[][] snapshot = board.snapshot();
+        assertEquals(Cell.occupiedBy(TetrominoType.T), snapshot[2][0]);
+        assertEquals(Cell.occupiedBy(TetrominoType.T), snapshot[2][2]);
+        assertTrue(snapshot[2][3].isEmpty());
+        for (int row : new int[] {0, 1, 3, 4}) {
+            for (Cell cell : snapshot[row]) {
+                assertTrue(cell.isEmpty());
+            }
+        }
+    }
+
+    @Test
+    void clearRowsRejectsRowsOutsideTheBoard() {
+        Board board = new Board(4, 4);
+
+        assertThrows(IllegalArgumentException.class, () -> board.clearRows(List.of(4)));
+        assertThrows(IllegalArgumentException.class, () -> board.clearRows(List.of(-1)));
+    }
+
+    @Test
+    void removeCellEmptiesOneCellWithoutShiftingAnythingDown() {
+        Board board = new Board(4, 4);
+        board.place(TetrominoType.T, 0, new Position(0, 0));
+
+        board.removeCell(new Position(1, 1));
+        board.removeCell(new Position(1, -1)); // 보드 위쪽은 원래 비어 있으므로 무시
+
+        assertTrue(board.cellAt(new Position(1, 1)).isEmpty());
+        assertEquals(Cell.occupiedBy(TetrominoType.T), board.cellAt(new Position(1, 0)));
+        assertEquals(Cell.occupiedBy(TetrominoType.T), board.cellAt(new Position(0, 1)));
+    }
+
+    @Test
+    void removeItemKeepsTheBlockButDropsTheItem() {
+        Board board = new Board(4, 4);
+        board.place(new ActivePiece(Piece.of(TetrominoType.O).withItem(0, TestItems.marker('M')), 0, new Position(0, 0)));
+
+        board.removeItem(new Position(1, 0));
+
+        assertEquals(Cell.occupiedBy(TetrominoType.O), board.cellAt(new Position(1, 0)));
+    }
+
+    @Test
+    void cellAtTreatsAboveTheBoardAsEmptyAndRejectsOtherOutsidePositions() {
+        Board board = new Board(4, 4);
+
+        assertTrue(board.cellAt(new Position(0, -1)).isEmpty());
+        assertThrows(IllegalArgumentException.class, () -> board.cellAt(new Position(4, 0)));
+        assertThrows(IllegalArgumentException.class, () -> board.cellAt(new Position(0, 4)));
+        assertThrows(IllegalArgumentException.class, () -> board.removeCell(new Position(-1, 0)));
     }
 }

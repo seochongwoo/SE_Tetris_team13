@@ -121,7 +121,7 @@ class SinglePlayerSessionTest {
 
         public EngineSnapshot snapshot() {
             snapshots++;
-            return new EngineSnapshot(board, null, TetrominoType.I, phase);
+            return new EngineSnapshot(board, null, Piece.of(TetrominoType.I), phase);
         }
 
         public EngineStep apply(GameAction action) {
@@ -146,10 +146,10 @@ class SinglePlayerSessionTest {
         }
 
         void enqueue(int distance, int lines, boolean locked, EnginePhase after) {
-            steps.add(new EngineStep(new EngineSnapshot(board, null, TetrominoType.I, after),
+            steps.add(new EngineStep(new EngineSnapshot(board, null, Piece.of(TetrominoType.I), after),
                     new DropResult(distance),
                     locked ? new LockResult(TetrominoType.I, new Position(0, 0), 0) : null,
-                    new ClearResult(IntStream.range(0, lines).mapToObj(ClearedRow::new).toList())));
+                    new ClearResult(IntStream.range(0, lines).mapToObj(row -> new ClearedRow(row, List.of())).toList())));
         }
     }
 

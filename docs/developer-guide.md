@@ -188,7 +188,7 @@ while (gameScreenActive) {
 
 ### 화면 데이터 읽기
 
-`view.engine()`을 프레임당 한 번 받아 사용합니다. `board()[y][x]`는 고정된 셀이며 행 0이 맨 위입니다. 낙하 중인 블록은 `activePiece`를 별도로 그립니다. 각 칸의 위치는 `activePiece.origin()`에 `activePiece.type().cellsAt(activePiece.rotation())`의 오프셋을 더해 구합니다. 보드 위쪽의 음수 y좌표는 화면에서 제외합니다. `nextType()`은 다음 블록 미리보기입니다.
+`view.engine()`을 프레임당 한 번 받아 사용합니다. `board()[y][x]`는 고정된 셀이며 행 0이 맨 위입니다. 낙하 중인 블록은 `activePiece`를 별도로 그립니다. 각 칸의 보드 좌표는 `activePiece.cells()`로 구하며, 같은 인덱스의 아이템은 `activePiece.itemAt(i)`입니다. 보드 위쪽의 음수 y좌표는 화면에서 제외합니다. `nextPiece()`는 다음 블록 미리보기이며 아이템을 포함합니다. 칸의 블록 모양은 `Cell.occupiedBy()`(`Shape`), 아이템은 `Cell.item()`으로 읽습니다. 모양이 `TetrominoType`이 아닌 칸(무게추 등 특수 블록)도 있을 수 있습니다.
 
 `GameSnapshot`은 생성·조회 시 보드 배열을 복사합니다. 코어의 `EngineSnapshot` record 자체에 방어 복사 기능이 있는 것은 아닙니다. 화면에서는 반환 데이터를 읽기 전용으로 취급하고, 종료 화면 전환은 엔진 phase 대신 세션 `status()`와 `result()`를 기준으로 판단합니다.
 
@@ -383,7 +383,10 @@ lineBonus = 100 × clearedLinesInThisStep²
 
 - 점수·속도: `ScoreRule`과 `SpeedRule`을 구현하고 `AppComposition(Path, Supplier<? extends PieceGenerator>, ScoreRule, SpeedRule)`에 전달합니다. 순수 계산으로 구현하며 실행 중 외부에서 변경하지 않습니다.
 - 블록 생성: `PieceGenerator`를 구현하고 위 생성자에 팩터리를 전달합니다. 새 게임마다 독립된 생성기를 반환해야 합니다.
-- 코어: `TetrisEnginePort`는 `snapshot()`, `apply(GameAction)`, `tick()`을 제공합니다. 세션은 이 포트에 의존하며 실제 엔진 생성은 bootstrap에서 수행합니다. `EngineStep`의 drop/lock/clear 결과는 없으면 null일 수 있습니다.
+- 코어: `TetrisEnginePort`는 `snapshot()`, `apply(GameAction)`, `tick()`을 제공합니다. 세션은 이 포트에 의존하며 실제 엔진 생성은 bootstrap에서 수행합니다. `EngineStep`의 drop/lock/clear 결과는 없으면 null일 수 있고, `itemActivations()`는 아이템이 발동하지 않으면 빈 목록입니다. `ClearedRow.cells()`에 지워지기 직전 칸 내용이 있어 삭제 애니메이션에 쓸 수 있습니다.
+- 블록 모양: 테트로미노가 아닌 블록은 `core.Shape`를 구현합니다. 회전해도 같은 인덱스가 같은 칸을 가리키도록 좌표를 정렬하고, 회전하지 않는 블록은 `rotationStates()`를 1로 둡니다.
+- 아이템: `core.item.Item`을 구현합니다. 블록이 고정되면 아이템이 실린 칸마다 `onLock(ItemContext, Position)`이 한 번 호출되고 아이템은 소모됩니다. 처리 순서는 보드 기록 → 아이템 효과 → 꽉 찬 줄과 `ItemContext.clearRow`로 지정한 줄 일괄 삭제이며, 지운 줄은 모두 `clearResult`로 보고되어 기존 방식대로 점수가 계산됩니다. 점수 배율처럼 보드 밖 효과는 `itemActivations()`를 보고 application에서 처리합니다.
+- 아이템 공급: `core.rule.PieceSource`를 구현해 `PlayerEngine(width, height, source)`에 전달합니다. 블록 모양은 기존처럼 `PieceGenerator`가 정하고, 아이템을 실을지는 공급자가 정합니다. 줄이 지워지면 다음 블록을 꺼내기 전에 `onLinesCleared(lines)`가 호출되므로 "10줄마다 아이템"을 바로 미리보기에 반영할 수 있습니다. 일반 모드는 `PlainPieceSource`를 씁니다.
 - 저장 방식: `SettingsRepository` 또는 `ScoreRepository`를 구현해 서비스 생성자에 전달합니다. 앱 전체에 적용하려면 bootstrap 조립도 변경합니다. 테스트용 메모리 구현은 `storage.memory`에 있습니다.
 - 순위 정책: `ScoreboardService(repository, policy, clock)`으로 보관 개수·이름 제한 등을 주입합니다. 현재 종료 조율자는 ABORTED를 항상 메뉴로 보내므로, 중도 종료 등록 정책을 바꿀 경우 종료 흐름도 함께 검토해야 합니다.
 
