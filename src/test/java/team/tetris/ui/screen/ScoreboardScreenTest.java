@@ -9,6 +9,8 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import team.tetris.application.GameResult;
 import team.tetris.application.GameStatus;
 import team.tetris.application.model.ScoreStore;
@@ -170,6 +172,88 @@ class ScoreboardScreenTest {
         assertFalse(screenRouter.render().text().contains("기록을 불러오지 못했습니다"));
         assertEquals(Difficulty.NORMAL, screenRouter.settings().difficulty());
         assertEquals(1, backing.load().registrations().size());
+    }
+
+    @Test
+    void endingRetryReadsAgainAndKeepsErrorUntilStorageRecovers() {
+        var repository = new FailingScoreRepository();
+        var application = new TestApplication(new InMemorySettingsRepository(), repository);
+        var screenRouter = application.router();
+        var result = new GameResult(UUID.randomUUID(), 50, 0, 0, GameStatus.GAME_OVER);
+        screenRouter.finishGame(result);
+        screenRouter.charTyped('X');
+        TestApplication.tap(screenRouter, "ENTER");
+        UUID savedId = ((ScoreboardScreen) screenRouter.current()).highlightedRecordId().orElseThrow();
+
+        repository.failReads = true;
+        TestApplication.tap(screenRouter, "RIGHT");
+        TestApplication.tap(screenRouter, "LEFT");
+        int readsBeforeRetry = repository.reads;
+        TestApplication.tap(screenRouter, "R");
+        assertEquals(readsBeforeRetry + 1, repository.reads);
+        assertTrue(screenRouter.render().text().contains("기록을 불러오지 못했습니다"));
+        assertTrue(((ScoreboardScreen) screenRouter.current()).entries().isEmpty());
+
+        repository.failReads = false;
+        TestApplication.tap(screenRouter, "R");
+        var screen = (ScoreboardScreen) screenRouter.current();
+        assertEquals(savedId, screen.entries().getFirst().recordId());
+        assertEquals(savedId, screen.highlightedRecordId().orElseThrow());
+        assertFalse(screenRouter.render().text().contains("기록을 불러오지 못했습니다"));
+        assertEquals(1, repository.writes);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"R,R", "RIGHT,LEFT", "DOWN,UP"})
+    void recoveringInitialScoreboardReadRestoresHighlightWithoutSavingAgain(String firstKey, String secondKey) {
+        var repository = new FailingScoreRepository();
+        repository.failAfterSave = true;
+        var application = new TestApplication(new InMemorySettingsRepository(), repository);
+        var screenRouter = application.router();
+        var result = new GameResult(UUID.randomUUID(), 50, 0, 0, GameStatus.GAME_OVER,
+                GameMode.ITEM, Difficulty.EASY);
+        screenRouter.finishGame(result);
+        screenRouter.charTyped('X');
+        TestApplication.tap(screenRouter, "ENTER");
+        assertTrue(screenRouter.render().text().contains("기록을 불러오지 못했습니다"));
+        assertTrue(((ScoreboardScreen) screenRouter.current()).highlightedRecordId().isEmpty());
+
+        repository.failReads = false;
+        TestApplication.tap(screenRouter, firstKey);
+        TestApplication.tap(screenRouter, secondKey);
+        var screen = (ScoreboardScreen) screenRouter.current();
+        assertEquals(1, screen.entries().size());
+        var entry = screen.entries().getFirst();
+        assertEquals(result.gameId(), entry.gameId());
+        assertEquals(entry.recordId(), screen.highlightedRecordId().orElseThrow());
+        assertFalse(screenRouter.render().text().contains("기록을 불러오지 못했습니다"));
+        assertTrue(screenRouter.render().text().contains("아이템 / EASY"));
+        assertEquals(1, repository.writes);
+        assertEquals(1, repository.backing.load().registrations().size());
+    }
+
+    private static final class FailingScoreRepository implements ScoreRepository {
+        private final InMemoryScoreRepository backing = new InMemoryScoreRepository();
+        private boolean failReads;
+        private boolean failAfterSave;
+        private int reads;
+        private int writes;
+
+        @Override
+        public ScoreStore load() throws StorageException {
+            reads++;
+            if (failReads) {
+                throw new StorageException(StorageException.Kind.READ_FAILED, Path.of("scores.bin"), null);
+            }
+            return backing.load();
+        }
+
+        @Override
+        public void save(ScoreStore store) {
+            writes++;
+            backing.save(store);
+            if (failAfterSave) failReads = true;
+        }
     }
 
     @Test

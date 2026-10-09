@@ -30,7 +30,7 @@ public final class ScoreboardScreen implements Screen {
 
     private final ScreenRouter router;
     private List<ScoreEntry> entries;
-    private final Optional<UUID> highlight;
+    private Optional<UUID> highlight;
     private Optional<StorageException> error;
     private GameMode mode;
     private Difficulty difficulty;
@@ -86,9 +86,7 @@ public final class ScoreboardScreen implements Screen {
                 reload();
             }
             case "R" -> {
-                if (isAfterGame() && error.isPresent() && mode == result.mode() && difficulty == result.difficulty()) {
-                    router.retryEnding(result);
-                } else if (error.isPresent()) {
+                if (error.isPresent()) {
                     reload();
                 } else {
                     showKeyHint = true;
@@ -108,6 +106,10 @@ public final class ScoreboardScreen implements Screen {
         var loaded = router.loadScores(mode, difficulty);
         entries = loaded.value();
         error = loaded.error();
+        // 최초 조회가 실패했어도 복구한 목록에서 이번 게임의 기록을 다시 찾는다.
+        highlight = result == null ? Optional.empty() : entries.stream()
+                .filter(entry -> entry.gameId().equals(result.gameId()))
+                .map(ScoreEntry::recordId).findFirst();
         showKeyHint = false;
     }
 
