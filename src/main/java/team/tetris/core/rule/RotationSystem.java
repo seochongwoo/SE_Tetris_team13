@@ -2,7 +2,7 @@ package team.tetris.core.rule;
 
 import team.tetris.core.Board;
 import team.tetris.core.Position;
-import team.tetris.core.TetrominoType;
+import team.tetris.core.Shape;
 
 /**
  * 회전 시도와 벽/바닥 근처에서의 간단한 밀어내기(벽차기)를 담당한다.
@@ -29,22 +29,22 @@ public final class RotationSystem {
             new Position(1, -1),
     };
 
-    /** 회전 상태 개수와 동일 (0~3). TetrominoType/ROTATION_STATES과 일치시켜 둔다. */
-    private static final int ROTATION_STATES = TetrominoType.ROTATION_STATES;
-
     /**
-     * type을 currentRotation/currentOrigin 상태에서 clockwise 방향으로 90도 회전을 시도한다.
+     * shape을 currentRotation/currentOrigin 상태에서 clockwise 방향으로 90도 회전을 시도한다.
      * 성공하면 새 rotation/origin을 담아 반환하고, 모든 벽차기 시도가 실패하면 원래 상태를
-     * 그대로 담아 실패를 반환한다.
+     * 그대로 담아 실패를 반환한다. 회전 상태가 하나뿐인 블록(무게추 등)은 항상 실패한다.
      */
     public RotationResult tryRotate(
-            Board board, TetrominoType type, int currentRotation, Position currentOrigin, boolean clockwise) {
-        int targetRotation = Math.floorMod(currentRotation + (clockwise ? 1 : -1), ROTATION_STATES);
+            Board board, Shape shape, int currentRotation, Position currentOrigin, boolean clockwise) {
+        if (shape.rotationStates() <= 1) {
+            return RotationResult.failed(currentRotation, currentOrigin);
+        }
+        int targetRotation = Math.floorMod(currentRotation + (clockwise ? 1 : -1), shape.rotationStates());
 
         for (Position kick : KICK_OFFSETS) {
             Position candidateOrigin = currentOrigin.translate(kick.x(), kick.y());
-            if (isFullyOnBoard(type, targetRotation, candidateOrigin)
-                    && board.canPlace(type, targetRotation, candidateOrigin)) {
+            if (isFullyOnBoard(shape, targetRotation, candidateOrigin)
+                    && board.canPlace(shape, targetRotation, candidateOrigin)) {
                 return RotationResult.success(targetRotation, candidateOrigin);
             }
         }
@@ -53,8 +53,8 @@ public final class RotationSystem {
     }
 
     /** 회전 결과의 모든 칸이 보드 위쪽 경계 안(y >= 0)에 있어야 한다 - 칸이 화면 밖으로 잘려 나가지 않게 한다. */
-    private static boolean isFullyOnBoard(TetrominoType type, int rotation, Position origin) {
-        for (Position offset : type.cellsAt(rotation)) {
+    private static boolean isFullyOnBoard(Shape shape, int rotation, Position origin) {
+        for (Position offset : shape.cellsAt(rotation)) {
             if (origin.y() + offset.y() < 0) {
                 return false;
             }

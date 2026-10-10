@@ -4,6 +4,7 @@ import java.awt.Color;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
+import team.tetris.core.Shape;
 import team.tetris.core.TetrominoType;
 import team.tetris.ui.render.TextStyle;
 
@@ -91,8 +92,18 @@ public record ColorPalette(
         return new TextStyle(border, background, false);
     }
 
-    public TextStyle blockStyle(TetrominoType type) {
-        return new TextStyle(block(type), background, true);
+    /** 블록 칸의 스타일. 테트로미노가 아닌 블록(무게추 등)은 글자색으로 그린다. */
+    public TextStyle blockStyle(Shape shape) {
+        return new TextStyle(colorOf(shape), background, true);
+    }
+
+    /** 아이템이 실린 칸: 블록 색을 배경으로 칠하고 글자는 배경색으로 반전해 일반 무늬와 구분한다. */
+    public TextStyle itemStyle(Shape shape) {
+        return new TextStyle(background, colorOf(shape), true);
+    }
+
+    private Color colorOf(Shape shape) {
+        return shape instanceof TetrominoType type ? block(type) : text;
     }
 
     /** 선택된 항목처럼 강조할 줄: 배경을 칠하고 글자는 배경색으로 반전. */

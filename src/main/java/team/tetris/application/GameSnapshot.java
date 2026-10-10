@@ -23,6 +23,6 @@ public record GameSnapshot(
         for (int row = 0; row < board.length; row++) {
             board[row] = board[row].clone();
         }
-        return new EngineSnapshot(board, source.activePiece(), source.nextType(), source.phase());
+        return new EngineSnapshot(board, source.activePiece(), source.nextPiece(), source.phase());
     }
 }

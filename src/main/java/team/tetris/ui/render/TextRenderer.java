@@ -6,8 +6,10 @@ import team.tetris.application.GameSnapshot;
 import team.tetris.core.ActivePiece;
 import team.tetris.core.Cell;
 import team.tetris.core.EngineSnapshot;
+import team.tetris.core.Piece;
 import team.tetris.core.Position;
-import team.tetris.core.TetrominoType;
+import team.tetris.core.Shape;
+import team.tetris.core.item.Item;
 import team.tetris.ui.input.InputMapper;
 import team.tetris.ui.input.KeyNames;
 import team.tetris.ui.render.palette.BlockGlyphs;
@@ -17,8 +19,8 @@ import team.tetris.ui.render.palette.ColorPalette;
  * 게임 화면을 텍스트 격자로 그린다. 왼쪽에 테두리를 두른 보드(블록 한 칸 = 두 글자),
  * 오른쪽에 다음 블록, 점수·레벨·지운 줄 수, 조작 키 안내를 둔다.
  *
- * <p>보드에는 고정된 칸만 들어 있으므로, 낙하 중인 블록은 origin에 회전 상태의 상대좌표를 더해
- * 따로 겹쳐 그린다.
+ * <p>보드에는 고정된 칸만 들어 있으므로, 낙하 중인 블록은 각 칸의 보드 좌표를 구해 따로 겹쳐
+ * 그린다. 아이템이 실린 칸은 아이템 문자를 반전 색으로 그려 일반 무늬와 구분한다.
  */
 public final class TextRenderer implements Renderer {
 
@@ -69,7 +71,7 @@ public final class TextRenderer implements Renderer {
         Cell[][] board = engine.board();
         drawBoard(frame, board);
         drawActivePiece(frame, engine.activePiece(), board[0].length, board.length);
-        drawNext(frame, engine.nextType());
+        drawNext(frame, engine.nextPiece());
         drawStats(frame, snapshot);
         drawHelp(frame);
         return frame;
@@ -85,7 +87,7 @@ public final class TextRenderer implements Renderer {
                 if (cell.isEmpty()) {
                     frame.put(columnOf(x), rowOf(y), BlockGlyphs.EMPTY, palette.dimStyle());
                 } else {
-                    drawCell(frame, columnOf(x), rowOf(y), cell.occupiedBy());
+                    drawCell(frame, columnOf(x), rowOf(y), cell.occupiedBy(), cell.item());
                 }
             }
         }
@@ -95,23 +97,24 @@ public final class TextRenderer implements Renderer {
         if (piece == null) {
             return;
         }
-        for (Position offset : piece.type().cellsAt(piece.rotation())) {
-            int x = piece.origin().x() + offset.x();
-            int y = piece.origin().y() + offset.y();
+        Position[] cells = piece.cells();
+        for (int i = 0; i < cells.length; i++) {
+            int x = cells[i].x();
+            int y = cells[i].y();
             if (x >= 0 && x < width && y >= 0 && y < height) {
-                drawCell(frame, columnOf(x), rowOf(y), piece.type());
+                drawCell(frame, columnOf(x), rowOf(y), piece.shape(), piece.itemAt(i));
             }
         }
     }
 
-    private void drawNext(TextFrame frame, TetrominoType next) {
+    private void drawNext(TextFrame frame, Piece next) {
         frame.put(PANEL_LEFT, BOARD_TOP, "NEXT", palette.accentStyle());
         int boxTop = BOARD_TOP + 1;
         frame.box(PANEL_LEFT, boxTop, NEXT_BOX_WIDTH, NEXT_BOX_HEIGHT, palette.borderStyle(), palette.base());
         if (next == null) {
             return;
         }
-        Position[] cells = next.cellsAt(0);
+        Position[] cells = next.shape().cellsAt(0);
         int minX = Integer.MAX_VALUE;
         int maxX = Integer.MIN_VALUE;
         int minY = Integer.MAX_VALUE;
@@ -126,8 +129,9 @@ public final class TextRenderer implements Renderer {
         int innerHeight = NEXT_BOX_HEIGHT - 2;
         int startCol = PANEL_LEFT + 1 + (innerWidth - (maxX - minX + 1) * CELL_WIDTH) / 2;
         int startRow = boxTop + 1 + (innerHeight - (maxY - minY + 1)) / 2;
-        for (Position cell : cells) {
-            drawCell(frame, startCol + (cell.x() - minX) * CELL_WIDTH, startRow + (cell.y() - minY), next);
+        for (int i = 0; i < cells.length; i++) {
+            drawCell(frame, startCol + (cells[i].x() - minX) * CELL_WIDTH, startRow + (cells[i].y() - minY),
+                    next.shape(), next.itemAt(i));
         }
     }
 
@@ -159,7 +163,11 @@ public final class TextRenderer implements Renderer {
         }
     }
 
-    private void drawCell(TextFrame frame, int col, int row, TetrominoType type) {
-        frame.put(col, row, BlockGlyphs.of(type), palette.blockStyle(type));
+    private void drawCell(TextFrame frame, int col, int row, Shape shape, Item item) {
+        if (item != null) {
+            frame.put(col, row, BlockGlyphs.of(item), palette.itemStyle(shape));
+        } else {
+            frame.put(col, row, BlockGlyphs.of(shape), palette.blockStyle(shape));
+        }
     }
 }
