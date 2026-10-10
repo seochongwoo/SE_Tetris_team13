@@ -85,7 +85,8 @@
 - **core**
   - 구현됨 (카드 1): `Shape`(블럭 모양), `Piece`(모양 + 칸별 아이템), 아이템을 담는 `Cell`, `item/Item`·`item/ItemContext`(고정 시 효과), `rule/PieceSource`·`rule/PlainPieceSource`(아이템 공급과 지운 줄 수 알림), `ClearedRow`의 지운 칸 내용, `EngineStep.itemActivations()`
   - 구현됨 (카드 6): `rule/ItemPieceSource`(10줄마다 아이템, 일반 공급자를 감싸는 형태), `item/ItemKind`·`item/AttachedItem`(아이템이 블럭에 실리는 방식), `item/ItemCatalog`(등장 아이템 목록, 새 아이템은 여기에 한 줄 추가)
-  - 할 일: 아이템 구현체들(`core/item/`), `rule/WeightedRandomGenerator`(7-bag 대체, 블럭별 가중치를 생성자로 받음), 무게추용 엔진 확장 지점
+  - 구현됨 (카드 3): `rule/WeightedRandomGenerator`(7-bag 대체, 블럭별 가중치를 생성자로 받음), 난이도별 가중치는 application의 `PieceWeightPolicy`
+  - 할 일: 아이템 구현체들(`core/item/`), 무게추용 엔진 확장 지점
 - **application**: `Difficulty`, `GameMode`, `Settings`(난이도), `GameResult`·`ScoreEntry`(모드·난이도), `ScoreboardService`(모드·난이도별 순위), `SpeedPolicy`(난이도별 증가율), `ApplicationContext.newGame`(모드·난이도 전달), `SinglePlayerSession`(줄 삭제 애니메이션 동안 대기, `$` 같은 보드 밖 아이템 효과)
 - **storage**: `PropertiesSettingsRepository`(설정 파일 `schemaVersion` 2), `BinaryScoreRepository`(점수 파일 버전 2, 기존 기록은 일반 모드·normal로 변환)
 - **bootstrap**: `AppComposition`(모드·난이도에 맞는 생성기·공급자·규칙 조립)

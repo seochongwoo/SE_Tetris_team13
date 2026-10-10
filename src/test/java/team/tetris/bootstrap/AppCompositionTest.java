@@ -3,10 +3,15 @@ package team.tetris.bootstrap;
 import static org.junit.jupiter.api.Assertions.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import team.tetris.application.*;
 import team.tetris.application.EndGameView.Stage;
 import team.tetris.application.model.Settings;
@@ -221,5 +226,40 @@ class AppCompositionTest {
         session.handle(GameCommand.QUIT_GAME);
 
         assertEquals(GameMode.NORMAL, session.result().orElseThrow().mode());
+    }
+    /** 실제 게임의 블록 생성 코드(난이도별 가중치 + 룰렛 휠)가 요구사항의 분포 테스트를 통과하는지 확인한다. */
+    @ParameterizedTest
+    @EnumSource(Difficulty.class)
+    void theRealGameGeneratorMatchesTheDifficultyWeights(Difficulty difficulty) {
+        Map<TetrominoType, Integer> weights = PieceWeightPolicy.weightsFor(difficulty);
+        int totalWeight = weights.values().stream().mapToInt(Integer::intValue).sum();
+        for (int draws : new int[] {1_000, 100_000}) {
+            PieceGenerator generator = AppComposition.generatorFor(difficulty, 20261010L + draws);
+            Map<TetrominoType, Integer> counts = new EnumMap<>(TetrominoType.class);
+            for (int i = 0; i < draws; i++) {
+                counts.merge(generator.next(), 1, Integer::sum);
+            }
+            for (TetrominoType type : TetrominoType.values()) {
+                double expected = (double) draws * weights.get(type) / totalWeight;
+                // 1,000회는 확률 ±5%p, 100,000회는 기대값의 ±5% 이내.
+                double tolerance = draws == 1_000 ? draws * 0.05 : expected * 0.05;
+                assertEquals(expected, counts.getOrDefault(type, 0), tolerance,
+                        difficulty + " " + type + " over " + draws);
+            }
+        }
+    }
+
+    @Test
+    void eachNewGameBuildsItsGeneratorForTheSavedDifficulty() throws Exception {
+        List<Difficulty> requested = new ArrayList<>();
+        var app = new AppComposition(directory, difficulty -> { requested.add(difficulty); return squares(); },
+                new ScorePolicy(), SpeedPolicy::new, List.of());
+
+        app.newGame();
+        app.settings().update(new Settings(Settings.ScreenSize.MEDIUM, Settings.defaults().keyBindings(), false,
+                Difficulty.HARD));
+        app.newGame(GameMode.ITEM);
+
+        assertEquals(List.of(Difficulty.NORMAL, Difficulty.HARD), requested);
     }
 }
