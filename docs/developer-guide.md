@@ -129,7 +129,7 @@ public record GameSnapshot(
 - 생성된 세션은 RUNNING으로 시작한다. 새 게임은 새 엔진·세션을 생성하며 이전 세션을 재사용하지 않는다.
 - `SinglePlayerSession(TetrisEnginePort)`는 RUNNING인 새 엔진을 받는다. null 또는 RUNNING이 아닌 엔진은 거부한다. 엔진은 세션이 소유하며 외부에서 직접 조작하지 않는다.
 - `SinglePlayerSession(TetrisEnginePort, ScoreRule, SpeedRule)`로 점수·속도 규칙을 주입할 수 있다. 기본 생성자는 아래의 `ScorePolicy`와 `SpeedPolicy`를 사용한다. 정책은 순수 계산으로 구현하며 실행 중 외부에서 변경하지 않는다.
-- `result()`는 진행·정지 중 `Optional.empty()`이고 종료 후 한 번 확정한 동일 `GameResult`를 반환한다. 결과 필드는 `UUID gameId`, `long score`, `int level`, `int clearedLines`, `GameStatus reason`이며 종료 사유는 GAME_OVER 또는 ABORTED다.
+- `result()`는 진행·정지 중 `Optional.empty()`이고 종료 후 한 번 확정한 동일 `GameResult`를 반환한다. 결과 필드는 `UUID gameId`, `long score`, `int level`, `int clearedLines`, `GameStatus reason`, `GameMode mode`, `Difficulty difficulty`이며 종료 사유는 GAME_OVER 또는 ABORTED다.
 - `QUIT_GAME`은 현재 판을 ABORTED로 종료한다. 프로그램 종료와 메뉴 복귀는 UI 라우터가 구분한다.
 - RUNNING에서는 조작·PAUSE·QUIT_GAME을 허용한다. PAUSED에서는 RESUME·QUIT_GAME만 허용한다. 종료 상태에서는 모든 명령과 시간 갱신이 상태를 바꾸지 않는다.
 - null 명령과 음수 경과 시간은 프로그래밍 오류로 거부한다. `update(0)`은 진행하지 않는다.
@@ -238,7 +238,7 @@ ending = application.endings().submitName(result.gameId(), nameFromInput);
 
 CHECKING에서 submitName 호출은 거부하며 먼저 begin으로 조회 재시도 필요.
 NAME_REQUIRED에서 begin을 반복해도 이름 입력을 자동 완료하지 않음.
-완료 응답은 해당 종료 시점의 목록으로 유지. 메뉴에서 최신 순위를 보려면 `scores().list()` 호출.
+완료 응답은 해당 종료 시점의 목록으로 유지. 메뉴에서 최신 순위를 보려면 `scores().list(mode, difficulty)` 호출.
 조율자의 완료 이력은 조율자 수명 동안 보관. 앱 재시작 시 영속 등록 이력으로 중복 판별.
 이름 입력 취소는 현재 범위에 미포함.
 
@@ -247,7 +247,7 @@ NAME_REQUIRED에서 begin을 반복해도 이름 입력을 자동 완료하지 �
 ```java
 var settings = application.settings();
 Settings current = settings.get();
-settings.update(new Settings(Settings.ScreenSize.LARGE, current.keyBindings(), true));
+settings.update(new Settings(Settings.ScreenSize.LARGE, current.keyBindings(), true, current.difficulty()));
 settings.reset();
 ```
 
@@ -259,6 +259,8 @@ settings.reset();
 
 기본값은 `Settings.defaults()` 한 곳에서 정의. 기존 빈 `default_config.json`은 로드하지 않음.
 화면 크기는 SMALL/MEDIUM/LARGE 중 선택, 기본 MEDIUM. 색맹 모드는 기본 false.
+난이도는 `Difficulty.EASY/NORMAL/HARD`이며 기본 NORMAL입니다. 설정 화면에서 ←/→ 또는 Enter로 변경하고 즉시 저장합니다. 다른 설정을 바꿀 때도 현재 난이도를 전달해야 합니다.
+설정 파일은 schemaVersion 2로 저장합니다. 버전 1은 기존 값을 유지하고 난이도를 NORMAL로 읽으며, 명시적으로 저장할 때 버전 2로 전환합니다.
 SMALL/MEDIUM/LARGE는 각각 14/18/24px 글꼴을 사용하며 창 크기도 다시 계산합니다. 색맹 모드는 별도 팔레트를 적용하고, 블록별 문자 무늬는 두 모드 모두 표시합니다.
 
 | 명령                   | 기본 키 식별자 |
@@ -279,7 +281,7 @@ PAUSE와 RESUME은 문맥이 달라 같은 키 사용 가능.
 
 ## 6. 순위 화면
 
-메뉴에서 순위만 표시하려면 `application.scores().list()`를 호출합니다. 읽기 오류와 빈 목록을 함께 받고 싶다면 `loadOrEmpty()`를 사용하고 오류를 별도로 표시합니다. 아래 등록 예제는 종료 조율자 없이 별도 흐름을 구성할 때의 하위 API입니다.
+메뉴에서 특정 조합의 순위를 표시하려면 `application.scores().list(mode, difficulty)`를 호출합니다. 읽기 오류와 빈 목록을 함께 받고 싶다면 `loadOrEmpty(mode, difficulty)`를 사용하고 오류를 별도로 표시합니다. 아래 등록 예제는 종료 조율자 없이 별도 흐름을 구성할 때의 하위 API입니다.
 
 ```java
 var scores = application.scores();
@@ -287,10 +289,11 @@ if (scores.qualifies(result)) {
     // UI에서 이름 입력 후 등록 시점의 순위 재판단.
     Optional<UUID> recordId = scores.register(result, name);
 }
-List<ScoreEntry> entries = scores.list();
+List<ScoreEntry> entries = scores.list(result.mode(), result.difficulty());
 ```
 
-- `list()`: 점수 내림차순의 수정 불가능한 목록 반환.
+- `list()`: 각 조합의 상위 기록 전체를 점수 내림차순으로 반환(기본 최대 60개). 수정 불가능한 목록.
+- `list(mode, difficulty)`: 해당 조합의 상위 기록만 반환.
 - `registeredRecordId(gameId)`: 기존 등록 이력의 기록 ID 조회. 종료 조율자 재생성 시 중복 등록 확인.
 - `qualifies(result)`: 이름 입력 전 참고 판단. 이미 등록된 게임 또는 등록 대상이 아닌 종료 사유는 false.
 - `register(result, name)`: 저장 직전 데이터 재조회 및 순위 재판단. 저장 성공 시 기록 ID, 미진입 시 empty 반환.
@@ -298,13 +301,13 @@ List<ScoreEntry> entries = scores.list();
 - `loadOrEmpty()`: 읽기 실패 시 빈 목록과 오류를 함께 반환. 원본 자동 수정 없음.
 - `ScoreboardService(repository, policy, clock)`: 순위 정책과 등록 시각용 시계 주입 지원.
 
-기본 정책은 상위 10개, 이름 1~12 Unicode 코드 포인트, 자연 게임오버만 등록.
+기본 정책은 모드·난이도 조합별 상위 10개, 이름 1~12 Unicode 코드 포인트, 자연 게임오버만 등록.
 `ScoreboardPolicy`로 보관 개수(최소 10), 이름 길이, 중도 종료 허용 여부 변경 가능.
 이름은 앞뒤 공백 제거 후 길이 검증. 제어 문자는 앞뒤 위치와 무관하게 거부.
 
 동점은 **등록 순서** 유지. 점수와 등록 시각으로 재정렬하지 않으므로 시계 역행에도 순서 유지.
 정원이 찼을 때 마지막 기록과 같은 점수의 신규 진입 거부.
-`ScoreEntry`는 recordId, gameId, name, score(long), registeredAt(Instant) 보관.
+`ScoreEntry`는 recordId, gameId, name, score(long), registeredAt(Instant), mode(GameMode), difficulty(Difficulty) 보관.
 이름 길이 정책은 신규 등록 시 적용하며 기존 기록을 정책 변경만으로 삭제하지 않음.
 
 동일 게임 ID 재등록은 최초 기록 ID 반환. 새 이름이나 점수로 기존 기록 변경 없음.
@@ -312,6 +315,12 @@ List<ScoreEntry> entries = scores.list();
 반환된 ID가 현재 순위 목록에 없을 수 있으므로 UI의 강조 대상 존재 확인 필요.
 등록 이력은 명시적 `clear()`까지 유지하며 초기화 후 이전 게임 재등록 가능.
 이력의 장기 용량 제한·정리 정책은 후속 협의 대상.
+
+스코어보드는 제목 아래에 일반/아이템과 EASY/NORMAL/HARD를 표시합니다. ←/→로 난이도, ↑/↓로 모드를 전환하며 게임 설정은 바꾸지 않습니다. 메뉴에서는 일반 모드·현재 설정 난이도로, 게임 종료 후에는 종료 결과의 조합으로 시작합니다. 기록 읽기에 실패하면 R로 재시도합니다.
+
+점수 파일은 버전 2로 저장하며 각 기록의 타임스탬프 뒤에 모드·난이도 이름을 UTF 문자열로 기록합니다. 버전 1의 기록은 일반·NORMAL로 읽고, 기존 ID·점수·시각·등록 이력을 유지합니다. 조회만으로 파일을 바꾸지 않으며 다음 기록 저장 또는 명시적 초기화 때 버전 2로 전환합니다. 지원하지 않는 버전, 잘못된 모드·난이도는 오류로 보고합니다.
+
+`GameResult`와 `ScoreEntry`의 기존 생성자는 일반·NORMAL을 기본값으로 사용합니다. `SinglePlayerSession(engine, scoring, speed, mode, difficulty)`는 시작 시 받은 분류를 자연 종료·중도 종료 결과까지 유지합니다. 6번 아이템 모드 구현에서는 아이템 엔진·규칙을 조립한 뒤 `GameMode.ITEM`을 이 생성자에 전달하면 됩니다. 현재 `AppComposition.newGame()`은 일반 모드를 생성합니다.
 
 ## 7. 오류 처리
 
@@ -342,7 +351,8 @@ List<ScoreEntry> entries = scores.list();
 
 ```text
 level = totalClearedLines / 10                 // 초기 0
-gravityIntervalMs = max(100, 1000 - level × 100)
+decreaseMs = EASY: 80, NORMAL: 100, HARD: 120
+gravityIntervalMs = max(100, 1000 - level × decreaseMs)
 dropScore = actualDroppedCells × (levelBeforeStep + 1)
 lineBonus = 100 × clearedLinesInThisStep²
 ```
@@ -350,9 +360,11 @@ lineBonus = 100 × clearedLinesInThisStep²
 - 자동 낙하, 소프트드롭, 하드드롭 모두 실제 하강 칸 수만큼 점수를 얻는다.
 - 이동 실패·회전·좌우 이동·하강 거리 0에는 낙하 점수가 없다.
 - 초기 칸당 1점, 가속 이후 추가 점수를 부여한다. 줄 삭제 보너스는 별도의 추가 점수 방식이다.
-- 점수는 long으로 누적한다. 레벨 9 이상에서도 낙하 주기는 최소 100ms를 유지한다.
+- 점수는 long으로 누적한다. 모든 난이도에서 낙하 주기는 최소 100ms를 유지한다.
 
 블록 추첨은 현재 7-bag 방식입니다. 일곱 종류를 한 번씩 담아 섞으므로 전체 출현 비율은 같지만, 매 추첨이 독립적인 1/7 확률은 아닙니다. Req1 9쪽의 동일 확률 조건이 독립 추첨을 뜻하는지는 [미확정 사항](open-questions.md)에서 추적합니다.
+
+난이도별 가속은 기존 레벨당 간격 감소량 100ms의 ±20%로 정의합니다. 초기 간격(1초)과 레벨 경계(10줄)는 동일합니다. 기본 `AppComposition`은 새 게임 시작 시 저장된 난이도로 `SpeedPolicy`를 만들며, 진행 중인 판의 규칙은 고정됩니다. 난이도에 따른 추가 점수 배율은 적용하지 않습니다.
 
 ### 정책 교체 계약
 
@@ -381,7 +393,7 @@ lineBonus = 100 × clearedLinesInThisStep²
 
 ### 확장 지점
 
-- 점수·속도: `ScoreRule`과 `SpeedRule`을 구현하고 `AppComposition(Path, Supplier<? extends PieceGenerator>, ScoreRule, SpeedRule)`에 전달합니다. 순수 계산으로 구현하며 실행 중 외부에서 변경하지 않습니다.
+- 점수·속도: `ScoreRule`과 `SpeedRule`을 구현하고 `AppComposition(Path, Supplier<? extends PieceGenerator>, ScoreRule, SpeedRule)`에 전달합니다. 순수 계산으로 구현하며 실행 중 외부에서 변경하지 않습니다. 이 생성자의 명시적 `SpeedRule`은 난이도와 무관하게 그대로 사용합니다. 난이도에 맞춰 만들려면 마지막 인자에 `Function<Difficulty, ? extends SpeedRule>` (예: `SpeedPolicy::new`)을 전달합니다.
 - 블록 생성: `PieceGenerator`를 구현하고 위 생성자에 팩터리를 전달합니다. 새 게임마다 독립된 생성기를 반환해야 합니다.
 - 코어: `TetrisEnginePort`는 `snapshot()`, `apply(GameAction)`, `tick()`을 제공합니다. 세션은 이 포트에 의존하며 실제 엔진 생성은 bootstrap에서 수행합니다. `EngineStep`의 drop/lock/clear 결과는 없으면 null일 수 있고, `itemActivations()`는 아이템이 발동하지 않으면 빈 목록입니다. `ClearedRow.cells()`에 지워지기 직전 칸 내용이 있어 삭제 애니메이션에 쓸 수 있습니다.
 - 블록 모양: 테트로미노가 아닌 블록은 `core.Shape`를 구현합니다. 회전해도 같은 인덱스가 같은 칸을 가리키도록 좌표를 정렬하고, 회전하지 않는 블록은 `rotationStates()`를 1로 둡니다.
@@ -390,7 +402,7 @@ lineBonus = 100 × clearedLinesInThisStep²
 - 저장 방식: `SettingsRepository` 또는 `ScoreRepository`를 구현해 서비스 생성자에 전달합니다. 앱 전체에 적용하려면 bootstrap 조립도 변경합니다. 테스트용 메모리 구현은 `storage.memory`에 있습니다.
 - 순위 정책: `ScoreboardService(repository, policy, clock)`으로 보관 개수·이름 제한 등을 주입합니다. 현재 종료 조율자는 ABORTED를 항상 메뉴로 보내므로, 중도 종료 등록 정책을 바꿀 경우 종료 흐름도 함께 검토해야 합니다.
 
-현재 파일 저장소는 Java 기본 API로 설정을 Properties, 기록을 바이너리 형식에 저장합니다. 이전 파일 형식의 자동 변환은 제공하지 않습니다. 기존 파일을 보존하기 위해 같은 디렉터리의 임시 파일을 원자적으로 교체합니다. 원자적 교체가 지원되지 않으면 `WRITE_FAILED`이며 비원자적 덮어쓰기로 전환하지 않습니다. 여러 프로세스의 동시 쓰기는 보장하지 않습니다.
+현재 파일 저장소는 Java 기본 API로 설정을 Properties, 기록을 바이너리 형식에 저장합니다. 설정 파일 버전 1은 NORMAL 난이도로, 점수 파일 버전 1은 일반·NORMAL 기록으로 읽으며 저장 시 버전 2로 전환합니다. 기존 파일을 보존하기 위해 같은 디렉터리의 임시 파일을 원자적으로 교체합니다. 원자적 교체가 지원되지 않으면 `WRITE_FAILED`이며 비원자적 덮어쓰기로 전환하지 않습니다. 여러 프로세스의 동시 쓰기는 보장하지 않습니다.
 
 ## 9. 주요 소스와 API 참고
 

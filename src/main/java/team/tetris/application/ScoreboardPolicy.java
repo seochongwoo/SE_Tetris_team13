@@ -2,7 +2,7 @@ package team.tetris.application;
 
 import java.util.Objects;
 
-/** 기록 보관 개수와 이름 길이의 교체 가능한 기준안. */
+/** 모드·난이도 조합별 기록 보관 개수와 이름 길이의 교체 가능한 기준안. */
 public record ScoreboardPolicy(int capacity, int maxNameCodePoints, boolean allowAborted) {
     public ScoreboardPolicy {
         if (capacity < 10 || maxNameCodePoints < 1) {

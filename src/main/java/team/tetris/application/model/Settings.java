@@ -6,11 +6,17 @@ import java.util.Objects;
 import team.tetris.application.GameCommand;
 
 /** UI 독립 키 식별자와 화면 프리셋 보관. 동일 조작 문맥의 키 충돌 검증. */
-public record Settings(ScreenSize screenSize, Map<GameCommand, String> keyBindings, boolean colorBlindMode) {
+public record Settings(ScreenSize screenSize, Map<GameCommand, String> keyBindings, boolean colorBlindMode, Difficulty difficulty) {
     public enum ScreenSize { SMALL, MEDIUM, LARGE }
+
+    /** 기존 호출은 보통 난이도를 사용한다. */
+    public Settings(ScreenSize screenSize, Map<GameCommand, String> keyBindings, boolean colorBlindMode) {
+        this(screenSize, keyBindings, colorBlindMode, Difficulty.NORMAL);
+    }
 
     public Settings {
         Objects.requireNonNull(screenSize, "screenSize");
+        Objects.requireNonNull(difficulty, "difficulty");
         keyBindings = Map.copyOf(keyBindings);
         if (keyBindings.size() != GameCommand.values().length) {
             throw new IllegalArgumentException("Every game command requires a key");

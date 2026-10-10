@@ -6,6 +6,8 @@ import java.util.UUID;
 import team.tetris.application.EndGameView;
 import team.tetris.application.GameResult;
 import team.tetris.application.model.LoadResult;
+import team.tetris.application.model.GameMode;
+import team.tetris.application.model.Difficulty;
 import team.tetris.application.model.ScoreEntry;
 import team.tetris.application.port.StorageException;
 import team.tetris.ui.ScreenRouter;
@@ -27,9 +29,11 @@ public final class ScoreboardScreen implements Screen {
     private static final int SCORE_END = 42;
 
     private final ScreenRouter router;
-    private final List<ScoreEntry> entries;
-    private final Optional<UUID> highlight;
-    private final Optional<StorageException> error;
+    private List<ScoreEntry> entries;
+    private Optional<UUID> highlight;
+    private Optional<StorageException> error;
+    private GameMode mode;
+    private Difficulty difficulty;
     private final GameResult result;
     private boolean showKeyHint;
 
@@ -40,6 +44,8 @@ public final class ScoreboardScreen implements Screen {
         this.highlight = highlight;
         this.error = error;
         this.result = result;
+        mode = result == null ? GameMode.NORMAL : result.mode();
+        difficulty = result == null ? router.settings().difficulty() : result.difficulty();
     }
 
     public static ScoreboardScreen fromMenu(ScreenRouter router, LoadResult<List<ScoreEntry>> loaded) {
@@ -73,9 +79,15 @@ public final class ScoreboardScreen implements Screen {
                     router.showMenu();
                 }
             }
+            case KeyNames.LEFT -> changeDifficulty(-1);
+            case KeyNames.RIGHT -> changeDifficulty(1);
+            case KeyNames.UP, KeyNames.DOWN -> {
+                mode = mode == GameMode.NORMAL ? GameMode.ITEM : GameMode.NORMAL;
+                reload();
+            }
             case "R" -> {
-                if (isAfterGame() && error.isPresent()) {
-                    router.retryEnding(result);
+                if (error.isPresent()) {
+                    reload();
                 } else {
                     showKeyHint = true;
                 }
@@ -84,11 +96,30 @@ public final class ScoreboardScreen implements Screen {
         }
     }
 
+    private void changeDifficulty(int direction) {
+        Difficulty[] choices = Difficulty.values();
+        difficulty = choices[Math.floorMod(difficulty.ordinal() + direction, choices.length)];
+        reload();
+    }
+
+    private void reload() {
+        var loaded = router.loadScores(mode, difficulty);
+        entries = loaded.value();
+        error = loaded.error();
+        // 최초 조회가 실패했어도 복구한 목록에서 이번 게임의 기록을 다시 찾는다.
+        highlight = result == null ? Optional.empty() : entries.stream()
+                .filter(entry -> entry.gameId().equals(result.gameId()))
+                .map(ScoreEntry::recordId).findFirst();
+        showKeyHint = false;
+    }
+
     @Override
     public TextFrame render() {
         ColorPalette palette = router.palette();
         TextFrame frame = TextFrame.blank(palette.base());
         frame.putCentered(1, "스코어보드", palette.accentStyle());
+        frame.putCentered(2, (mode == GameMode.NORMAL ? "일반" : "아이템") + " / " + difficulty.name(),
+                palette.accentStyle());
         frame.put(RANK_COL, LIST_TOP - 2, "순위", palette.dimStyle());
         frame.put(NAME_COL, LIST_TOP - 2, "이름", palette.dimStyle());
         frame.putRight(SCORE_END, LIST_TOP - 2, "점수", palette.dimStyle());
@@ -115,10 +146,9 @@ public final class ScoreboardScreen implements Screen {
         }
         error.ifPresent(failure -> {
             frame.putCentered(LIST_TOP + VISIBLE_ROWS + 3, "기록을 불러오지 못했습니다", palette.warningStyle());
-            if (isAfterGame()) {
-                frame.putCentered(LIST_TOP + VISIBLE_ROWS + 4, "R 다시 시도", palette.warningStyle());
-            }
+            frame.putCentered(LIST_TOP + VISIBLE_ROWS + 4, "R 다시 시도", palette.warningStyle());
         });
+        frame.putCentered(TextFrame.ROWS - 4, "←→ 난이도   ↑↓ 모드", palette.dimStyle());
         if (showKeyHint) {
             frame.putCentered(TextFrame.ROWS - 3, "사용할 수 있는 키: " + keyList(), palette.warningStyle());
         }
@@ -128,6 +158,6 @@ public final class ScoreboardScreen implements Screen {
     }
 
     private String keyList() {
-        return isAfterGame() ? (error.isPresent() ? "Enter Esc R" : "Enter Esc") : "Enter Esc";
+        return "← → ↑ ↓ Enter Esc" + (error.isPresent() ? " R" : "");
     }
 }

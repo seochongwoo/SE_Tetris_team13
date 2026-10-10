@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import team.tetris.core.*;
+import team.tetris.application.model.GameMode;
+import team.tetris.application.model.Difficulty;
 import team.tetris.core.port.TetrisEnginePort;
 import team.tetris.core.result.*;
 
@@ -326,6 +328,25 @@ class SinglePlayerSessionTest {
             engine.phase = phase;
             assertThrows(IllegalArgumentException.class, () -> new SinglePlayerSession(engine));
         }
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = GameStatus.class, names = {"GAME_OVER", "ABORTED"})
+    void terminalResultPreservesExplicitModeAndDifficulty(GameStatus reason) {
+        var engine = new FakeEngine();
+        var session = new SinglePlayerSession(engine, new ScorePolicy(), new SpeedPolicy(Difficulty.HARD),
+                GameMode.ITEM, Difficulty.HARD);
+        if (reason == GameStatus.GAME_OVER) {
+            engine.enqueue(0, 1, true, EnginePhase.GAME_OVER);
+            session.handle(GameCommand.HARD_DROP);
+        } else {
+            session.handle(GameCommand.QUIT_GAME);
+        }
+        GameResult result = session.result().orElseThrow();
+        assertEquals(GameMode.ITEM, result.mode());
+        assertEquals(Difficulty.HARD, result.difficulty());
+        assertEquals(reason, result.reason());
+        assertTerminalIsFrozen(session, engine, result);
     }
 
     @Test

@@ -13,6 +13,7 @@ import java.util.Properties;
 import java.util.Set;
 import team.tetris.application.GameCommand;
 import team.tetris.application.model.Settings;
+import team.tetris.application.model.Difficulty;
 import team.tetris.application.port.SettingsRepository;
 import team.tetris.application.port.StorageException;
 
@@ -38,8 +39,10 @@ public final class PropertiesSettingsRepository extends AtomicFileRepository<Set
         try (var reader = new InputStreamReader(new ByteArrayInputStream(contents), StandardCharsets.UTF_8.newDecoder())) {
             values.load(reader);
         }
-        requireVersion(Integer.parseInt(values.getProperty("schemaVersion")));
+        int version = Integer.parseInt(values.getProperty("schemaVersion"));
+        requireVersion(version, 1, 2);
         Set<String> expected = new HashSet<>(Set.of("schemaVersion", "screenSize", "colorBlindMode"));
+        if (version == 2) expected.add("difficulty");
         var bindings = new EnumMap<GameCommand, String>(GameCommand.class);
         for (GameCommand command : GameCommand.values()) {
             String field = "key." + command.name();
@@ -52,13 +55,15 @@ public final class PropertiesSettingsRepository extends AtomicFileRepository<Set
             throw new IllegalArgumentException("Expected true or false");
         }
         return new Settings(Settings.ScreenSize.valueOf(values.getProperty("screenSize")), bindings,
-                Boolean.parseBoolean(colorBlind));
+                Boolean.parseBoolean(colorBlind), version == 1 ? Difficulty.NORMAL
+                        : Difficulty.valueOf(values.getProperty("difficulty")));
     }
 
     @Override
     byte[] encode(Settings settings) throws IOException {
         Properties values = new Properties();
-        values.setProperty("schemaVersion", "1");
+        values.setProperty("schemaVersion", "2");
+        values.setProperty("difficulty", settings.difficulty().name());
         values.setProperty("screenSize", settings.screenSize().name());
         values.setProperty("colorBlindMode", Boolean.toString(settings.colorBlindMode()));
         settings.keyBindings().forEach((command, key) -> values.setProperty("key." + command.name(), key));

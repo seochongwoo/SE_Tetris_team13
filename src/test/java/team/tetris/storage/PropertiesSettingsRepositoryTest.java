@@ -15,6 +15,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import team.tetris.application.SettingsService;
 import team.tetris.application.model.Settings;
+import team.tetris.application.model.Difficulty;
 import team.tetris.application.port.StorageException;
 import team.tetris.application.port.StorageException.Kind;
 
@@ -57,12 +58,12 @@ class PropertiesSettingsRepositoryTest {
         var repository = new PropertiesSettingsRepository(file);
         repository.save(Settings.defaults());
         String original = Files.readString(file);
-        for (String field : List.of("screenSize", "colorBlindMode", "key.MOVE_LEFT")) {
+        for (String field : List.of("screenSize", "colorBlindMode", "key.MOVE_LEFT", "difficulty")) {
             Properties values = properties(original);
             values.remove(field);
             assertInvalid(repository, file, values);
         }
-        for (String[] change : new String[][] {{"colorBlindMode", "FALSE"}, {"screenSize", "HUGE"},
+        for (String[] change : new String[][] {{"difficulty", "UNKNOWN"}, {"colorBlindMode", "FALSE"}, {"screenSize", "HUGE"},
                 {"key.UNKNOWN", "A"}, {"key.MOVE_LEFT", "RIGHT"}}) {
             Properties values = properties(original);
             values.setProperty(change[0], change[1]);
@@ -81,7 +82,7 @@ class PropertiesSettingsRepositoryTest {
     @Test
     void reportsUnknownVersionAndReadIoFailureSeparately() throws Exception {
         Path file = directory.resolve("settings.properties");
-        Files.writeString(file, "schemaVersion=2");
+        Files.writeString(file, "schemaVersion=3");
         var exception = assertThrows(StorageException.class, () -> new PropertiesSettingsRepository(file).load());
         assertEquals(Kind.UNSUPPORTED_VERSION, exception.kind());
         assertEquals(file.toAbsolutePath(), exception.path());
@@ -105,6 +106,33 @@ class PropertiesSettingsRepositoryTest {
             assertArrayEquals(original, Files.readAllBytes(file));
             try (var files = Files.list(directory)) { assertEquals(1, files.count()); }
         }
+    }
+
+    @Test
+    void allDifficultiesSurviveRestartAndV1LoadsAsNormalWithoutRewriting() throws Exception {
+        Path file = directory.resolve("settings.properties");
+        var repository = new PropertiesSettingsRepository(file);
+        for (Difficulty difficulty : Difficulty.values()) {
+            var settings = new Settings(Settings.ScreenSize.LARGE, Settings.defaults().keyBindings(), true, difficulty);
+            repository.save(settings);
+            assertEquals(settings, new PropertiesSettingsRepository(file).load().orElseThrow());
+            assertEquals("2", properties(Files.readString(file)).getProperty("schemaVersion"));
+        }
+        Properties legacy = properties(Files.readString(file));
+        legacy.setProperty("schemaVersion", "1");
+        legacy.remove("difficulty");
+        StringWriter writer = new StringWriter();
+        legacy.store(writer, null);
+        Files.writeString(file, writer.toString());
+        byte[] original = Files.readAllBytes(file);
+        Settings loaded = repository.load().orElseThrow();
+        assertEquals(Difficulty.NORMAL, loaded.difficulty());
+        assertEquals(Settings.ScreenSize.LARGE, loaded.screenSize());
+        assertTrue(loaded.colorBlindMode());
+        assertArrayEquals(original, Files.readAllBytes(file));
+        repository.save(loaded);
+        assertEquals("2", properties(Files.readString(file)).getProperty("schemaVersion"));
+        assertEquals(loaded, repository.load().orElseThrow());
     }
 
     @Test

@@ -3,6 +3,8 @@ package team.tetris.application;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import team.tetris.application.model.GameMode;
+import team.tetris.application.model.Difficulty;
 import team.tetris.core.EnginePhase;
 import team.tetris.core.GameAction;
 import team.tetris.core.port.TetrisEnginePort;
@@ -16,6 +18,8 @@ public final class SinglePlayerSession implements GameSession {
     private final UUID gameId = UUID.randomUUID();
     private final ScoreRule scorePolicy;
     private final SpeedRule speedPolicy;
+    private final GameMode mode;
+    private final Difficulty difficulty;
     private long score;
     private int level;
     private int clearedLines;
@@ -32,6 +36,14 @@ public final class SinglePlayerSession implements GameSession {
 
     /** 점수·속도 규칙 주입. 엔진과 정책의 외부 변경 금지. */
     public SinglePlayerSession(TetrisEnginePort engine, ScoreRule scorePolicy, SpeedRule speedPolicy) {
+        this(engine, scorePolicy, speedPolicy, GameMode.NORMAL, Difficulty.NORMAL);
+    }
+
+    /** 모드·난이도는 시작할 때 확정하고 종료 결과까지 유지한다. */
+    public SinglePlayerSession(TetrisEnginePort engine, ScoreRule scorePolicy, SpeedRule speedPolicy,
+                               GameMode mode, Difficulty difficulty) {
+        this.mode = Objects.requireNonNull(mode, "mode");
+        this.difficulty = Objects.requireNonNull(difficulty, "difficulty");
         this.engine = Objects.requireNonNull(engine, "engine");
         this.scorePolicy = Objects.requireNonNull(scorePolicy, "scorePolicy");
         this.speedPolicy = Objects.requireNonNull(speedPolicy, "speedPolicy");
@@ -149,7 +161,7 @@ public final class SinglePlayerSession implements GameSession {
     private void finish(GameStatus reason) {
         status = reason;
         accumulatedNanos = 0;
-        result = new GameResult(gameId, score, level, clearedLines, reason);
+        result = new GameResult(gameId, score, level, clearedLines, reason, mode, difficulty);
     }
 
     @Override
