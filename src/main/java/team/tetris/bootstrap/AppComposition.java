@@ -1,7 +1,9 @@
 package team.tetris.bootstrap;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Objects;
+import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Supplier;
 import java.util.function.Function;
@@ -9,7 +11,12 @@ import team.tetris.application.model.Difficulty;
 import team.tetris.application.model.GameMode;
 import team.tetris.application.*;
 import team.tetris.core.PlayerEngine;
+import team.tetris.core.item.ItemCatalog;
+import team.tetris.core.item.ItemKind;
+import team.tetris.core.rule.ItemPieceSource;
 import team.tetris.core.rule.PieceGenerator;
+import team.tetris.core.rule.PieceSource;
+import team.tetris.core.rule.PlainPieceSource;
 import team.tetris.core.rule.SevenBagGenerator;
 import team.tetris.storage.BinaryScoreRepository;
 import team.tetris.storage.PropertiesSettingsRepository;
@@ -22,6 +29,7 @@ public final class AppComposition implements ApplicationContext {
     private final Supplier<? extends PieceGenerator> generators;
     private final ScoreRule scoring;
     private final Function<Difficulty, ? extends SpeedRule> speeds;
+    private final List<ItemKind> itemKinds;
 
     public AppComposition(Path dataDirectory) {
         this(dataDirectory, () -> new SevenBagGenerator(ThreadLocalRandom.current().nextLong()),
@@ -35,9 +43,17 @@ public final class AppComposition implements ApplicationContext {
         Objects.requireNonNull(speed, "speed");
     }
 
-    /** 저장된 난이도로 매 게임의 속도 규칙을 생성한다. */
+    /** 저장된 난이도로 매 게임의 속도 규칙을 생성한다. 아이템 모드에는 {@link ItemCatalog}의 아이템을 쓴다. */
     public AppComposition(Path dataDirectory, Supplier<? extends PieceGenerator> generators,
                           ScoreRule scoring, Function<Difficulty, ? extends SpeedRule> speeds) {
+        this(dataDirectory, generators, scoring, speeds, ItemCatalog.all());
+    }
+
+    /** 아이템 모드에 등장할 아이템 목록까지 주입. */
+    public AppComposition(Path dataDirectory, Supplier<? extends PieceGenerator> generators,
+                          ScoreRule scoring, Function<Difficulty, ? extends SpeedRule> speeds,
+                          List<ItemKind> itemKinds) {
+        this.itemKinds = List.copyOf(itemKinds);
         Path directory = Objects.requireNonNull(dataDirectory, "dataDirectory").toAbsolutePath().normalize();
         this.generators = Objects.requireNonNull(generators, "generators");
         this.scoring = Objects.requireNonNull(scoring, "scoring");
@@ -55,11 +71,16 @@ public final class AppComposition implements ApplicationContext {
     public EndGameCoordinator endings() { return endings; }
 
     @Override
-    public StartedGame newGame() {
+    public StartedGame newGame(GameMode mode) {
+        Objects.requireNonNull(mode, "mode");
         var loaded = settings.loadOrDefault();
         var speed = Objects.requireNonNull(speeds.apply(loaded.value().difficulty()), "speed");
-        var engine = new PlayerEngine(10, 20, Objects.requireNonNull(generators.get(), "generator"));
-        var session = new SinglePlayerSession(engine, scoring, speed, GameMode.NORMAL, loaded.value().difficulty());
+        PieceSource pieces = new PlainPieceSource(Objects.requireNonNull(generators.get(), "generator"));
+        if (mode == GameMode.ITEM) {
+            pieces = new ItemPieceSource(pieces, itemKinds, new Random(ThreadLocalRandom.current().nextLong()));
+        }
+        var engine = new PlayerEngine(10, 20, pieces);
+        var session = new SinglePlayerSession(engine, scoring, speed, mode, loaded.value().difficulty());
         return new StartedGame(session, loaded);
     }
 }

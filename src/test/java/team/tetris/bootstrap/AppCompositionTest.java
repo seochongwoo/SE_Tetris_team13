@@ -3,6 +3,7 @@ package team.tetris.bootstrap;
 import static org.junit.jupiter.api.Assertions.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -11,7 +12,11 @@ import team.tetris.application.EndGameView.Stage;
 import team.tetris.application.model.Settings;
 import team.tetris.application.model.Difficulty;
 import team.tetris.application.model.GameMode;
+import team.tetris.core.Position;
 import team.tetris.core.TetrominoType;
+import team.tetris.core.item.AttachedItem;
+import team.tetris.core.item.Item;
+import team.tetris.core.item.ItemContext;
 import team.tetris.core.rule.PieceGenerator;
 
 class AppCompositionTest {
@@ -173,5 +178,48 @@ class AppCompositionTest {
         for (String[] invalid : new String[][] {{"unknown"}, {"--data-dir"}, {"--data-dir", " "}}) {
             assertThrows(IllegalArgumentException.class, () -> TetrisApplication.dataDirectory(invalid, directory));
         }
+    }
+    private static final Item MARK = new Item() {
+        @Override public char symbol() { return 'M'; }
+        @Override public void onLock(ItemContext context, Position position) { }
+    };
+
+    /** 25개의 O 블록을 왼쪽부터 채워 10줄을 지운다. */
+    private static void clearTenLines(GameSession session) {
+        for (int pair = 0; pair < 5; pair++) {
+            for (int target : new int[]{0, 2, 4, 6, 8}) {
+                for (int i = 0; i < 10; i++) session.handle(GameCommand.MOVE_LEFT);
+                for (int i = 0; i < target; i++) session.handle(GameCommand.MOVE_RIGHT);
+                session.handle(GameCommand.HARD_DROP);
+            }
+        }
+    }
+
+    @Test
+    void itemModeShowsAnItemBlockAfterTenLinesAndRecordsTheMode() {
+        var app = new AppComposition(directory, AppCompositionTest::squares, new ScorePolicy(), SpeedPolicy::new,
+                List.of(new AttachedItem(MARK)));
+        GameSession item = app.newGame(GameMode.ITEM).session();
+        GameSession normal = app.newGame(GameMode.NORMAL).session();
+
+        clearTenLines(item);
+        clearTenLines(normal);
+
+        assertEquals(10, item.snapshot().clearedLines());
+        assertTrue(item.snapshot().engine().nextPiece().items().containsValue(MARK));
+        assertFalse(normal.snapshot().engine().nextPiece().hasItems());
+        item.handle(GameCommand.QUIT_GAME);
+        normal.handle(GameCommand.QUIT_GAME);
+        assertEquals(GameMode.ITEM, item.result().orElseThrow().mode());
+        assertEquals(GameMode.NORMAL, normal.result().orElseThrow().mode());
+    }
+
+    @Test
+    void theDefaultNewGameIsTheNormalMode() {
+        GameSession session = new AppComposition(directory).newGame().session();
+
+        session.handle(GameCommand.QUIT_GAME);
+
+        assertEquals(GameMode.NORMAL, session.result().orElseThrow().mode());
     }
 }

@@ -73,7 +73,7 @@ TetrisApplication.launch(Path.of("tetris-test-data"), application -> {
 });
 ```
 
-`newGame()`은 매번 독립적인 엔진·세션과 최신 저장 설정을 반환합니다. 설정 읽기에 실패해도 기본 설정으로 세션을 생성하며 `started.settings().error()`로 오류를 함께 알립니다. UI는 기본값 사용 사실을 표시해야 합니다. 보드는 10×20이며 화면 크기 설정과 무관합니다.
+`newGame(GameMode)`은 매번 독립적인 엔진·세션과 최신 저장 설정을 반환합니다. 인자 없는 `newGame()`은 일반 모드입니다. 설정 읽기에 실패해도 기본 설정으로 세션을 생성하며 `started.settings().error()`로 오류를 함께 알립니다. UI는 기본값 사용 사실을 표시해야 합니다. 보드는 10×20이며 화면 크기 설정과 무관합니다.
 
 표준 `main`은 ServiceLoader로 `GameUi` 구현을 찾습니다. 현재 public 기본 생성자를 가진 `team.tetris.ui.TetrisUi`가 다음 파일에 등록되어 있습니다. UI를 교체하려면 이 등록도 변경합니다.
 
@@ -320,7 +320,7 @@ List<ScoreEntry> entries = scores.list(result.mode(), result.difficulty());
 
 점수 파일은 버전 2로 저장하며 각 기록의 타임스탬프 뒤에 모드·난이도 이름을 UTF 문자열로 기록합니다. 버전 1의 기록은 일반·NORMAL로 읽고, 기존 ID·점수·시각·등록 이력을 유지합니다. 조회만으로 파일을 바꾸지 않으며 다음 기록 저장 또는 명시적 초기화 때 버전 2로 전환합니다. 지원하지 않는 버전, 잘못된 모드·난이도는 오류로 보고합니다.
 
-`GameResult`와 `ScoreEntry`의 기존 생성자는 일반·NORMAL을 기본값으로 사용합니다. `SinglePlayerSession(engine, scoring, speed, mode, difficulty)`는 시작 시 받은 분류를 자연 종료·중도 종료 결과까지 유지합니다. 6번 아이템 모드 구현에서는 아이템 엔진·규칙을 조립한 뒤 `GameMode.ITEM`을 이 생성자에 전달하면 됩니다. 현재 `AppComposition.newGame()`은 일반 모드를 생성합니다.
+`GameResult`와 `ScoreEntry`의 기존 생성자는 일반·NORMAL을 기본값으로 사용합니다. `SinglePlayerSession(engine, scoring, speed, mode, difficulty)`는 시작 시 받은 분류를 자연 종료·중도 종료 결과까지 유지합니다. `AppComposition.newGame(GameMode.ITEM)`은 아이템 공급자(`ItemPieceSource`)로 엔진을 조립하고 `GameMode.ITEM`을 이 생성자에 전달합니다. 인자 없는 `newGame()`은 일반 모드를 생성합니다.
 
 ## 7. 오류 처리
 
@@ -398,7 +398,8 @@ lineBonus = 100 × clearedLinesInThisStep²
 - 코어: `TetrisEnginePort`는 `snapshot()`, `apply(GameAction)`, `tick()`을 제공합니다. 세션은 이 포트에 의존하며 실제 엔진 생성은 bootstrap에서 수행합니다. `EngineStep`의 drop/lock/clear 결과는 없으면 null일 수 있고, `itemActivations()`는 아이템이 발동하지 않으면 빈 목록입니다. `ClearedRow.cells()`에 지워지기 직전 칸 내용이 있어 삭제 애니메이션에 쓸 수 있습니다.
 - 블록 모양: 테트로미노가 아닌 블록은 `core.Shape`를 구현합니다. 회전해도 같은 인덱스가 같은 칸을 가리키도록 좌표를 정렬하고, 회전하지 않는 블록은 `rotationStates()`를 1로 둡니다.
 - 아이템: `core.item.Item`을 구현합니다. 블록이 고정되면 아이템이 실린 칸마다 `onLock(ItemContext, Position)`이 한 번 호출되고 아이템은 소모됩니다. 처리 순서는 보드 기록 → 아이템 효과 → 꽉 찬 줄과 `ItemContext.clearRow`로 지정한 줄 일괄 삭제이며, 지운 줄은 모두 `clearResult`로 보고되어 기존 방식대로 점수가 계산됩니다. 점수 배율처럼 보드 밖 효과는 `itemActivations()`를 보고 application에서 처리합니다.
-- 아이템 공급: `core.rule.PieceSource`를 구현해 `PlayerEngine(width, height, source)`에 전달합니다. 블록 모양은 기존처럼 `PieceGenerator`가 정하고, 아이템을 실을지는 공급자가 정합니다. 줄이 지워지면 다음 블록을 꺼내기 전에 `onLinesCleared(lines)`가 호출되므로 "10줄마다 아이템"을 바로 미리보기에 반영할 수 있습니다. 일반 모드는 `PlainPieceSource`를 씁니다.
+- 아이템 공급: `core.rule.PieceSource`를 구현해 `PlayerEngine(width, height, source)`에 전달합니다. 블록 모양은 기존처럼 `PieceGenerator`가 정하고, 아이템을 실을지는 공급자가 정합니다. 줄이 지워지면 다음 블록을 꺼내기 전에 `onLinesCleared(lines)`가 호출되므로 "10줄마다 아이템"을 바로 미리보기에 반영할 수 있습니다. 일반 모드는 `PlainPieceSource`를, 아이템 모드는 이를 감싼 `ItemPieceSource`를 씁니다. `ItemPieceSource`는 게임 전체 누적 삭제 줄 수가 10의 배수를 넘을 때마다 다음에 새로 나타나는 미리보기 블록에 아이템을 싣습니다.
+- 새 아이템 등록: `core.item.Item`을 구현하고 `core.item.ItemCatalog.all()`에 한 줄을 추가합니다. 블록의 한 칸에 붙는 아이템은 `new AttachedItem(item)`(무작위 칸), 블록 자체가 아이템이면 `ItemKind`를 직접 구현해 자기 모양의 블록을 돌려줍니다. 아이템이 나올 차례에는 목록에서 균등 확률로 하나를 고르며, 목록이 비어 있으면 아이템 없이 진행합니다.
 - 저장 방식: `SettingsRepository` 또는 `ScoreRepository`를 구현해 서비스 생성자에 전달합니다. 앱 전체에 적용하려면 bootstrap 조립도 변경합니다. 테스트용 메모리 구현은 `storage.memory`에 있습니다.
 - 순위 정책: `ScoreboardService(repository, policy, clock)`으로 보관 개수·이름 제한 등을 주입합니다. 현재 종료 조율자는 ABORTED를 항상 메뉴로 보내므로, 중도 종료 등록 정책을 바꿀 경우 종료 흐름도 함께 검토해야 합니다.
 

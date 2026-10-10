@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import team.tetris.application.GameCommand;
+import team.tetris.application.model.GameMode;
 import team.tetris.application.model.Settings;
 import team.tetris.core.TetrominoType;
 import team.tetris.ui.screen.GameScreen;
@@ -22,8 +24,18 @@ class ScreenRouterTest {
     @Test
     void startsAtTheMenuWithTheRequiredItems() {
         assertInstanceOf(MenuScreen.class, router.current());
-        assertEquals(List.of("게임 시작", "설정", "스코어보드", "종료"),
+        assertEquals(List.of("게임 시작", "아이템 모드", "설정", "스코어보드", "종료"),
                 router.menuItems().stream().map(MenuScreen.MenuItem::label).toList());
+    }
+
+    @Test
+    void theItemModeMenuStartsAnItemModeGame() {
+        router.startItemGame();
+        GameScreen game = assertInstanceOf(GameScreen.class, router.current());
+
+        game.session().handle(GameCommand.QUIT_GAME);
+
+        assertEquals(GameMode.ITEM, game.session().result().orElseThrow().mode());
     }
 
     @Test

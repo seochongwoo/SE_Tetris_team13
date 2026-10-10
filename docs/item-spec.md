@@ -72,7 +72,8 @@
 - **점수**: 아이템 효과로 지운 칸에는 점수 없음. 단, `L`로 삭제된 줄은 요구사항대로 기존 방식으로 점수 계산
 - **같은 고정에서 함께 지워진 줄**: `L`로 지운 줄과 꽉 차서 지운 줄은 합쳐서 한 번의 줄 삭제로 계산 (기존 동시 삭제 보너스 그대로 적용) (구현됨: 같은 `ClearResult`로 보고, 겹치는 줄은 한 번만 셈)
 - **아이템 소모**: 모든 아이템은 고정 시 한 번 발동하고 소모됨. 보드 칸에는 아이템 표시를 남기지 않음 (`L`·`V`·`B`는 자기 칸도 함께 지워지고, `C`·`$`도 발동 후 일반 칸이 됨) (구현됨)
-- **아이템 선택**: 아이템이 등장할 때 최종 아이템 중 하나를 균등 확률로 선택. 블럭에 붙는 아이템이면 붙을 블럭과 칸 위치도 무작위
+- **아이템 선택**: 아이템이 등장할 때 최종 아이템 중 하나를 균등 확률로 선택. 블럭에 붙는 아이템이면 붙을 블럭과 칸 위치도 무작위 (구현됨: `ItemPieceSource`, `AttachedItem`)
+- **등장 기준**: 게임 전체 누적 삭제 줄 수가 10, 20, 30…을 넘을 때마다 한 개. 한 번에 두 기준을 넘으면 두 블럭 연속으로 아이템 (구현됨, e-class 답변에 따라 변경 가능)
 - **회전**: 블럭에 붙은 아이템은 블럭과 함께 회전 (구현됨: 회전해도 같은 칸 번호가 같은 칸을 가리킴). 블럭 자체가 아이템인 `W`·`B`는 회전 불가 (`rotationStates()`를 1로 두면 됨)
 - **지속 효과 기준**: 시간(초)이 아니라 횟수(줄 N번, 블럭 N개)로 정의 → 일시정지 영향이 없고 테스트가 결정적
 - **중복 획득**: `$`처럼 지속 효과가 있는 아이템은 남은 횟수를 리셋할지 누적할지 정해서 명세에 기록
@@ -83,7 +84,8 @@
 
 - **core**
   - 구현됨 (카드 1): `Shape`(블럭 모양), `Piece`(모양 + 칸별 아이템), 아이템을 담는 `Cell`, `item/Item`·`item/ItemContext`(고정 시 효과), `rule/PieceSource`·`rule/PlainPieceSource`(아이템 공급과 지운 줄 수 알림), `ClearedRow`의 지운 칸 내용, `EngineStep.itemActivations()`
-  - 할 일: 아이템 구현체들(`core/item/`), `rule/WeightedRandomGenerator`(7-bag 대체, 블럭별 가중치를 생성자로 받음), 아이템 모드용 `PieceSource`(10줄마다 아이템, 일반 생성기를 감싸는 형태), 무게추용 엔진 확장 지점
+  - 구현됨 (카드 6): `rule/ItemPieceSource`(10줄마다 아이템, 일반 공급자를 감싸는 형태), `item/ItemKind`·`item/AttachedItem`(아이템이 블럭에 실리는 방식), `item/ItemCatalog`(등장 아이템 목록, 새 아이템은 여기에 한 줄 추가)
+  - 할 일: 아이템 구현체들(`core/item/`), `rule/WeightedRandomGenerator`(7-bag 대체, 블럭별 가중치를 생성자로 받음), 무게추용 엔진 확장 지점
 - **application**: `Difficulty`, `GameMode`, `Settings`(난이도), `GameResult`·`ScoreEntry`(모드·난이도), `ScoreboardService`(모드·난이도별 순위), `SpeedPolicy`(난이도별 증가율), `ApplicationContext.newGame`(모드·난이도 전달), `SinglePlayerSession`(줄 삭제 애니메이션 동안 대기, `$` 같은 보드 밖 아이템 효과)
 - **storage**: `PropertiesSettingsRepository`(설정 파일 `schemaVersion` 2), `BinaryScoreRepository`(점수 파일 버전 2, 기존 기록은 일반 모드·normal로 변환)
 - **bootstrap**: `AppComposition`(모드·난이도에 맞는 생성기·공급자·규칙 조립)
