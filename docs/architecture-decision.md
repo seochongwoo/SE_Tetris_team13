@@ -26,6 +26,8 @@
 | 팀원2 | `core/`, `test/core/` | 블록 생성·이동·회전, 셀 정보, 점수/속도 정책 |
 | 팀원3 | `application/`, `storage/`, `bootstrap/`, `test/application/`, `test/storage/` | 게임 세션 진행, 점수·설정 저장, 전체 조립 |
 
+2차부터는 2명(A: 1차 `core`·`ui`, B: 1차 `application`·`storage`·`bootstrap`)이 기능 단위 카드를 나눠 가져가는 방식으로 진행합니다. 카드별 담당은 [백로그 진행 현황](requirements2-backlog.md) 참고.
+
 ### 남은 논의
 "블록 N개/줄 M개마다 속도 몇 % 증가"의 구체적 수치는 점수 공식과 묶어서 팀 합의 안건으로 처리.
 
