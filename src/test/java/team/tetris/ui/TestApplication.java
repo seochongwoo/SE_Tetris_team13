@@ -1,5 +1,7 @@
 package team.tetris.ui;
 
+import java.util.List;
+import java.util.Random;
 import java.util.function.Supplier;
 import team.tetris.application.ApplicationContext;
 import team.tetris.application.EndGameCoordinator;
@@ -15,7 +17,11 @@ import team.tetris.application.port.ScoreRepository;
 import team.tetris.application.port.SettingsRepository;
 import team.tetris.core.PlayerEngine;
 import team.tetris.core.TetrominoType;
+import team.tetris.core.item.ItemKind;
+import team.tetris.core.rule.ItemPieceSource;
 import team.tetris.core.rule.PieceGenerator;
+import team.tetris.core.rule.PieceSource;
+import team.tetris.core.rule.PlainPieceSource;
 import team.tetris.core.rule.SevenBagGenerator;
 import team.tetris.storage.memory.InMemoryScoreRepository;
 import team.tetris.storage.memory.InMemorySettingsRepository;
@@ -35,6 +41,7 @@ public final class TestApplication implements ApplicationContext {
     private final ScoreboardService scores;
     private final EndGameCoordinator endings;
     private Supplier<PieceGenerator> generators = () -> new SevenBagGenerator(42L);
+    private List<ItemKind> itemKinds = List.of();
     private int exits;
     private Settings applied;
 
@@ -46,6 +53,12 @@ public final class TestApplication implements ApplicationContext {
         this.settings = new SettingsService(settingsRepository);
         this.scores = new ScoreboardService(scoreRepository);
         this.endings = new EndGameCoordinator(scores);
+    }
+
+    /** 아이템 모드에 등장할 아이템을 정한다 (기본은 아이템 없음). */
+    public TestApplication withItems(ItemKind... kinds) {
+        itemKinds = List.of(kinds);
+        return this;
     }
 
     /** 모든 게임이 type 블록만 내놓도록 한다. */
@@ -70,11 +83,15 @@ public final class TestApplication implements ApplicationContext {
     }
 
     @Override
-    public StartedGame newGame() {
+    public StartedGame newGame(GameMode mode) {
         var loaded = settings.loadOrDefault();
         var difficulty = loaded.value().difficulty();
-        return new StartedGame(new SinglePlayerSession(new PlayerEngine(10, 20, generators.get()),
-                new ScorePolicy(), new SpeedPolicy(difficulty), GameMode.NORMAL, difficulty), loaded);
+        PieceSource pieces = new PlainPieceSource(generators.get());
+        if (mode == GameMode.ITEM) {
+            pieces = new ItemPieceSource(pieces, itemKinds, new Random(7L));
+        }
+        return new StartedGame(new SinglePlayerSession(new PlayerEngine(10, 20, pieces),
+                new ScorePolicy(), new SpeedPolicy(difficulty), mode, difficulty), loaded);
     }
 
     public ScreenRouter router() {

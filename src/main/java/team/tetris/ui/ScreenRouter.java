@@ -94,13 +94,20 @@ public final class ScreenRouter {
     public List<MenuItem> menuItems() {
         return List.of(
                 new MenuItem("게임 시작", this::startGame),
+                new MenuItem("아이템 모드", this::startItemGame),
                 new MenuItem("설정", this::showSettings),
                 new MenuItem("스코어보드", this::showScoreboard),
                 new MenuItem("종료", this::exit));
     }
 
+    /** 일반 모드 시작. */
     public void startGame() {
-        show(new GameScreen(this, application.newGame()));
+        show(new GameScreen(this, application.newGame(GameMode.NORMAL)));
+    }
+
+    /** 아이템 모드 시작: 10줄을 지울 때마다 아이템이 실린 블록이 나온다. */
+    public void startItemGame() {
+        show(new GameScreen(this, application.newGame(GameMode.ITEM)));
     }
 
     public void showSettings() {

@@ -37,7 +37,7 @@ class MenuScreenTest {
 
         assertTrue(text.contains("█"));
         assertTrue(text.contains("SE Tetris"));
-        for (String label : List.of("게임 시작", "설정", "스코어보드", "종료")) {
+        for (String label : List.of("게임 시작", "아이템 모드", "설정", "스코어보드", "종료")) {
             assertTrue(text.contains(label), label);
         }
         assertTrue(text.contains("↑↓ 이동   Enter 선택"));
@@ -61,9 +61,16 @@ class MenuScreenTest {
         router.showMenu();
         tap("DOWN");
         tap("ENTER");
+        assertInstanceOf(GameScreen.class, router.current()); // 아이템 모드
+
+        router.showMenu();
+        tap("DOWN");
+        tap("DOWN");
+        tap("ENTER");
         assertInstanceOf(SettingsScreen.class, router.current());
 
         router.showMenu();
+        tap("DOWN");
         tap("DOWN");
         tap("DOWN");
         tap("ENTER");

@@ -3,15 +3,25 @@ package team.tetris.bootstrap;
 import static org.junit.jupiter.api.Assertions.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import team.tetris.application.*;
 import team.tetris.application.EndGameView.Stage;
 import team.tetris.application.model.Settings;
 import team.tetris.application.model.Difficulty;
 import team.tetris.application.model.GameMode;
+import team.tetris.core.Position;
 import team.tetris.core.TetrominoType;
+import team.tetris.core.item.AttachedItem;
+import team.tetris.core.item.Item;
+import team.tetris.core.item.ItemContext;
 import team.tetris.core.rule.PieceGenerator;
 
 class AppCompositionTest {
@@ -173,5 +183,83 @@ class AppCompositionTest {
         for (String[] invalid : new String[][] {{"unknown"}, {"--data-dir"}, {"--data-dir", " "}}) {
             assertThrows(IllegalArgumentException.class, () -> TetrisApplication.dataDirectory(invalid, directory));
         }
+    }
+    private static final Item MARK = new Item() {
+        @Override public char symbol() { return 'M'; }
+        @Override public void onLock(ItemContext context, Position position) { }
+    };
+
+    /** 25개의 O 블록을 왼쪽부터 채워 10줄을 지운다. */
+    private static void clearTenLines(GameSession session) {
+        for (int pair = 0; pair < 5; pair++) {
+            for (int target : new int[]{0, 2, 4, 6, 8}) {
+                for (int i = 0; i < 10; i++) session.handle(GameCommand.MOVE_LEFT);
+                for (int i = 0; i < target; i++) session.handle(GameCommand.MOVE_RIGHT);
+                session.handle(GameCommand.HARD_DROP);
+            }
+        }
+    }
+
+    @Test
+    void itemModeShowsAnItemBlockAfterTenLinesAndRecordsTheMode() {
+        var app = new AppComposition(directory, AppCompositionTest::squares, new ScorePolicy(), SpeedPolicy::new,
+                List.of(new AttachedItem(MARK)));
+        GameSession item = app.newGame(GameMode.ITEM).session();
+        GameSession normal = app.newGame(GameMode.NORMAL).session();
+
+        clearTenLines(item);
+        clearTenLines(normal);
+
+        assertEquals(10, item.snapshot().clearedLines());
+        assertTrue(item.snapshot().engine().nextPiece().items().containsValue(MARK));
+        assertFalse(normal.snapshot().engine().nextPiece().hasItems());
+        item.handle(GameCommand.QUIT_GAME);
+        normal.handle(GameCommand.QUIT_GAME);
+        assertEquals(GameMode.ITEM, item.result().orElseThrow().mode());
+        assertEquals(GameMode.NORMAL, normal.result().orElseThrow().mode());
+    }
+
+    @Test
+    void theDefaultNewGameIsTheNormalMode() {
+        GameSession session = new AppComposition(directory).newGame().session();
+
+        session.handle(GameCommand.QUIT_GAME);
+
+        assertEquals(GameMode.NORMAL, session.result().orElseThrow().mode());
+    }
+    /** 실제 게임의 블록 생성 코드(난이도별 가중치 + 룰렛 휠)가 요구사항의 분포 테스트를 통과하는지 확인한다. */
+    @ParameterizedTest
+    @EnumSource(Difficulty.class)
+    void theRealGameGeneratorMatchesTheDifficultyWeights(Difficulty difficulty) {
+        Map<TetrominoType, Integer> weights = PieceWeightPolicy.weightsFor(difficulty);
+        int totalWeight = weights.values().stream().mapToInt(Integer::intValue).sum();
+        for (int draws : new int[] {1_000, 100_000}) {
+            PieceGenerator generator = AppComposition.generatorFor(difficulty, 20261010L + draws);
+            Map<TetrominoType, Integer> counts = new EnumMap<>(TetrominoType.class);
+            for (int i = 0; i < draws; i++) {
+                counts.merge(generator.next(), 1, Integer::sum);
+            }
+            for (TetrominoType type : TetrominoType.values()) {
+                double expected = (double) draws * weights.get(type) / totalWeight;
+                // 1,000회는 확률 ±5%p, 100,000회는 기대값의 ±5% 이내.
+                double tolerance = draws == 1_000 ? draws * 0.05 : expected * 0.05;
+                assertEquals(expected, counts.getOrDefault(type, 0), tolerance,
+                        difficulty + " " + type + " over " + draws);
+            }
+        }
+    }
+
+    @Test
+    void eachNewGameBuildsItsGeneratorForTheSavedDifficulty() throws Exception {
+        List<Difficulty> requested = new ArrayList<>();
+        var app = new AppComposition(directory, difficulty -> { requested.add(difficulty); return squares(); },
+                new ScorePolicy(), SpeedPolicy::new, List.of());
+
+        app.newGame();
+        app.settings().update(new Settings(Settings.ScreenSize.MEDIUM, Settings.defaults().keyBindings(), false,
+                Difficulty.HARD));
+        app.newGame(GameMode.ITEM);
+
+        assertEquals(List.of(Difficulty.NORMAL, Difficulty.HARD), requested);
     }
 }
