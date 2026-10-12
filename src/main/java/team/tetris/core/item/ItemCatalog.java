@@ -14,7 +14,8 @@ public final class ItemCatalog {
 
     public static List<ItemKind> all() {
         return List.of(
-                // 예: new AttachedItem(new LineClearItem()),
-        );
+                new AttachedItem(new ChainClearItem()),
+                new SoloBlock(new BombItem()),
+                new AttachedItem(new DoubleScoreItem()));
     }
 }

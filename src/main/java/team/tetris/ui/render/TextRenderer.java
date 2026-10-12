@@ -138,6 +138,10 @@ public final class TextRenderer implements Renderer {
     private void drawStats(TextFrame frame, GameSnapshot snapshot) {
         int row = BOARD_TOP + NEXT_BOX_HEIGHT + 2;
         drawStat(frame, row, "SCORE", Long.toString(snapshot.score()));
+        if (snapshot.doubleScoreClears() > 0) {
+            // 점수 2배 아이템($)이 남은 줄 삭제 횟수
+            frame.put(PANEL_LEFT + 6, row, "x2 (" + snapshot.doubleScoreClears() + ")", palette.accentStyle());
+        }
         drawStat(frame, row + 2, "LEVEL", Integer.toString(snapshot.level()));
         drawStat(frame, row + 4, "LINES", Integer.toString(snapshot.clearedLines()));
     }

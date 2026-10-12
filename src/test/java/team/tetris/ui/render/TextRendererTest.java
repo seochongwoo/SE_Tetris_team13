@@ -166,4 +166,14 @@ class TextRendererTest {
         assertEquals(BlockGlyphs.SPECIAL, frame.rowText(row).substring(TextRenderer.columnOf(1), TextRenderer.columnOf(2)));
         assertEquals(palette.text(), frame.styleAt(TextRenderer.columnOf(1), row).foreground());
     }
+
+    @Test
+    void showsTheRemainingDoubleScoreClearsNextToTheScoreOnlyWhileActive() {
+        GameSnapshot plain = session.snapshot();
+        GameSnapshot doubled = new GameSnapshot(plain.engine(), plain.score(), plain.level(), plain.clearedLines(),
+                plain.gravityIntervalNanos(), plain.status(), 2);
+
+        assertTrue(renderer.render(doubled).text().contains("x2 (2)"));
+        assertTrue(!renderer.render(plain).text().contains("x2 ("));
+    }
 }
