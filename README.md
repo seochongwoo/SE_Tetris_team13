@@ -86,6 +86,7 @@ Java 21(JDK)이 필요합니다.
 | [요구사항 추적표](docs/requirements-traceability.md) | 1·2차 요구사항별 구현 위치, 테스트, 상태 |
 | [요구사항별 코드 흐름](docs/requirements-code-map.md) | 요구사항마다 거치는 파일과 메서드 호출 흐름 |
 | [프로젝트 관리 규칙](docs/project-management.md) | 브랜치·PR·이슈·Trello 운영 규칙 |
+| [프로젝트 진행 기록](docs/project-history.md) | 날짜별 결정 사항, 문서 수정, 검토·확인 내역 |
 | [평가 준비와 데모 순서](docs/evaluation-guide.md) | 평가 당일 준비물과 시연 순서 |
 | [개발 가이드](docs/developer-guide.md) | 구조, API, 확장 방법, 빌드 |
 | [아키텍처 결정 기록](docs/architecture-decision.md) | 헥사고날 구조를 고른 이유 |

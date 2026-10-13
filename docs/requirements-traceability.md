@@ -44,7 +44,7 @@
 | ID | 요구사항 (슬라이드) | 구현·근거 | 테스트 | 상태 |
 | --- | --- | --- | --- | --- |
 | N1-01 | Windows 11, Java 21, 1.2GHz·1GB RAM에서 문제없는 성능 (p4, p15) | 힙 상한 256MB(`build.gradle`), 프레임 16ms 루프 | `ResponsivenessTest` (프레임 처리 시간, 입력 반응) | ✅ |
-| N1-02 | 산출물(코드, 문서, 논의) 추적 관리 (p4, p16) | GitHub 저장소, `docs/`, PR | - | ✅ |
+| N1-02 | 산출물(코드, 문서, 논의) 추적 관리 (p4, p16) | GitHub 저장소, `docs/`, PR, [프로젝트 진행 기록](project-history.md) | - | ✅ |
 | N1-03 | 이슈와 해결 상황 기록 (p16) | GitHub Issues | - | ⚠️ 이슈 미등록 ([프로젝트 관리 규칙](project-management.md) 참고) |
 | N1-04 | 팀원별 업무 분담 기록 (p16) | Trello, [백로그 진행 현황](requirements2-backlog.md), [ADR 역할 분담](architecture-decision.md) | - | ✅ |
 | N1-05 | 단위 테스트, 라인 커버리지 50~70% 이상 (p17) | JUnit 5, JaCoCo | 전체 403개 | ✅ 92.6% |

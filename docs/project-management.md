@@ -11,6 +11,7 @@
 | 문제와 해결 과정 | GitHub Issues |
 | 코드 변경과 리뷰 | GitHub Pull Requests |
 | 빌드·테스트·커버리지 결과 | GitHub Actions (`.github/workflows/ci.yml`) |
+| 결정 사항, 문서 수정, 검토·확인 내역 (날짜순) | [프로젝트 진행 기록](project-history.md) |
 | 설계 결정과 요구사항 해석 | [아키텍처 결정 기록](architecture-decision.md), [미확정 사항](open-questions.md), [요구사항 추적표](requirements-traceability.md) |
 | 배포 파일 | GitHub Releases (`v<버전>` 태그) |
 
