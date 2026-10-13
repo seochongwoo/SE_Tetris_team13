@@ -1,6 +1,6 @@
 # 요구사항 추적표
 
-1차·2차 요구사항(`TeamProject_Req1.pdf`, `TeamProject_Req2.pdf`)의 항목별로 구현 위치, 검증 테스트, 상태를 정리한 표입니다. 평가 전에 빠진 항목이 없는지 확인하는 체크리스트로 씁니다. 구현이 바뀌면 이 표도 함께 고칩니다.
+1차·2차 요구사항(`TeamProject_Req1.pdf`, `TeamProject_Req2.pdf`)의 항목별로 구현 위치, 검증 테스트, 상태를 정리한 표입니다. 평가 전에 빠진 항목이 없는지 확인하는 체크리스트로 씁니다. 요구사항마다 거치는 파일과 메서드 흐름은 [요구사항별 코드 흐름](requirements-code-map.md)에 있습니다. 구현이 바뀌면 이 표도 함께 고칩니다.
 
 - 상태: ✅ 충족 / 🔄 진행 중 / ❌ 미구현 / ⚠️ 보완 필요
 - 경로는 `src/main/java/team/tetris/` 기준, 테스트는 `src/test/java/team/tetris/` 아래 클래스 이름입니다.

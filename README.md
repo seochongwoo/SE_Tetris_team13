@@ -84,6 +84,7 @@ Java 21(JDK)이 필요합니다.
 | --- | --- |
 | [아이템 명세서](docs/item-specification.md) | 아이템 모드의 아이템 형태·기능 (평가용) |
 | [요구사항 추적표](docs/requirements-traceability.md) | 1·2차 요구사항별 구현 위치, 테스트, 상태 |
+| [요구사항별 코드 흐름](docs/requirements-code-map.md) | 요구사항마다 거치는 파일과 메서드 호출 흐름 |
 | [프로젝트 관리 규칙](docs/project-management.md) | 브랜치·PR·이슈·Trello 운영 규칙 |
 | [평가 준비와 데모 순서](docs/evaluation-guide.md) | 평가 당일 준비물과 시연 순서 |
 | [개발 가이드](docs/developer-guide.md) | 구조, API, 확장 방법, 빌드 |

@@ -52,6 +52,7 @@
 
 | 예상 질문 | 답할 위치 |
 | --- | --- |
+| 이 요구사항은 코드 어디에 있나 | [요구사항별 코드 흐름](requirements-code-map.md) |
 | 왜 이 구조를 골랐나, 아이템을 어떻게 추가하나 | [아키텍처 결정 기록](architecture-decision.md), [2차 요구사항 분석](requirements2-analysis.md), [개발 가이드](developer-guide.md) 8장 |
 | 확률 생성은 어떻게 했나 | `core/rule/WeightedRandomGenerator` (누적 가중치 + 난수 구간 탐색) |
 | 요구사항이 모호한 부분은 어떻게 정했나 | [미확정 사항](open-questions.md), [요구사항 추적표](requirements-traceability.md) 4장 |
