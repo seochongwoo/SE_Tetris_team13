@@ -7,12 +7,16 @@ import team.tetris.application.model.GameMode;
 import team.tetris.application.model.Difficulty;
 import team.tetris.core.EnginePhase;
 import team.tetris.core.GameAction;
+import team.tetris.core.item.DoubleScoreItem;
 import team.tetris.core.port.TetrisEnginePort;
 import team.tetris.core.result.EngineStep;
+import team.tetris.core.result.ItemActivation;
 
 /** 코어 호출과 시간·점수·한 판의 수명 관리. 하나의 실행 흐름에서 호출 필요. */
 public final class SinglePlayerSession implements GameSession {
     private static final int MAX_TICKS_PER_UPDATE = 5;
+    /** 점수 2배 아이템({@code $}) 하나가 적용되는 줄 삭제 횟수. */
+    public static final int DOUBLE_SCORE_CLEARS = 3;
 
     private final TetrisEnginePort engine;
     private final UUID gameId = UUID.randomUUID();
@@ -23,6 +27,7 @@ public final class SinglePlayerSession implements GameSession {
     private long score;
     private int level;
     private int clearedLines;
+    private int doubleScoreClears;
     private long gravityIntervalNanos;
     private long accumulatedNanos;
     private GameStatus status = GameStatus.RUNNING;
@@ -53,7 +58,7 @@ public final class SinglePlayerSession implements GameSession {
         if (initial.phase() != EnginePhase.RUNNING) {
             throw new IllegalArgumentException("A new session requires a running engine");
         }
-        view = new GameSnapshot(initial, score, level, clearedLines, gravityIntervalNanos, status);
+        view = new GameSnapshot(initial, score, level, clearedLines, gravityIntervalNanos, status, doubleScoreClears);
     }
 
     @Override
@@ -64,7 +69,7 @@ public final class SinglePlayerSession implements GameSession {
         }
         if (command == GameCommand.QUIT_GAME) {
             finish(GameStatus.ABORTED);
-            view = new GameSnapshot(view.engine(), score, level, clearedLines, gravityIntervalNanos, status);
+            view = new GameSnapshot(view.engine(), score, level, clearedLines, gravityIntervalNanos, status, doubleScoreClears);
             return;
         }
         if (status == GameStatus.PAUSED && command != GameCommand.RESUME) {
@@ -123,11 +128,20 @@ public final class SinglePlayerSession implements GameSession {
         if (gained < 0) {
             throw new IllegalStateException("Score rule must return a non-negative score");
         }
+        int nextDoubleClears = doubleScoreClears;
+        if (activatesDoubleScore(step)) {
+            nextDoubleClears = DOUBLE_SCORE_CLEARS; // 중복 획득 시 남은 횟수를 다시 채운다 (누적하지 않음)
+        }
+        if (lines > 0 && nextDoubleClears > 0) {
+            gained = Math.multiplyExact(gained, 2L);
+            nextDoubleClears--;
+        }
         long nextScore = Math.addExact(score, gained);
         int nextLines = Math.addExact(clearedLines, lines);
         int nextLevel = checkedLevel(nextLines);
         long nextInterval = checkedInterval(nextLevel);
         score = nextScore;
+        doubleScoreClears = nextDoubleClears;
         clearedLines = nextLines;
         level = nextLevel;
         gravityIntervalNanos = nextInterval;
@@ -143,7 +157,20 @@ public final class SinglePlayerSession implements GameSession {
         if (status == GameStatus.GAME_OVER) {
             finish(status);
         }
-        view = new GameSnapshot(step.snapshot(), score, level, clearedLines, gravityIntervalNanos, status);
+        view = new GameSnapshot(step.snapshot(), score, level, clearedLines, gravityIntervalNanos, status, doubleScoreClears);
+    }
+
+    /**
+     * 이번 결과에 점수 2배 아이템 발동이 있는가. 아이템이 붙은 블록이 줄을 지우면 그 삭제부터 2배가
+     * 적용된다.
+     */
+    private static boolean activatesDoubleScore(EngineStep step) {
+        for (ItemActivation activation : step.itemActivations()) {
+            if (activation.item() instanceof DoubleScoreItem) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private int checkedLevel(int lines) {
