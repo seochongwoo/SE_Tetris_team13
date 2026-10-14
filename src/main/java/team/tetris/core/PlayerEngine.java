@@ -7,6 +7,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import team.tetris.core.item.Item;
 import team.tetris.core.item.ItemContext;
+import team.tetris.core.item.WeightBlock;
 import team.tetris.core.port.TetrisEnginePort;
 import team.tetris.core.result.ClearResult;
 import team.tetris.core.result.DropResult;
@@ -41,6 +42,7 @@ public final class PlayerEngine implements TetrisEnginePort {
     private final RotationSystem rotationSystem = new RotationSystem();
 
     private ActivePiece activePiece;
+    private boolean weightTouchedDown;
     private EnginePhase phase = EnginePhase.READY;
 
     public PlayerEngine(int width, int height, PieceSource source) {
@@ -118,9 +120,13 @@ public final class PlayerEngine implements TetrisEnginePort {
     }
 
     private EngineStep tryShift(int dx, int dy) {
+        if (weightTouchedDown) {
+            return noEvent();
+        }
         Position moved = activePiece.origin().translate(dx, dy);
         if (board.canPlace(activePiece.shape(), activePiece.rotation(), moved)) {
             activePiece = activePiece.movedTo(moved);
+            updateWeightContact();
         }
         return noEvent();
     }
@@ -140,23 +146,49 @@ public final class PlayerEngine implements TetrisEnginePort {
      * tick()과 SOFT_DROP이 이 동작을 공유한다.
      */
     private EngineStep descendOrLock() {
-        Position lowered = activePiece.origin().translate(0, 1);
-        if (DropRule.canDescend(board, activePiece)) {
-            activePiece = activePiece.movedTo(lowered);
+        if (descendOneCell()) {
             return new EngineStep(snapshot(), new DropResult(1), null, null);
         }
         return lockActivePieceAndSpawnNext(null);
     }
 
     private EngineStep hardDrop() {
-        ActivePiece landing = activePiece;
         int cellsDropped = 0;
-        while (DropRule.canDescend(board, landing)) {
-            landing = landing.movedTo(landing.origin().translate(0, 1));
+        while (descendOneCell()) {
             cellsDropped++;
         }
-        activePiece = landing;
         return lockActivePieceAndSpawnNext(new DropResult(cellsDropped));
+    }
+
+    /** 일반 블록은 충돌을 검사하고, 무게추는 다음 위치의 칸을 지우며 한 칸 내려간다. */
+    private boolean descendOneCell() {
+        Position lowered = activePiece.origin().translate(0, 1);
+        if (activePiece.shape() == WeightBlock.SHAPE) {
+            ActivePiece next = activePiece.movedTo(lowered);
+            // 바닥을 넘는 시도는 보드를 바꾸지 않는다.
+            for (Position cell : next.cells()) {
+                if (cell.y() >= board.height()) {
+                    return false;
+                }
+            }
+            for (Position cell : next.cells()) {
+                board.removeCell(cell);
+            }
+        } else if (!DropRule.canDescend(board, activePiece)) {
+            return false;
+        }
+        activePiece = activePiece.movedTo(lowered);
+        updateWeightContact();
+        return true;
+    }
+
+    /** 닿은 순간부터 잠근다. 아래 칸을 지워 다시 공중에 떠도 다음 스폰까지 풀지 않는다. */
+    private void updateWeightContact() {
+        if (activePiece.shape() == WeightBlock.SHAPE
+                && !board.canPlace(activePiece.shape(), activePiece.rotation(),
+                        activePiece.origin().translate(0, 1))) {
+            weightTouchedDown = true;
+        }
     }
 
     private EngineStep lockActivePieceAndSpawnNext(DropResult dropResult) {
@@ -204,10 +236,12 @@ public final class PlayerEngine implements TetrisEnginePort {
      * 공간이 없으면) GAME_OVER로 전환한다.
      */
     private void spawnNext() {
+        weightTouchedDown = false;
         Piece piece = source.next();
         Position origin = spawnOrigin(piece.shape());
         if (board.canPlace(piece.shape(), 0, origin)) {
             activePiece = new ActivePiece(piece, 0, origin);
+            updateWeightContact();
             phase = EnginePhase.RUNNING;
         } else {
             activePiece = null;

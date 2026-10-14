@@ -27,11 +27,11 @@ class ItemCatalogTest {
     }
 
     @Test
-    void containsTheTeamItemsEachWithItsOwnLetter() {
+    void containsAllFiveItemsEachWithItsOwnLetter() {
         List<Character> symbols = symbols();
 
         assertEquals(ItemCatalog.all().size(), symbols.size());
         assertEquals(symbols.size(), new HashSet<>(symbols).size(), "아이템마다 다른 문자");
-        assertTrue(symbols.containsAll(Set.of('C', 'B', '$')));
+        assertEquals(Set.of('L', 'W', 'C', 'B', '$'), new HashSet<>(symbols));
     }
 }

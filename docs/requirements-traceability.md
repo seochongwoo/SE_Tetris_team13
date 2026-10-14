@@ -4,7 +4,7 @@
 
 - 상태: ✅ 충족 / 🔄 진행 중 / ❌ 미구현 / ⚠️ 보완 필요
 - 경로는 `src/main/java/team/tetris/` 기준, 테스트는 `src/test/java/team/tetris/` 아래 클래스 이름입니다.
-- 마지막 확인: 2026-10-13, `feat/team-items` 브랜치 (테스트 403개 통과, 라인 커버리지 92.6%)
+- 마지막 확인: 2026-10-14, 카드 7·8 로컬 구현 포함 (테스트 421개 통과, 라인 커버리지 92.7%)
 
 ## 1. 1차 요구사항
 
@@ -82,12 +82,12 @@
 | R2-12 | 10줄 삭제마다 아이템, 미리보기에 새로 나타나는 블록은 아이템 (p7) | `core/rule/ItemPieceSource` | `ItemPieceSourceTest`, `AppCompositionTest` | ✅ |
 | R2-13 | 블록 일부가 아이템인 경우와 블록 자체가 아이템인 경우 (p7) | `core/item/AttachedItem`, `core/item/SoloBlock` | `SoloBlockTest` | ✅ |
 | R2-14 | 아이템은 특징적인 모양·다른 문자, 아이템마다 다른 문자 (p7) | `BlockGlyphs.of(Item)`, `ColorPalette.itemStyle` | `ItemCatalogTest`, `TextRendererTest` | ✅ |
-| R2-15 | 줄 삭제 아이템 `L` (p8) | 엔진의 줄 지정 삭제(`ItemContext.clearRow`)만 준비됨 | - | ❌ 카드 7 |
-| R2-16 | 무게추 아이템 (p9) | 1칸 이상 블록 모양(`Shape`) 확장은 준비됨. 접촉 후 좌우 이동 금지·낙하 삭제는 미구현 | - | ❌ 카드 8 |
+| R2-15 | 줄 삭제 아이템 `L` (p8) | `LineClearItem` + `AttachedItem`, 줄 일괄 삭제·점수·누적 줄 수 반영 | `RequiredItemsTest`, `RequiredItemScoringTest` | 🔄 카드 7 (로컬 검증 완료, PR 전) |
+| R2-16 | 무게추 아이템 (p9) | `WeightBlock`, `PlayerEngine` 접촉 잠금·낙하 삭제, 세션 하강 점수 제외 | `RequiredItemsTest`, `RequiredItemScoringTest`, `TextRendererTest` | 🔄 카드 8 (로컬 검증 완료, PR 전) |
 | R2-17 | 팀 구상 아이템 3개 이상 (p7) | `ChainClearItem`(`C`), `BombItem`(`B`), `DoubleScoreItem`(`$`) | `ChainClearItemTest`, `BombItemTest`, `DoubleScoreTest`, `TeamItemsInEngineTest` | 🔄 카드 9~11 (PR 전) |
 | R2-18 | 아이템을 추가하기 쉬운 구조 (p10) | `Item` 구현 + `ItemCatalog.all()`에 한 줄 | `ItemCatalogTest` | ✅ |
 | R2-19 | 1차 요구사항과 어긋나지 않는 규칙: 아이템 표시 + 색맹 모드, 난이도 설정 저장, 실행 환경 (p10) | 아이템은 문자로 구분, 설정 파일 v2에 난이도 저장 | `ColorPaletteTest`, `PropertiesSettingsRepositoryTest` | ✅ |
-| R2-20 | 팀 아이템 형태·기능 명세서를 평가팀에 제공 (p10) | [아이템 명세서](item-specification.md) | - | 🔄 `L`·무게추 구현 후 확정 |
+| R2-20 | 팀 아이템 형태·기능 명세서를 평가팀에 제공 (p10) | [아이템 명세서](item-specification.md) | - | 🔄 5종 구현 반영, 팀 확정·평가팀 제공 대기 |
 
 ### 프로젝트 관리와 검증
 
@@ -96,14 +96,14 @@
 | N2-01 | Trello 등으로 진척 상황·할 일 배정 관리, 팀원 생산성 확인 (p11) | Trello 보드, [백로그 진행 현황](requirements2-backlog.md) | ✅ |
 | N2-02 | Git·GitHub 버전 관리, 브랜치·PR 정책 (p11) | [프로젝트 관리 규칙](project-management.md), PR #1~#7 | ⚠️ PR 리뷰 기록 없음 |
 | N2-03 | 이슈를 GitHub Issue로 등록하고 해결 내역 추적 (p11) | GitHub Issues | ⚠️ 이슈 미등록 |
-| N2-04 | 중간평가 라인 커버리지 50%, 기말 70% (p12) | JaCoCo | ✅ 92.6% |
+| N2-04 | 중간평가 라인 커버리지 50%, 기말 70% (p12) | JaCoCo | ✅ 92.7% |
 
 ## 3. 남은 작업
 
 | 항목 | 관련 ID | 카드 |
 | --- | --- | --- |
-| 줄 삭제 아이템 `L` | R2-15 | 7 |
-| 무게추 아이템 | R2-16 | 8 |
+| 줄 삭제 아이템 `L` PR 리뷰·머지 | R2-15 | 7 |
+| 무게추 아이템 PR 리뷰·머지 | R2-16 | 8 |
 | 팀 아이템 PR 리뷰·머지, 팀 확정 | R2-17 | 9~11 |
 | 줄 삭제 애니메이션 | R2-06 | 12 |
 | 2차 반영 배포 패키지 v2.0.0 | N1-08 | 13 |
