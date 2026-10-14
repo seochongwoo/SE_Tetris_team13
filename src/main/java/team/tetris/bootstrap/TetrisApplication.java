@@ -10,11 +10,11 @@ public final class TetrisApplication {
     private TetrisApplication() {}
 
     public static void main(String[] args) {
-        Path directory = dataDirectory(args, Path.of(System.getProperty("user.home")));
+        LaunchOptions options = parseOptions(args, Path.of(System.getProperty("user.home")));
         GameUi ui = ServiceLoader.load(GameUi.class).findFirst().orElseThrow(() ->
                 new IllegalStateException("No GameUi provider installed. Register the UI implementation in "
                         + "META-INF/services/team.tetris.application.port.GameUi"));
-        launch(directory, ui);
+        ui.open(new AppComposition(options.directory(), options.debug()));
     }
 
     /** UI 직접 주입으로 실행 및 통합 테스트 지원. */
@@ -23,11 +23,27 @@ public final class TetrisApplication {
     }
 
     static Path dataDirectory(String[] args, Path homeDirectory) {
+        return parseOptions(args, homeDirectory).directory();
+    }
+
+    private record LaunchOptions(Path directory, boolean debug) { }
+
+    private static LaunchOptions parseOptions(String[] args, Path homeDirectory) {
         Objects.requireNonNull(args, "args");
-        if (args.length == 0) return homeDirectory.resolve(".se-tetris-team13");
-        if (args.length == 2 && "--data-dir".equals(args[0]) && !args[1].isBlank()) {
-            return Path.of(args[1]);
+        Path directory = homeDirectory.resolve(".se-tetris-team13");
+        boolean debug = false;
+        boolean hasDirectory = false;
+        for (int i = 0; i < args.length; i++) {
+            if ("--debug".equals(args[i]) && !debug) {
+                debug = true;
+            } else if ("--data-dir".equals(args[i]) && !hasDirectory && i + 1 < args.length
+                    && !args[i + 1].isBlank() && !args[i + 1].startsWith("--")) {
+                directory = Path.of(args[++i]);
+                hasDirectory = true;
+            } else {
+                throw new IllegalArgumentException("Usage: TetrisApplication [--debug] [--data-dir PATH]");
+            }
         }
-        throw new IllegalArgumentException("Usage: TetrisApplication [--data-dir PATH]");
+        return new LaunchOptions(directory, debug);
     }
 }

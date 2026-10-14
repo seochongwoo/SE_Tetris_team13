@@ -28,6 +28,14 @@ public final class ItemPieceSource implements PieceSource {
     private int itemsPending;
 
     public ItemPieceSource(PieceSource base, List<ItemKind> kinds, RandomGenerator random) {
+        this(base, kinds, random, 0);
+    }
+
+    /** 과거 줄 삭제 보상은 지급된 것으로 간주하고 지정 누적 줄 수에서 시작한다. */
+    public ItemPieceSource(PieceSource base, List<ItemKind> kinds, RandomGenerator random, int initialLines) {
+        if (initialLines < 0) throw new IllegalArgumentException("Initial lines must be non-negative");
+        totalLines = initialLines;
+        itemsEarned = initialLines / LINES_PER_ITEM;
         this.base = Objects.requireNonNull(base, "base");
         this.kinds = List.copyOf(kinds);
         this.random = Objects.requireNonNull(random, "random");
@@ -44,6 +52,18 @@ public final class ItemPieceSource implements PieceSource {
     @Override
     public Piece peek() {
         return upcoming;
+    }
+
+    /** 이미 표시한 미리보기는 보존하고, 과거 보상은 지급된 것으로 간주해 집계를 다시 맞춘다. */
+    public void resetLineProgress(int lines) {
+        if (lines < 0) throw new IllegalArgumentException("Lines must be non-negative");
+        totalLines = lines;
+        itemsEarned = lines / LINES_PER_ITEM;
+        itemsPending = 0;
+    }
+
+    public String debugState() {
+        return "totalLines=" + totalLines + " itemsEarned=" + itemsEarned + " itemsPending=" + itemsPending;
     }
 
     /**

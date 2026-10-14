@@ -1,6 +1,7 @@
 package team.tetris.ui;
 
 import java.awt.Dimension;
+import java.awt.BorderLayout;
 import java.awt.Graphics2D;
 import java.awt.GraphicsConfiguration;
 import java.awt.Image;
@@ -19,6 +20,7 @@ import java.util.List;
 import java.util.Objects;
 import javax.imageio.ImageIO;
 import javax.swing.JFrame;
+import javax.swing.JScrollPane;
 import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
 import team.tetris.application.ApplicationContext;
@@ -56,7 +58,7 @@ public final class TetrisUi implements GameUi {
     private static void createWindow(ApplicationContext application) {
         LoadResult<Settings> loaded = application.settings().loadOrDefault();
         Settings initial = loaded.value();
-        JFrame window = new JFrame(TITLE);
+        JFrame window = new JFrame(TITLE + (application.debugEnabled() ? " [DEBUG]" : ""));
         TextFramePanel panel = new TextFramePanel(initial.screenSize(),
                 TextFrame.blank(ColorPalette.of(initial.colorBlindMode()).base()));
 
@@ -67,12 +69,15 @@ public final class TetrisUi implements GameUi {
                     window.dispose();
                 },
                 settings -> fitToScreen(window, panel, settings.screenSize()));
+        DebugPanel debugPanel = application.debugEnabled()
+                ? new DebugPanel(router, panel::requestFocusInWindow) : null;
         loop[0] = new GameLoop(NanoClock.system(), elapsed -> {
             router.update(elapsed);
             if (!router.hasExited()) {
                 // 이름 입력 화면에서만 입력기를 켠다 (화면은 키 입력이나 게임 종료로 바뀌므로 매 프레임 맞춘다).
                 panel.setTextInput(router.acceptsTextInput());
                 panel.show(router.render());
+                if (debugPanel != null) debugPanel.refresh();
             }
         });
 
@@ -116,7 +121,13 @@ public final class TetrisUi implements GameUi {
         window.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         window.setIconImages(icons());
         window.setResizable(false);
-        window.add(panel);
+        window.add(panel, BorderLayout.CENTER);
+        if (debugPanel != null) {
+            JScrollPane debugScroll = new JScrollPane(debugPanel);
+            debugScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+            debugScroll.setPreferredSize(new Dimension(320, 540));
+            window.add(debugScroll, BorderLayout.EAST);
+        }
         panel.show(router.render());
         window.pack(); // 창 테두리(제목 표시줄) 크기를 알아야 화면에 맞출 수 있다.
         fitToScreen(window, panel, initial.screenSize());
@@ -133,8 +144,13 @@ public final class TetrisUi implements GameUi {
     private static void fitToScreen(JFrame window, TextFramePanel panel, ScreenSize size) {
         Rectangle usable = usableArea(window.getGraphicsConfiguration());
         Insets border = window.getInsets();
+        java.awt.Component extra = ((BorderLayout) window.getContentPane().getLayout())
+                .getLayoutComponent(BorderLayout.EAST);
+        int extraWidth = extra == null ? 0 : extra.getPreferredSize().width;
+        if (extra != null) extra.setPreferredSize(new Dimension(extraWidth,
+                Math.min(540, usable.height - border.top - border.bottom)));
         panel.setScreenSize(size, new Dimension(
-                usable.width - border.left - border.right,
+                usable.width - border.left - border.right - extraWidth,
                 usable.height - border.top - border.bottom));
         window.pack();
         int x = Math.max(usable.x, Math.min(window.getX(), usable.x + usable.width - window.getWidth()));

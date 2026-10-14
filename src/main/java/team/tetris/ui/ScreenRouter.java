@@ -9,6 +9,8 @@ import java.util.function.Consumer;
 import team.tetris.application.ApplicationContext;
 import team.tetris.application.EndGameView;
 import team.tetris.application.GameResult;
+import team.tetris.application.debug.DebugSetup;
+import team.tetris.application.debug.DebugSession;
 import team.tetris.application.model.LoadResult;
 import team.tetris.application.model.ScoreEntry;
 import team.tetris.application.model.GameMode;
@@ -87,6 +89,8 @@ public final class ScreenRouter {
     // ---- 화면 전환 ----
 
     public void showMenu() {
+        debugSession().filter(debug -> debug.result().isEmpty())
+                .ifPresent(debug -> debug.handle(team.tetris.application.GameCommand.QUIT_GAME));
         show(new MenuScreen(this, menuItems()));
     }
 
@@ -108,6 +112,27 @@ public final class ScreenRouter {
     /** 아이템 모드 시작: 10줄을 지울 때마다 아이템이 실린 블록이 나온다. */
     public void startItemGame() {
         show(new GameScreen(this, application.newGame(GameMode.ITEM)));
+    }
+
+    public Optional<DebugSession> debugSession() {
+        return current instanceof GameScreen game && game.session() instanceof DebugSession debug
+                ? Optional.of(debug) : Optional.empty();
+    }
+
+    public void startDebugSetup(DebugSetup setup) {
+        GameMode mode = debugSession().map(DebugSession::mode).orElse(GameMode.ITEM);
+        var started = application.newDebugGame(setup, mode);
+        debugSession().filter(previous -> previous.result().isEmpty())
+                .ifPresent(previous -> previous.handle(team.tetris.application.GameCommand.QUIT_GAME));
+        show(new GameScreen(this, started));
+    }
+
+    /** 패널의 숫자 입력 중 누른 키나 대기 명령이 게임으로 새어 들어가지 않게 한다. */
+    public void freezeDebugInput() {
+        debugSession().ifPresent(debug -> debug.setFrozen(true));
+        heldKeys.clear();
+        ignoredUntilRelease.clear();
+        if (current instanceof GameScreen game) game.clearPendingInput();
     }
 
     public void showSettings() {
@@ -229,6 +254,8 @@ public final class ScreenRouter {
         if (exited) {
             return;
         }
+        debugSession().filter(debug -> debug.result().isEmpty())
+                .ifPresent(debug -> debug.handle(team.tetris.application.GameCommand.QUIT_GAME));
         exited = true;
         exitAction.run();
     }

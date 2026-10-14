@@ -37,6 +37,19 @@ public final class Board {
         return width;
     }
 
+    /** 시나리오의 고정 칸을 복사해 새 보드를 만든다. */
+    public Board(Cell[][] cells) {
+        this(cells.length == 0 ? 0 : cells[0].length, cells.length);
+        for (int y = 0; y < height; y++) {
+            if (cells[y] == null || cells[y].length != width) {
+                throw new IllegalArgumentException("Board rows must have equal width");
+            }
+            for (int x = 0; x < width; x++) {
+                grid[y][x] = java.util.Objects.requireNonNull(cells[y][x], "cell");
+            }
+        }
+    }
+
     public int height() {
         return height;
     }

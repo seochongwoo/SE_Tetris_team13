@@ -21,9 +21,10 @@ public final class SinglePlayerSession implements GameSession {
     private final TetrisEnginePort engine;
     private final UUID gameId = UUID.randomUUID();
     private final ScoreRule scorePolicy;
-    private final SpeedRule speedPolicy;
+    private SpeedRule speedPolicy;
     private final GameMode mode;
-    private final Difficulty difficulty;
+    private Difficulty difficulty;
+    private java.util.function.Consumer<EngineStep> stepObserver = ignored -> {};
     private long score;
     private int level;
     private int clearedLines;
@@ -47,12 +48,20 @@ public final class SinglePlayerSession implements GameSession {
     /** 모드·난이도는 시작할 때 확정하고 종료 결과까지 유지한다. */
     public SinglePlayerSession(TetrisEnginePort engine, ScoreRule scorePolicy, SpeedRule speedPolicy,
                                GameMode mode, Difficulty difficulty) {
+        this(engine, scorePolicy, speedPolicy, mode, difficulty, 0);
+    }
+
+    /** 누적 줄 수에서 레벨과 속도를 계산해 새 세션을 시작한다. */
+    public SinglePlayerSession(TetrisEnginePort engine, ScoreRule scorePolicy, SpeedRule speedPolicy,
+                               GameMode mode, Difficulty difficulty, int initialLines) {
+        if (initialLines < 0) throw new IllegalArgumentException("Initial lines must be non-negative");
+        clearedLines = initialLines;
         this.mode = Objects.requireNonNull(mode, "mode");
         this.difficulty = Objects.requireNonNull(difficulty, "difficulty");
         this.engine = Objects.requireNonNull(engine, "engine");
         this.scorePolicy = Objects.requireNonNull(scorePolicy, "scorePolicy");
         this.speedPolicy = Objects.requireNonNull(speedPolicy, "speedPolicy");
-        level = checkedLevel(0);
+        level = checkedLevel(initialLines);
         gravityIntervalNanos = checkedInterval(level);
         var initial = engine.snapshot();
         if (initial.phase() != EnginePhase.RUNNING) {
@@ -158,6 +167,44 @@ public final class SinglePlayerSession implements GameSession {
             finish(status);
         }
         view = new GameSnapshot(step.snapshot(), score, level, clearedLines, gravityIntervalNanos, status, doubleScoreClears);
+        stepObserver.accept(step);
+    }
+
+    /** 디버그 관찰자: 한 update 안에 여러 중력이 실행되어도 각 결과의 점수 반영 뒤 호출한다. */
+    public void observeSteps(java.util.function.Consumer<EngineStep> observer) {
+        stepObserver = Objects.requireNonNull(observer, "observer");
+    }
+
+    /** 진행 중인 판의 보드·점수·아이템 효과는 보존하고 줄 수와 속도 정책만 바꾼다. */
+    public void configureProgress(int lines, Difficulty nextDifficulty, SpeedRule nextSpeed) {
+        if (result != null) throw new IllegalStateException("종료된 게임은 다시 시작한 뒤 수정하세요.");
+        if (lines < 0) throw new IllegalArgumentException("Lines must be non-negative");
+        Objects.requireNonNull(nextDifficulty, "difficulty");
+        Objects.requireNonNull(nextSpeed, "speed");
+        int nextLevel = nextSpeed.levelFor(lines);
+        long nextInterval = nextSpeed.gravityIntervalNanos(nextLevel);
+        if (nextLevel < 0 || nextInterval <= 0) throw new IllegalArgumentException("Invalid speed rule");
+        difficulty = nextDifficulty;
+        speedPolicy = nextSpeed;
+        clearedLines = lines;
+        level = nextLevel;
+        gravityIntervalNanos = nextInterval;
+        resetGravityClock();
+        view = new GameSnapshot(view.engine(), score, level, clearedLines, gravityIntervalNanos, status, doubleScoreClears);
+    }
+
+    public long accumulatedGravityNanos() { return accumulatedNanos; }
+
+    /** 자동 진행과 같은 점수·종료 경로로 중력을 정확히 한 번 적용한다. */
+    public void stepGravity() {
+        if (status != GameStatus.RUNNING) return;
+        resetGravityClock();
+        accept(engine.tick(), level);
+    }
+
+    /** 시간 제어 방식을 바꿀 때 이전 중력 잔여 시간을 버린다. */
+    public void resetGravityClock() {
+        accumulatedNanos = 0;
     }
 
     /**

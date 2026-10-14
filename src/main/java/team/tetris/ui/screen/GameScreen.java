@@ -8,6 +8,7 @@ import team.tetris.application.GameResult;
 import team.tetris.application.GameSession;
 import team.tetris.application.GameSnapshot;
 import team.tetris.application.GameStatus;
+import team.tetris.application.debug.DebugSession;
 import team.tetris.application.StartedGame;
 import team.tetris.application.model.Settings;
 import team.tetris.ui.ScreenRouter;
@@ -63,7 +64,7 @@ public final class GameScreen implements Screen {
         this.pauseSelectKey = findPauseMenuKey(KeyNames.ENTER, "SPACE", "F1");
         this.repeats = repeats;
         this.palette = ColorPalette.of(settings.colorBlindMode());
-        this.renderer = new TextRenderer(palette, keys);
+        this.renderer = new TextRenderer(palette, keys, session instanceof DebugSession);
         this.settingsWarning = started.settings().error().isPresent()
                 ? "설정을 읽지 못해 기본값으로 진행합니다" : null;
     }
@@ -71,6 +72,11 @@ public final class GameScreen implements Screen {
     /** 이 화면이 진행 중인 세션 (테스트와 성능 측정용). */
     public GameSession session() {
         return session;
+    }
+
+    public void clearPendingInput() {
+        pending.clear();
+        repeats.releaseAll();
     }
 
     public int pauseCursor() {
@@ -181,6 +187,10 @@ public final class GameScreen implements Screen {
         if (result.isEmpty()) {
             return;
         }
+        // 재현 결과를 관찰하고 같은 프리셋을 다시 시작할 수 있도록 화면을 유지한다.
+        if (session instanceof DebugSession && result.get().reason() == GameStatus.GAME_OVER) {
+            return;
+        }
         if (result.get().reason() == GameStatus.GAME_OVER && gameOverNanos < GAME_OVER_DELAY_NANOS) {
             gameOverNanos += elapsedNanos;
             if (gameOverNanos < GAME_OVER_DELAY_NANOS) {
@@ -235,6 +245,7 @@ public final class GameScreen implements Screen {
         frame.box(left, top, width, 5, palette.borderStyle(), palette.base());
         frame.putCentered(left, left + width, top + 1, "GAME OVER", palette.warningStyle());
         frame.putCentered(left, left + width, top + 2, "점수 " + score, palette.base());
-        frame.putCentered(left, left + width, top + 3, "Enter 계속", palette.dimStyle());
+        frame.putCentered(left, left + width, top + 3,
+                session instanceof DebugSession ? "패널에서 재시작" : "Enter 계속", palette.dimStyle());
     }
 }

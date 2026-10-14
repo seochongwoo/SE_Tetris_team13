@@ -13,6 +13,9 @@ public final class BlockGlyphs {
     /** 빈 칸. */
     public static final String EMPTY = " .";
 
+    /** 디버그 모드의 하드 드롭 착지 그림자. */
+    public static final String GHOST = "░░";
+
     /** 테트로미노가 아닌 블록(무게추 등)의 무늬. */
     public static final String SPECIAL = "@@";
 
