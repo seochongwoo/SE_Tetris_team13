@@ -20,6 +20,7 @@ import team.tetris.core.item.Item;
 import team.tetris.core.port.TetrisEnginePort;
 import team.tetris.core.result.ClearResult;
 import team.tetris.core.result.ClearedRow;
+import team.tetris.core.result.DropResult;
 import team.tetris.core.result.EngineStep;
 import team.tetris.core.result.ItemActivation;
 import team.tetris.core.result.LockResult;
@@ -49,6 +50,19 @@ class DoubleScoreTest {
         assertEquals(200, lock(1));
         assertEquals(0, session.snapshot().doubleScoreClears());
         assertEquals(100, lock(1));
+    }
+
+    @Test
+    void doublesBothDropAndLineScoresWhenHardDropClearsLines() {
+        EngineStep lockStep = engine.lockStep(2, new DoubleScoreItem());
+        engine.queue.add(new EngineStep(lockStep.snapshot(), new DropResult(5),
+                lockStep.lockResult(), lockStep.clearResult(), lockStep.itemActivations()));
+
+        session.handle(GameCommand.HARD_DROP);
+
+        // 레벨 0: 하강 5칸의 5점과 2줄 삭제의 400점을 모두 2배로 계산한다.
+        assertEquals(810, session.snapshot().score());
+        assertEquals(2, session.snapshot().doubleScoreClears());
     }
 
     @Test
