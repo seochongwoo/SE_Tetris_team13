@@ -25,10 +25,11 @@ final class DebugPanel extends JPanel {
     private final JSpinner holesPerRow = number("holesPerRow", 1, 10);
     private final JSpinner clearedLines = number("clearedLines", 0, DebugSetup.MAX_LINES);
     private final JComboBox<DebugSetup.HolePattern> pattern = new JComboBox<>(DebugSetup.HolePattern.values());
+    private final JComboBox<DebugSetup.FillMode> fillMode = new JComboBox<>(DebugSetup.FillMode.values());
     private final JComboBox<Difficulty> difficulty = new JComboBox<>(Difficulty.values());
     private final JCheckBox repeatSeed = new JCheckBox("같은 랜덤 결과 유지", true);
     private final JComboBox<TetrominoType> pieces = new JComboBox<>(TetrominoType.values());
-    private final JComboBox<DebugItem> items = new JComboBox<>(DebugItem.values());
+    private final JComboBox<DebugItem> items = new JComboBox<>(DebugItem.all().toArray(DebugItem[]::new));
     private final JCheckBox frozen = new JCheckBox("자동 낙하 정지 (이동·회전 가능)", true);
     private final JTextArea state = readOnlyText(8);
     private final JTextArea logPath = readOnlyText(3);
@@ -49,6 +50,8 @@ final class DebugPanel extends JPanel {
         row("아래부터 채울 줄 수", filledRows);
         row("줄마다 비울 칸 수", holesPerRow);
         row("빈칸 배치", pattern);
+        fillMode.setName("fillMode");
+        row("채울 블록", fillMode);
         control(repeatSeed);
         label("스탯");
         row("누적 삭제 줄 수", clearedLines);
@@ -75,14 +78,16 @@ final class DebugPanel extends JPanel {
         playingControls.add(button("중력 한 단계 (낙하 / 고정)", () ->
                 router.debugSession().ifPresent(DebugSession::stepGravity)));
         label("다음 블록 / 아이템");
+        pieces.setName("pieces");
         row("블록", pieces);
+        items.setName("items");
         row("아이템", items);
         playingControls.add(pieces);
         playingControls.add(items);
         playingControls.add(button("다음 블록에 적용", () -> router.debugSession().ifPresent(debug ->
                 debug.replaceNext((TetrominoType) pieces.getSelectedItem(),
                         (DebugItem) items.getSelectedItem()))));
-        label("폭탄은 선택한 모양을 대체합니다.");
+        label("전용 모양 아이템은 선택한 블록을 대체합니다.");
         label("P 일시정지 중에는 재개 후 조작하세요.");
         add(state);
         add(logPath);
@@ -101,7 +106,8 @@ final class DebugPanel extends JPanel {
         long seed = repeatSeed.isSelected() ? router.debugSession().map(debug -> debug.setup().seed()).orElse(13L)
                 : ThreadLocalRandom.current().nextLong();
         return new DebugSetup(empty ? 0 : value(filledRows), value(holesPerRow),
-                (DebugSetup.HolePattern) pattern.getSelectedItem(), value(clearedLines),
+                (DebugSetup.HolePattern) pattern.getSelectedItem(),
+                (DebugSetup.FillMode) fillMode.getSelectedItem(), value(clearedLines),
                 (Difficulty) difficulty.getSelectedItem(), seed);
     }
 
@@ -123,6 +129,7 @@ final class DebugPanel extends JPanel {
             filledRows.setValue(debug.setup().filledRows());
             holesPerRow.setValue(debug.setup().holesPerRow());
             pattern.setSelectedItem(debug.setup().pattern());
+            fillMode.setSelectedItem(debug.setup().fillMode());
             clearedLines.setValue(snapshot.clearedLines());
             difficulty.setSelectedItem(debug.difficulty());
         }

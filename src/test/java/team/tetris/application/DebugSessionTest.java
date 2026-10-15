@@ -4,16 +4,19 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import team.tetris.application.debug.*;
 import team.tetris.application.model.GameMode;
 import team.tetris.application.model.Difficulty;
 import team.tetris.application.model.Settings;
 import team.tetris.bootstrap.AppComposition;
 import team.tetris.core.*;
+import team.tetris.core.item.DoubleScoreItem;
 import team.tetris.core.rule.PlainPieceSource;
 import team.tetris.core.rule.SevenBagGenerator;
 
@@ -77,7 +80,9 @@ class DebugSessionTest {
         assertTrue(session.snapshot().score() >= 100);
     }
 
-    @ParameterizedTest @EnumSource(DebugItem.class)
+    static List<DebugItem> debugItems() { return DebugItem.all(); }
+
+    @ParameterizedTest @MethodSource("debugItems")
     void selectedItemImmediatelyMatchesPreviewAndNextSpawn(DebugItem item) {
         DebugSession session = start(DebugSetup.empty(Difficulty.NORMAL));
         session.replaceNext(TetrominoType.I, item);
@@ -87,7 +92,9 @@ class DebugSessionTest {
         assertEquals(preview, session.snapshot().engine().activePiece().piece());
         session.handle(GameCommand.HARD_DROP);
         assertEquals(GameStatus.RUNNING, session.snapshot().status());
-        if (item == DebugItem.DOUBLE) assertEquals(3, session.snapshot().doubleScoreClears());
+        if (preview.items().values().stream().anyMatch(DoubleScoreItem.class::isInstance)) {
+            assertEquals(3, session.snapshot().doubleScoreClears());
+        }
     }
 
     @ParameterizedTest @EnumSource(DebugSetup.HolePattern.class)
@@ -203,7 +210,9 @@ class DebugSessionTest {
         assertTrue(gravity.contains("score=2 "));
         assertTrue(gravity.contains("score=3 "));
         session.applyStats(9, Difficulty.HARD);
-        session.replaceNext(TetrominoType.I, DebugItem.DOUBLE);
+        DebugItem doubleScore = DebugItem.all().stream().filter(item -> item.piece(TetrominoType.I)
+                .items().values().stream().anyMatch(DoubleScoreItem.class::isInstance)).findFirst().orElseThrow();
+        session.replaceNext(TetrominoType.I, doubleScore);
         session.handle(GameCommand.HARD_DROP);
         session.handle(GameCommand.HARD_DROP);
         session.handle(GameCommand.PAUSE);

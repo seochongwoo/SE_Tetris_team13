@@ -15,6 +15,7 @@ import team.tetris.core.Piece;
 import team.tetris.core.PlayerEngine;
 import team.tetris.core.Position;
 import team.tetris.core.Shape;
+import team.tetris.core.TemporaryBlock;
 import team.tetris.core.TetrominoType;
 import team.tetris.core.item.Item;
 import team.tetris.core.item.ItemContext;
@@ -53,6 +54,24 @@ class TextRendererTest {
         assertEquals(palette.block(TetrominoType.T), frame.styleAt(col, row).foreground());
         assertEquals('.', frame.codePointAt(TextRenderer.columnOf(0) + 1, TextRenderer.rowOf(0)));
         assertEquals(palette.dim(), frame.styleAt(TextRenderer.columnOf(0), TextRenderer.rowOf(19)).foreground());
+    }
+
+    @Test
+    void temporaryCellsHaveTheirOwnVisiblePatternInBothPalettes() {
+        var engine = session.snapshot().engine();
+        Cell[][] board = engine.board();
+        board[19][0] = Cell.occupiedBy(TemporaryBlock.INSTANCE);
+        var snapshot = new GameSnapshot(
+                new EngineSnapshot(board, engine.activePiece(), engine.nextPiece(), engine.phase()),
+                0, 0, 0, 1_000_000_000L, GameStatus.RUNNING);
+        for (boolean colorBlind : new boolean[]{false, true}) {
+            var colors = ColorPalette.of(colorBlind);
+            var frame = new TextRenderer(colors, new InputMapper(Settings.defaults())).render(snapshot);
+            int column = TextRenderer.columnOf(0);
+            int row = TextRenderer.rowOf(19);
+            assertEquals("▒▒", frame.rowText(row).substring(column, column + 2));
+            assertEquals(colors.text(), frame.styleAt(column, row).foreground());
+        }
     }
 
     @Test
