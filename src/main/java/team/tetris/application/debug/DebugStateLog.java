@@ -56,7 +56,7 @@ final class DebugStateLog {
                     + "(" + item.item().symbol() + ")@" + item.position()).toList()).append('\n');
         }
         Cell[][] board = engine.board();
-        out.append("board (fixed cells; active piece above):\n");
+        out.append("board (fixed cells; active piece above; #=temporary):\n");
         for (int y = 0; y < board.length; y++) {
             out.append(String.format(java.util.Locale.ROOT, "%02d|", y));
             for (Cell cell : board[y]) {
@@ -77,6 +77,7 @@ final class DebugStateLog {
     }
 
     private static String shape(Shape shape) {
+        if (shape == TemporaryBlock.INSTANCE) return "#";
         if (shape == SoloBlock.SHAPE) return "B";
         return shape.toString();
     }
