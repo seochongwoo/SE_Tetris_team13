@@ -1,5 +1,7 @@
 package team.tetris.ui;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -46,6 +48,7 @@ public final class ScreenRouter {
     private final Set<String> heldKeys = new HashSet<>();
     /** 뗄 때까지 무시할 키 (화면 전환 전부터 누르고 있던 키). */
     private final Set<String> ignoredUntilRelease = new HashSet<>();
+    private final Deque<DebugSetup> debugSetupHistory = new ArrayDeque<>();
     private Settings settings;
     private String notice;
     private Screen current;
@@ -92,6 +95,7 @@ public final class ScreenRouter {
         debugSession().filter(debug -> debug.result().isEmpty())
                 .ifPresent(debug -> debug.handle(team.tetris.application.GameCommand.QUIT_GAME));
         show(new MenuScreen(this, menuItems()));
+        debugSetupHistory.clear();
     }
 
     /** 시작 메뉴 항목. 메뉴를 추가하려면 여기에 한 줄을 더한다. */
@@ -107,11 +111,13 @@ public final class ScreenRouter {
     /** 일반 모드 시작. */
     public void startGame() {
         show(new GameScreen(this, application.newGame(GameMode.NORMAL)));
+        debugSetupHistory.clear();
     }
 
     /** 아이템 모드 시작: 10줄을 지울 때마다 아이템이 실린 블록이 나온다. */
     public void startItemGame() {
         show(new GameScreen(this, application.newGame(GameMode.ITEM)));
+        debugSetupHistory.clear();
     }
 
     public Optional<DebugSession> debugSession() {
@@ -120,6 +126,25 @@ public final class ScreenRouter {
     }
 
     public void startDebugSetup(DebugSetup setup) {
+        var previous = debugSession().map(DebugSession::setup);
+        openDebugSetup(setup);
+        if (previous.isEmpty()) debugSetupHistory.clear();
+        // 같은 설정으로 재시작하는 동작은 배치 이력에 쌓지 않는다.
+        previous.filter(value -> !value.equals(setup)).ifPresent(debugSetupHistory::push);
+    }
+
+    public boolean canRestorePreviousDebugSetup() {
+        return debugSession().isPresent() && !debugSetupHistory.isEmpty();
+    }
+
+    /** 직전에 적용했던 설정과 시드로 보드를 다시 생성한다. 게임 진행 중의 이동은 되돌리지 않는다. */
+    public void restorePreviousDebugSetup() {
+        if (!canRestorePreviousDebugSetup()) return;
+        openDebugSetup(debugSetupHistory.peek());
+        debugSetupHistory.pop();
+    }
+
+    private void openDebugSetup(DebugSetup setup) {
         GameMode mode = debugSession().map(DebugSession::mode).orElse(GameMode.ITEM);
         var started = application.newDebugGame(setup, mode);
         debugSession().filter(previous -> previous.result().isEmpty())

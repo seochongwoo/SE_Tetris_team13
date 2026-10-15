@@ -36,6 +36,7 @@ final class DebugPanel extends JPanel {
     private final JLabel error = new JLabel(" ");
     private final List<Component> playingControls = new ArrayList<>();
     private final JButton restart;
+    private final JButton previousSetup;
     private final JButton stats;
     private DebugSession displayedSession;
 
@@ -49,9 +50,12 @@ final class DebugPanel extends JPanel {
         label("보드 (위 두 줄은 생성 공간)");
         row("아래부터 채울 줄 수", filledRows);
         row("줄마다 비울 칸 수", holesPerRow);
+        pattern.setName("pattern");
+        pattern.setSelectedItem(DebugSetup.HolePattern.RANDOM);
         row("빈칸 배치", pattern);
         fillMode.setName("fillMode");
         row("채울 블록", fillMode);
+        repeatSeed.setName("repeatSeed");
         control(repeatSeed);
         label("스탯");
         row("누적 삭제 줄 수", clearedLines);
@@ -67,6 +71,7 @@ final class DebugPanel extends JPanel {
         }));
         restart = button("설정한 상태로 되돌리기", () -> router.debugSession().ifPresent(debug ->
                 router.startDebugSetup(debug.setup())));
+        previousSetup = button("직전 배치로 되돌리기", router::restorePreviousDebugSetup);
         error.setForeground(java.awt.Color.RED);
         error.setAlignmentX(LEFT_ALIGNMENT);
         add(error);
@@ -117,6 +122,7 @@ final class DebugPanel extends JPanel {
         boolean running = snapshot != null && snapshot.status() == GameStatus.RUNNING;
         playingControls.forEach(control -> control.setEnabled(running));
         restart.setEnabled(debug != null);
+        previousSetup.setEnabled(router.canRestorePreviousDebugSetup());
         stats.setEnabled(debug != null && debug.result().isEmpty());
         if (debug == null) {
             displayedSession = null;

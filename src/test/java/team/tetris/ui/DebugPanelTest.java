@@ -23,6 +23,87 @@ import team.tetris.ui.screen.GameScreen;
 class DebugPanelTest {
     @TempDir Path directory;
 
+    @Test void randomHolesAreSelectedByDefaultBeforeAndAfterStartingAGame() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var app = new AppComposition(directory, true);
+            var router = new ScreenRouter(app, app.settings().loadOrDefault(), () -> {}, ignored -> {});
+            var panel = new DebugPanel(router, () -> {});
+            var pattern = (JComboBox<?>) named(panel, "pattern");
+            assertEquals(DebugSetup.HolePattern.RANDOM, pattern.getSelectedItem());
+            router.startItemGame();
+            panel.refresh();
+            assertEquals(DebugSetup.HolePattern.RANDOM, pattern.getSelectedItem());
+            ((JSpinner) named(panel, "filledRows")).setValue(5);
+            button(panel, "보드·스탯 적용").doClick();
+            assertEquals(DebugSetup.HolePattern.RANDOM, router.debugSession().orElseThrow().setup().pattern());
+        });
+    }
+
+    @Test void previousLayoutRestoresAppliedSetupsAndSeedsInReverseOrder() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var app = new AppComposition(directory, true);
+            var router = new ScreenRouter(app, app.settings().loadOrDefault(), () -> {}, ignored -> {});
+            var panel = new DebugPanel(router, () -> {});
+            var undo = button(panel, "직전 배치로 되돌리기");
+            assertFalse(undo.isEnabled());
+            var first = new DebugSetup(5, 3, DebugSetup.HolePattern.RANDOM,
+                    DebugSetup.FillMode.TEMPORARY, 9, Difficulty.EASY, 77);
+            router.startDebugSetup(first);
+            panel.refresh();
+            assertFalse(undo.isEnabled());
+            router.debugSession().orElseThrow().handle(GameCommand.HARD_DROP);
+
+            ((JSpinner) named(panel, "filledRows")).setValue(6);
+            ((JSpinner) named(panel, "holesPerRow")).setValue(2);
+            ((JSpinner) named(panel, "clearedLines")).setValue(29);
+            ((JComboBox<?>) named(panel, "pattern")).setSelectedItem(DebugSetup.HolePattern.ALIGNED);
+            ((JComboBox<?>) named(panel, "fillMode")).setSelectedItem(DebugSetup.FillMode.RANDOM);
+            ((JComboBox<?>) named(panel, "difficulty")).setSelectedItem(Difficulty.HARD);
+            ((JCheckBox) named(panel, "repeatSeed")).setSelected(false);
+            button(panel, "보드·스탯 적용").doClick();
+            var second = router.debugSession().orElseThrow().setup();
+            assertTrue(undo.isEnabled());
+            button(panel, "설정한 상태로 되돌리기").doClick();
+
+            var session = router.debugSession().orElseThrow();
+            var field = ((JSpinner.DefaultEditor) ((JSpinner) named(panel, "filledRows")).getEditor()).getTextField();
+            field.setText("invalid");
+            button(panel, "보드·스탯 적용").doClick();
+            assertSame(session, router.debugSession().orElseThrow());
+            field.setText("6");
+            button(panel, "보드 비우기").doClick();
+            assertEquals(0, router.debugSession().orElseThrow().setup().filledRows());
+
+            undo.doClick();
+            assertEquals(second, router.debugSession().orElseThrow().setup());
+            assertArrayEquals(second.board(), router.debugSession().orElseThrow().snapshot().engine().board());
+            assertEquals(DebugSetup.FillMode.RANDOM, ((JComboBox<?>) named(panel, "fillMode")).getSelectedItem());
+            assertTrue(undo.isEnabled());
+
+            undo.doClick();
+            var restored = router.debugSession().orElseThrow();
+            assertEquals(first, restored.setup());
+            assertArrayEquals(first.board(), restored.snapshot().engine().board());
+            assertEquals(0, restored.snapshot().score());
+            assertEquals(9, restored.snapshot().clearedLines());
+            assertTrue(restored.frozen());
+            assertEquals(5, ((JSpinner) named(panel, "filledRows")).getValue());
+            assertEquals(3, ((JSpinner) named(panel, "holesPerRow")).getValue());
+            assertEquals(DebugSetup.HolePattern.RANDOM, ((JComboBox<?>) named(panel, "pattern")).getSelectedItem());
+            assertEquals(DebugSetup.FillMode.TEMPORARY, ((JComboBox<?>) named(panel, "fillMode")).getSelectedItem());
+            assertEquals(Difficulty.EASY, ((JComboBox<?>) named(panel, "difficulty")).getSelectedItem());
+            assertFalse(undo.isEnabled());
+
+            button(panel, "보드 비우기").doClick();
+            assertTrue(undo.isEnabled());
+            button(panel, "메뉴로").doClick();
+            assertFalse(undo.isEnabled());
+            router.startItemGame();
+            panel.refresh();
+            assertFalse(undo.isEnabled());
+        });
+    }
+
     @Test void fillModeAppliesAndRestoresWithTheBoard() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var app = new AppComposition(directory, true);
@@ -32,8 +113,11 @@ class DebugPanelTest {
             assertEquals(DebugSetup.FillMode.TEMPORARY, fillMode.getSelectedItem());
             ((JSpinner) named(panel, "filledRows")).setValue(5);
             button(panel, "보드·스탯 적용").doClick();
-            assertSame(TemporaryBlock.INSTANCE,
-                    router.debugSession().orElseThrow().snapshot().engine().board()[19][0].occupiedBy());
+            for (var row : router.debugSession().orElseThrow().snapshot().engine().board()) {
+                for (var cell : row) {
+                    if (!cell.isEmpty()) assertSame(TemporaryBlock.INSTANCE, cell.occupiedBy());
+                }
+            }
 
             fillMode.setSelectedItem(DebugSetup.FillMode.RANDOM);
             button(panel, "보드·스탯 적용").doClick();

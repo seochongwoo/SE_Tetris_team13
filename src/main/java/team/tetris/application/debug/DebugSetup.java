@@ -49,7 +49,7 @@ public record DebugSetup(int filledRows, int holesPerRow, HolePattern pattern, F
     }
 
     public static DebugSetup empty(Difficulty difficulty) {
-        return new DebugSetup(0, 1, HolePattern.ALIGNED, 0, difficulty, 13);
+        return new DebugSetup(0, 1, HolePattern.RANDOM, 0, difficulty, 13);
     }
 
     public Cell[][] board() {

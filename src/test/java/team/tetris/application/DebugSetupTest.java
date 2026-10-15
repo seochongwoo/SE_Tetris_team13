@@ -14,6 +14,10 @@ import team.tetris.core.TemporaryBlock;
 import team.tetris.core.TetrominoType;
 
 class DebugSetupTest {
+    @Test void defaultSetupUsesRandomHoles() {
+        assertEquals(DebugSetup.HolePattern.RANDOM, DebugSetup.empty(Difficulty.NORMAL).pattern());
+    }
+
     @ParameterizedTest @EnumSource(DebugSetup.HolePattern.class)
     void rowsHaveTheRequestedHoleCountAndTheSpawnAreaStaysEmpty(DebugSetup.HolePattern pattern) {
         for (int rows : new int[]{0, 1, 18}) {
