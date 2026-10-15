@@ -23,6 +23,41 @@ import team.tetris.ui.screen.GameScreen;
 class DebugPanelTest {
     @TempDir Path directory;
 
+    @Test void placementUndoEnablesAfterDroppingABlockAndRestoresTheGame() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var app = new AppComposition(directory, true);
+            var router = new ScreenRouter(app, app.settings().loadOrDefault(), () -> {}, ignored -> {});
+            var panel = new DebugPanel(router, () -> {});
+            var undo = button(panel, "직전 배치로 되돌리기");
+            assertFalse(undo.isEnabled());
+            button(panel, "보드·스탯 적용").doClick();
+            var session = router.debugSession().orElseThrow();
+            var before = session.snapshot();
+            assertFalse(undo.isEnabled());
+            session.handle(GameCommand.MOVE_LEFT);
+            panel.refresh();
+            assertFalse(undo.isEnabled());
+            var positioned = session.snapshot().engine().activePiece();
+            session.handle(GameCommand.HARD_DROP);
+            panel.refresh();
+            assertTrue(undo.isEnabled());
+            assertFalse(button(panel, "직전 설정으로 되돌리기").isEnabled());
+
+            undo.doClick();
+            var restored = router.debugSession().orElseThrow();
+            assertArrayEquals(before.engine().board(), restored.snapshot().engine().board());
+            assertEquals(positioned, restored.snapshot().engine().activePiece());
+            assertEquals(before.engine().nextPiece(), restored.snapshot().engine().nextPiece());
+            assertEquals(before.score(), restored.snapshot().score());
+            assertEquals(GameStatus.RUNNING, restored.snapshot().status());
+            assertTrue(restored.frozen());
+            assertFalse(undo.isEnabled());
+            restored.handle(GameCommand.HARD_DROP);
+            panel.refresh();
+            assertTrue(undo.isEnabled());
+        });
+    }
+
     @Test void randomHolesAreSelectedByDefaultBeforeAndAfterStartingAGame() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var app = new AppComposition(directory, true);
@@ -44,7 +79,7 @@ class DebugPanelTest {
             var app = new AppComposition(directory, true);
             var router = new ScreenRouter(app, app.settings().loadOrDefault(), () -> {}, ignored -> {});
             var panel = new DebugPanel(router, () -> {});
-            var undo = button(panel, "직전 배치로 되돌리기");
+            var undo = button(panel, "직전 설정으로 되돌리기");
             assertFalse(undo.isEnabled());
             var first = new DebugSetup(5, 3, DebugSetup.HolePattern.RANDOM,
                     DebugSetup.FillMode.TEMPORARY, 9, Difficulty.EASY, 77);

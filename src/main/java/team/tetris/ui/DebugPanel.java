@@ -37,6 +37,7 @@ final class DebugPanel extends JPanel {
     private final List<Component> playingControls = new ArrayList<>();
     private final JButton restart;
     private final JButton previousSetup;
+    private final JButton undoPlacement;
     private final JButton stats;
     private DebugSession displayedSession;
 
@@ -71,7 +72,8 @@ final class DebugPanel extends JPanel {
         }));
         restart = button("설정한 상태로 되돌리기", () -> router.debugSession().ifPresent(debug ->
                 router.startDebugSetup(debug.setup())));
-        previousSetup = button("직전 배치로 되돌리기", router::restorePreviousDebugSetup);
+        previousSetup = button("직전 설정으로 되돌리기", router::restorePreviousDebugSetup);
+        undoPlacement = button("직전 배치로 되돌리기", router::undoDebugPlacement);
         error.setForeground(java.awt.Color.RED);
         error.setAlignmentX(LEFT_ALIGNMENT);
         add(error);
@@ -123,6 +125,7 @@ final class DebugPanel extends JPanel {
         playingControls.forEach(control -> control.setEnabled(running));
         restart.setEnabled(debug != null);
         previousSetup.setEnabled(router.canRestorePreviousDebugSetup());
+        undoPlacement.setEnabled(router.canUndoDebugPlacement());
         stats.setEnabled(debug != null && debug.result().isEmpty());
         if (debug == null) {
             displayedSession = null;

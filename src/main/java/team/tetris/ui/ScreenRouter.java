@@ -137,6 +137,19 @@ public final class ScreenRouter {
         return debugSession().isPresent() && !debugSetupHistory.isEmpty();
     }
 
+    public boolean canUndoDebugPlacement() {
+        return debugSession().map(DebugSession::canUndoPlacement).orElse(false);
+    }
+
+    public void undoDebugPlacement() {
+        var previous = debugSession().filter(DebugSession::canUndoPlacement).orElse(null);
+        if (previous == null) return;
+        var started = application.newDebugGame(previous.setup(), previous.mode());
+        previous.replayBeforeLastPlacement((DebugSession) started.session());
+        if (previous.result().isEmpty()) previous.handle(team.tetris.application.GameCommand.QUIT_GAME);
+        show(new GameScreen(this, started));
+    }
+
     /** 직전에 적용했던 설정과 시드로 보드를 다시 생성한다. 게임 진행 중의 이동은 되돌리지 않는다. */
     public void restorePreviousDebugSetup() {
         if (!canRestorePreviousDebugSetup()) return;
