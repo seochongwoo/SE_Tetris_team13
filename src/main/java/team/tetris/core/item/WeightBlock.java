@@ -5,8 +5,9 @@ import java.util.random.RandomGenerator;
 import team.tetris.core.Piece;
 import team.tetris.core.Position;
 import team.tetris.core.Shape;
+import team.tetris.core.rule.PieceMovementRule;
 
-/** 폭 4칸 무게추. 낙하 중 삭제와 접촉 후 이동 제한은 PlayerEngine이 처리한다. */
+/** 폭 4칸 무게추. 낙하 중 삭제와 접촉 후 이동 제한은 전용 이동 규칙으로 처리한다. */
 public final class WeightBlock implements ItemKind, Item {
     public static final char SYMBOL = 'W';
 
@@ -23,6 +24,11 @@ public final class WeightBlock implements ItemKind, Item {
         @Override
         public int rotationStates() {
             return 1;
+        }
+
+        @Override
+        public PieceMovementRule movementRule() {
+            return WeightMovementRule.INSTANCE;
         }
 
         @Override

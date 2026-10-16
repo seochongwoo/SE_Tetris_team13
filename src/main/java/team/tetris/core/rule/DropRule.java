@@ -4,7 +4,6 @@ import team.tetris.core.ActivePiece;
 import team.tetris.core.Board;
 import team.tetris.core.Cell;
 import team.tetris.core.Position;
-import team.tetris.core.item.WeightBlock;
 
 /** 실제 낙하와 착지 미리보기가 공유하는 충돌 규칙. */
 public final class DropRule {
@@ -15,18 +14,9 @@ public final class DropRule {
         return board.canPlace(piece.shape(), piece.rotation(), lowered);
     }
 
-    /** 한 칸 낙하. 무게추는 경로의 칸을 지우며, 바닥에 닿으면 보드를 바꾸지 않고 null 반환. */
+    /** 블록의 이동 규칙으로 한 칸 낙하. 실제 엔진과 미리보기에 같은 규칙을 적용한다. */
     public static ActivePiece descend(Board board, ActivePiece piece) {
-        ActivePiece next = piece.movedTo(piece.origin().translate(0, 1));
-        if (piece.shape() == WeightBlock.SHAPE) {
-            for (Position cell : next.cells()) {
-                if (cell.y() >= board.height()) return null;
-            }
-            for (Position cell : next.cells()) board.removeCell(cell);
-        } else if (!canDescend(board, piece)) {
-            return null;
-        }
-        return next;
+        return piece.shape().movementRule().descend(board, piece);
     }
 
     /** 보드·공급자·아이템 효과를 바꾸지 않고, 고정 직전 위치만 계산한다. */

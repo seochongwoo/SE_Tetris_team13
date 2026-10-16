@@ -7,7 +7,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import team.tetris.core.item.Item;
 import team.tetris.core.item.ItemContext;
-import team.tetris.core.item.WeightBlock;
 import team.tetris.core.port.TetrisEnginePort;
 import team.tetris.core.result.ClearResult;
 import team.tetris.core.result.DropResult;
@@ -42,7 +41,7 @@ public final class PlayerEngine implements TetrisEnginePort {
     private final RotationSystem rotationSystem = new RotationSystem();
 
     private ActivePiece activePiece;
-    private boolean weightTouchedDown;
+    private boolean touchedDown;
     private EnginePhase phase = EnginePhase.READY;
 
     public PlayerEngine(int width, int height, PieceSource source) {
@@ -67,7 +66,7 @@ public final class PlayerEngine implements TetrisEnginePort {
         for (Position cell : initialPiece.cells()) {
             if (cell.y() < 0) throw new IllegalArgumentException("Initial piece must be visible");
         }
-        updateWeightContact();
+        updateContact();
         phase = EnginePhase.RUNNING;
     }
 
@@ -121,22 +120,26 @@ public final class PlayerEngine implements TetrisEnginePort {
     }
 
     private EngineStep tryShift(int dx, int dy) {
-        if (weightTouchedDown) {
+        if (!activePiece.shape().movementRule().allowsHorizontalMovement(touchedDown)) {
             return noEvent();
         }
         Position moved = activePiece.origin().translate(dx, dy);
         if (board.canPlace(activePiece.shape(), activePiece.rotation(), moved)) {
             activePiece = activePiece.movedTo(moved);
-            updateWeightContact();
+            updateContact();
         }
         return noEvent();
     }
 
     private EngineStep rotate(boolean clockwise) {
+        if (!activePiece.shape().movementRule().allowsRotation(touchedDown)) {
+            return noEvent();
+        }
         RotationResult result = rotationSystem.tryRotate(
                 board, activePiece.shape(), activePiece.rotation(), activePiece.origin(), clockwise);
         if (result.rotated()) {
             activePiece = activePiece.rotatedTo(result.rotation(), result.origin());
+            updateContact();
         }
         return noEvent();
     }
@@ -166,16 +169,14 @@ public final class PlayerEngine implements TetrisEnginePort {
         ActivePiece next = DropRule.descend(board, activePiece);
         if (next == null) return false;
         activePiece = next;
-        updateWeightContact();
+        updateContact();
         return true;
     }
 
-    /** 닿은 순간부터 잠근다. 아래 칸을 지워 다시 공중에 떠도 다음 스폰까지 풀지 않는다. */
-    private void updateWeightContact() {
-        if (activePiece.shape() == WeightBlock.SHAPE
-                && !board.canPlace(activePiece.shape(), activePiece.rotation(),
-                        activePiece.origin().translate(0, 1))) {
-            weightTouchedDown = true;
+    /** 최초 아래쪽 접촉을 기억한다. 이동 제한 여부는 블록의 규칙이 결정한다. */
+    private void updateContact() {
+        if (!DropRule.canDescend(board, activePiece)) {
+            touchedDown = true;
         }
     }
 
@@ -224,12 +225,12 @@ public final class PlayerEngine implements TetrisEnginePort {
      * 공간이 없으면) GAME_OVER로 전환한다.
      */
     private void spawnNext() {
-        weightTouchedDown = false;
+        touchedDown = false;
         Piece piece = source.next();
         Position origin = spawnOrigin(piece.shape());
         if (board.canPlace(piece.shape(), 0, origin)) {
             activePiece = new ActivePiece(piece, 0, origin);
-            updateWeightContact();
+            updateContact();
             phase = EnginePhase.RUNNING;
         } else {
             activePiece = null;
