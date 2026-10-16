@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Random;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import team.tetris.core.*;
 import team.tetris.core.result.EngineStep;
 import team.tetris.core.rule.ItemPieceSource;
@@ -246,6 +248,29 @@ class RequiredItemsTest {
         engine.apply(GameAction.MOVE_RIGHT);
         assertEquals(floor, engine.snapshot().activePiece().origin());
         assertNotNull(engine.tick().lockResult());
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {2, 18})
+    void initialWeightContactLocksMovementBeforeTheFirstTick(int row) {
+        Cell[][] board = new Board(10, 20).snapshot();
+        if (row == 2) board[4][3] = Cell.occupiedBy(TetrominoType.J);
+        ActivePiece initial = new ActivePiece(WEIGHT, 0, new Position(3, row));
+        PlayerEngine engine = new PlayerEngine(board, initial, new Sequence());
+
+        engine.apply(GameAction.MOVE_LEFT);
+        assertEquals(initial, engine.snapshot().activePiece());
+        engine.apply(GameAction.MOVE_RIGHT);
+        assertEquals(initial, engine.snapshot().activePiece());
+        assertArrayEquals(board, engine.snapshot().board());
+
+        if (row == 2) {
+            engine.tick(); // 접촉한 칸을 지워도 이동 잠금은 유지된다.
+            assertTrue(engine.snapshot().board()[4][3].isEmpty());
+            ActivePiece descended = engine.snapshot().activePiece();
+            engine.apply(GameAction.MOVE_RIGHT);
+            assertEquals(descended, engine.snapshot().activePiece());
+        }
     }
 
     private static PlayerEngine stackedWeight() {

@@ -67,6 +67,7 @@ public final class PlayerEngine implements TetrisEnginePort {
         for (Position cell : initialPiece.cells()) {
             if (cell.y() < 0) throw new IllegalArgumentException("Initial piece must be visible");
         }
+        updateWeightContact();
         phase = EnginePhase.RUNNING;
     }
 
