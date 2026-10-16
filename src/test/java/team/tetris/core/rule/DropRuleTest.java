@@ -11,6 +11,7 @@ import team.tetris.core.item.Item;
 import team.tetris.core.item.ItemContext;
 import team.tetris.core.item.BombItem;
 import team.tetris.core.item.SoloBlock;
+import team.tetris.core.item.WeightBlock;
 
 class DropRuleTest {
     @ParameterizedTest @EnumSource(TetrominoType.class)
@@ -50,6 +51,35 @@ class DropRuleTest {
         assertEquals(before.activePiece(), engine.snapshot().activePiece());
         assertEquals(before.nextPiece(), engine.snapshot().nextPiece());
         assertEquals(ghost.origin(), engine.apply(GameAction.HARD_DROP).lockResult().origin());
+    }
+
+    @Test void weightProjectionCrushesTheStackWithoutChangingTheBoardOrSource() {
+        Cell[][] board = emptyBoard();
+        board[10][3] = Cell.occupiedBy(TetrominoType.J);
+        board[19][4] = Cell.occupiedBy(TetrominoType.O);
+        board[19][8] = Cell.occupiedBy(TetrominoType.Z);
+        ActivePiece initial = new ActivePiece(new WeightBlock().toItemPiece(null, null),
+                0, new Position(3, 0));
+        int[] draws = {0};
+        PieceSource source = new PieceSource() {
+            public Piece peek() { return Piece.of(TetrominoType.T); }
+            public Piece next() { draws[0]++; return peek(); }
+        };
+        PlayerEngine engine = new PlayerEngine(board, initial, source);
+        Cell[][] original = engine.snapshot().board();
+
+        ActivePiece ghost = DropRule.landingPiece(board, initial);
+
+        assertEquals(new Position(3, 18), ghost.origin());
+        assertArrayEquals(original, board);
+        assertArrayEquals(original, engine.snapshot().board());
+        assertEquals(initial, engine.snapshot().activePiece());
+        assertEquals(0, draws[0]);
+        var dropped = engine.apply(GameAction.HARD_DROP);
+        assertEquals(ghost.origin(), dropped.lockResult().origin());
+        assertEquals(18, dropped.dropResult().cellsDropped());
+        assertTrue(dropped.snapshot().board()[10][3].isEmpty());
+        assertEquals(TetrominoType.Z, dropped.snapshot().board()[19][8].occupiedBy());
     }
 
     @Test void projectionDoesNotActivateAttachedItems() {

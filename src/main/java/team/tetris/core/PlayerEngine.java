@@ -163,22 +163,9 @@ public final class PlayerEngine implements TetrisEnginePort {
 
     /** 일반 블록은 충돌을 검사하고, 무게추는 다음 위치의 칸을 지우며 한 칸 내려간다. */
     private boolean descendOneCell() {
-        Position lowered = activePiece.origin().translate(0, 1);
-        if (activePiece.shape() == WeightBlock.SHAPE) {
-            ActivePiece next = activePiece.movedTo(lowered);
-            // 바닥을 넘는 시도는 보드를 바꾸지 않는다.
-            for (Position cell : next.cells()) {
-                if (cell.y() >= board.height()) {
-                    return false;
-                }
-            }
-            for (Position cell : next.cells()) {
-                board.removeCell(cell);
-            }
-        } else if (!DropRule.canDescend(board, activePiece)) {
-            return false;
-        }
-        activePiece = activePiece.movedTo(lowered);
+        ActivePiece next = DropRule.descend(board, activePiece);
+        if (next == null) return false;
+        activePiece = next;
         updateWeightContact();
         return true;
     }
