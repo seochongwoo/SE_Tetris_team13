@@ -119,13 +119,18 @@ public record GameSnapshot(
     int level,
     int clearedLines,
     long gravityIntervalNanos,
-    GameStatus status
+    GameStatus status,
+    int doubleScoreClears,
+    LineClearAnimation lineClearAnimation,
+    GameMode mode,
+    Difficulty difficulty
 ) {}
 ```
 
 - 스냅샷의 `engine`은 기존 코어 타입이며 보드·현재 블록·다음 블록을 포함한다. UI는 코어 메서드를 직접 호출하지 않는다.
 - 현재 코어의 `Cell[][]`는 배열이므로 record 선언만으로 완전한 불변성이 보장되지는 않는다. 생성·조회 시 보드 데이터의 방어적 복사를 제공하며 UI는 읽기 전용으로 사용한다.
 - 게임오버 시 `activePiece`가 null일 수도, 마지막 블록이 남아 있을 수도 있다. UI는 null을 처리하고 세션의 `status`를 화면 전환 기준으로 사용한다.
+- `doubleScoreClears`는 점수 2배 효과의 남은 줄 삭제 횟수이며, `lineClearAnimation`은 연출이 없으면 null이다. `mode`와 `difficulty`는 게임 시작 시 확정한 값이다. 모드·난이도를 생략하는 호환 생성자는 일반·NORMAL을 사용한다.
 - 생성된 세션은 RUNNING으로 시작한다. 새 게임은 새 엔진·세션을 생성하며 이전 세션을 재사용하지 않는다.
 - `SinglePlayerSession(TetrisEnginePort)`는 RUNNING인 새 엔진을 받는다. null 또는 RUNNING이 아닌 엔진은 거부한다. 엔진은 세션이 소유하며 외부에서 직접 조작하지 않는다.
 - `SinglePlayerSession(TetrisEnginePort, ScoreRule, SpeedRule)`로 점수·속도 규칙을 주입할 수 있다. 기본 생성자는 아래의 `ScorePolicy`와 `SpeedPolicy`를 사용한다. 정책은 순수 계산으로 구현하며 실행 중 외부에서 변경하지 않는다.
@@ -133,6 +138,12 @@ public record GameSnapshot(
 - `QUIT_GAME`은 현재 판을 ABORTED로 종료한다. 프로그램 종료와 메뉴 복귀는 UI 라우터가 구분한다.
 - RUNNING에서는 조작·PAUSE·QUIT_GAME을 허용한다. PAUSED에서는 RESUME·QUIT_GAME만 허용한다. 종료 상태에서는 모든 명령과 시간 갱신이 상태를 바꾸지 않는다.
 - null 명령과 음수 경과 시간은 프로그래밍 오류로 거부한다. `update(0)`은 진행하지 않는다.
+
+### 게임 화면 표시
+
+`TextRenderer.drawStats`는 NEXT 아래, SCORE 위에 현재 판의 모드와 난이도를 `일반 / EASY`, `아이템 / HARD` 형식으로 표시합니다. `GameSnapshot.mode()`와 `difficulty()`를 사용하므로 일시정지·종료 상태에도 같은 분류를 유지합니다.
+
+보드의 빈 칸은 `BlockGlyphs.EMPTY`의 전각 가운뎃점(`・`)으로 표시합니다. `TextFramePanel`은 글자의 실제 그려지는 영역을 기준으로 두 글자 폭의 보드 칸 중앙에 배치하며, 화면 크기와 HiDPI 배율이 바뀌어도 중앙 정렬을 유지합니다.
 
 ### 일시정지 메뉴와 키 충돌
 
@@ -395,15 +406,9 @@ lineBonus = 100 × clearedLinesInThisStep²
 
 `SinglePlayerSession`은 줄을 지운 결과를 받으면 `GameSnapshot.lineClearAnimation()`에 삭제 행과 경과 시간을 전달합니다. `TextRenderer`는 `LineClearAnimation.boardBeforeClear`로 압축 전 위치를 복원해 150ms 동안 줄 전체를 흰색으로 강조하고, 150ms 동안 해당 줄을 비운 뒤 압축된 보드와 다음 블록을 표시합니다. 일반 삭제와 `L` 아이템으로 지운 미완성 줄에 같은 연출을 적용합니다. 칸만 지우는 폭탄·연쇄·무게추 효과 자체에는 적용하지 않습니다.
 
-실제 엔진은 고정 시점에 삭제·압축·다음 스폰을 끝냅니다. 점수·줄 수·아이템 공급은 그때 한 번만 처리하며, 연출 동안 세션이 이동·회전·드롭·중력 호출을 막습니다. 화면에서는 다음 활성 블록과 착지 그림자를 숨깁니다. 연출을 넘긴 경과 시간은 버리고 다음 블록에 온전한 중력 간격을 줍니다. 일시정지는 남은 연출 시간도 보존하며, 중도 종료는 연출을 취소합니다. 스폰에 실패한 경우에도 세션은 연출이 끝날 때까지 RUNNING(또는 PAUSED)을 유지하므로 화면 전환은 엔진 phase가 아닌 세션 status와 result를 따릅니다.
+실제 엔진은 고정 시점에 삭제·압축·다음 스폰을 끝냅니다. 점수·줄 수·아이템 공급은 그때 한 번만 처리하며, 연출 동안 세션이 이동·회전·드롭·중력 호출을 막습니다. 화면에서는 다음 활성 블록을 숨깁니다. 연출을 넘긴 경과 시간은 버리고 다음 블록에 온전한 중력 간격을 줍니다. 일시정지는 남은 연출 시간도 보존하며, 중도 종료는 연출을 취소합니다. 스폰에 실패한 경우에도 세션은 연출이 끝날 때까지 RUNNING(또는 PAUSED)을 유지하므로 화면 전환은 엔진 phase가 아닌 세션 status와 result를 따릅니다.
 
-디버그의 자동 낙하 정지 상태에서도 삭제 연출은 진행합니다. 한 칸 진행은 연출 중 무시하고, 연출 경과 시간은 배치 되돌리기 재생 이력에 포함합니다. UI는 연출 중 키 반복을 소비해 종료 직후 밀린 입력이 몰리지 않게 합니다.
-
-### 디버그 삭제 범위 미리보기
-
-디버그 화면은 `HardDropPreview.project`로 현재 위치·회전에서 하드 드롭했을 때 사라질 기존 보드 칸을 계산합니다. `L`의 삭제 행, `B`의 3×3 폭발, `C`의 같은 종류 연결 덩어리, `W`의 낙하 경로와 완성 줄 삭제를 반영합니다. 압축으로 아래로 이동할 뿐인 칸과 빈 공간은 강조하지 않습니다. 블록의 문자와 고유 색을 유지하고 배경에 흰색을 25% 섞어 표시합니다. 일반·색맹 모드 모두 같은 흰색 강조를 사용합니다. 일반 화면·게임 종료·줄 삭제 애니메이션 중에는 이 예고를 표시하지 않습니다.
-
-미리보기는 복사한 `Board`와 `Item.previewOnLock`만 사용하며 실제 발동 콜백, 생성기, 점수, 난수 상태를 바꾸지 않습니다. 새 보드 효과 아이템은 `previewOnLock`에 외부 상태를 바꾸지 않는 효과 계산을 구현하고 `onLock`과 공유합니다. 기본 미리보기 콜백은 효과가 없습니다. 무게추의 관통 낙하는 엔진과 미리보기가 `DropRule.descend`를 공유하므로 착지 그림자도 실제 바닥 위치를 표시합니다.
+UI는 연출 중 키 반복을 소비해 종료 직후 밀린 입력이 몰리지 않게 합니다.
 
 ### 확장 지점
 
@@ -414,7 +419,7 @@ lineBonus = 100 × clearedLinesInThisStep²
 - 블록 이동: `core.rule.PieceMovementRule`을 구현하고 `Shape.movementRule()`에서 반환합니다. 기본값은 일반 충돌 규칙입니다. 좌우 이동·회전 허용 여부와 한 칸 낙하를 재정의할 수 있으며, 허용된 좌우 이동·회전에는 기존 충돌 판정을 적용합니다. 최초 아래쪽 접촉 상태는 엔진이 초기 배치·스폰·이동·회전·낙하 시 갱신하고 다음 블록에서 초기화합니다. 규칙은 상태를 저장하지 않고 전달받은 접촉 여부를 사용해야 합니다. `descend`는 성공 시 한 칸 아래 위치, 실패 시 null을 반환하며 실패 시 보드를 변경하지 않습니다. 실제 낙하와 두 미리보기가 같은 규칙을 사용하므로 성공 시에도 전달받은 보드 외부의 상태를 바꾸면 안 됩니다. 무게추는 `WeightMovementRule`로 접촉 후 이동 제한·회전 금지·낙하 중 삭제를 구현합니다. 점수 계산은 기존처럼 application의 책임입니다.
 - 아이템: `core.item.Item`을 구현합니다. 블록이 고정되면 아이템이 실린 칸마다 `onLock(ItemContext, Position)`이 한 번 호출되고 아이템은 소모됩니다. 처리 순서는 보드 기록 → 아이템 효과 → 꽉 찬 줄과 `ItemContext.clearRow`로 지정한 줄 일괄 삭제이며, 지운 줄은 모두 `clearResult`로 보고되어 기존 방식대로 점수가 계산됩니다. 점수 배율처럼 보드 밖 효과는 `itemActivations()`를 보고 application에서 처리합니다.
 - 아이템 공급: `core.rule.PieceSource`를 구현해 `PlayerEngine(width, height, source)`에 전달합니다. 블록 모양은 기존처럼 `PieceGenerator`가 정하고, 아이템을 실을지는 공급자가 정합니다. 줄이 지워지면 다음 블록을 꺼내기 전에 `onLinesCleared(lines)`가 호출되므로 "10줄마다 아이템"을 바로 미리보기에 반영할 수 있습니다. 일반 모드는 `PlainPieceSource`를, 아이템 모드는 이를 감싼 `ItemPieceSource`를 씁니다. `ItemPieceSource`는 게임 전체 누적 삭제 줄 수가 10의 배수를 넘을 때마다 다음에 새로 나타나는 미리보기 블록에 아이템을 싣습니다.
-- 새 아이템 등록: `core.item.Item`을 구현하고 `core.item.ItemCatalog.all()`에 한 줄을 추가합니다. 블록의 한 칸에 붙는 아이템은 `new AttachedItem(item)`(무작위 칸), 블록 자체가 아이템이면 `ItemKind`를 직접 구현해 자기 모양의 블록을 돌려줍니다(1칸짜리 블록은 `new SoloBlock(item)`). 아이템이 나올 차례에는 목록에서 균등 확률로 하나를 고르며, 목록이 비어 있으면 아이템 없이 진행합니다.
+- 새 아이템 등록: `core.item.Item`을 구현하고 `core.item.ItemCatalog.entries()`에 `new Entry("표시 이름", 생성 방식)`을 추가합니다. `all()`은 이 목록을 게임 공급자용 `ItemKind` 목록으로 변환합니다. 블록의 한 칸에 붙는 아이템은 `new AttachedItem(item)`(무작위 칸), 블록 자체가 아이템이면 `ItemKind`를 직접 구현해 자기 모양의 블록을 돌려줍니다(1칸짜리 블록은 `new SoloBlock(item)`). 아이템이 나올 차례에는 목록에서 균등 확률로 하나를 고르며, 목록이 비어 있으면 아이템 없이 진행합니다.
 - 등록된 아이템: 연쇄 삭제 `C`(`ChainClearItem`, 블록의 한 칸), 폭탄 `B`(`BombItem`, 1칸 블록), 점수 2배 `$`(`DoubleScoreItem`, 블록의 한 칸). `$`는 보드 효과가 없고, `SinglePlayerSession`이 `itemActivations()`에서 이 아이템을 보면 그 고정부터 줄을 지운 동작 3번(`DOUBLE_SCORE_CLEARS`)의 점수를 2배로 계산합니다. 남은 횟수는 `GameSnapshot.doubleScoreClears()`로 화면에 표시합니다.
 - 저장 방식: `SettingsRepository` 또는 `ScoreRepository`를 구현해 서비스 생성자에 전달합니다. 앱 전체에 적용하려면 bootstrap 조립도 변경합니다. 테스트용 메모리 구현은 `storage.memory`에 있습니다.
 - 순위 정책: `ScoreboardService(repository, policy, clock)`으로 보관 개수·이름 제한 등을 주입합니다. 현재 종료 조율자는 ABORTED를 항상 메뉴로 보내므로, 중도 종료 등록 정책을 바꿀 경우 종료 흐름도 함께 검토해야 합니다.

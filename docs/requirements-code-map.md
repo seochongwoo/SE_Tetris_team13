@@ -87,9 +87,11 @@ GameScreen.update(경과 시간)
 | 7종 블록 | `core/TetrominoType`(I, O, T, S, Z, J, L), 회전 상태별 칸 좌표표 |
 | 같은 확률 | normal 난이도는 7종 가중치가 모두 10 → `WeightedRandomGenerator.spin` |
 | 줄 삭제 | `PlayerEngine.lockActivePieceAndSpawnNext` → `Board.clearRows`: 꽉 찬 줄 삭제 후 위 줄을 내림 |
-| 화면 구성 | `ui/render/TextRenderer.render`: `drawBoard`(보드), `drawActivePiece`(떨어지는 블록), `drawNext`(NEXT), `drawStats`(SCORE·LEVEL·LINES), `drawHelp`(키 안내) |
+| 화면 구성 | `ui/render/TextRenderer.render`: `drawBoard`(보드), `drawActivePiece`(떨어지는 블록), `drawNext`(NEXT), `drawStats`(모드·난이도·SCORE·LEVEL·LINES), `drawHelp`(키 안내) |
 
-테스트: `BoardTest`, `PlayerEngineTest`, `TetrominoTypeTest`, `TextRendererTest`
+`GameSnapshot.mode()`·`difficulty()`는 게임 시작 시 확정한 분류를 전달하고, `drawStats`는 NEXT 아래·SCORE 위에 `일반 / EASY`처럼 표시합니다. 보드 빈 칸은 `BlockGlyphs.EMPTY`의 전각 가운뎃점(`・`)이며, `TextFramePanel`이 실제 글자 영역을 기준으로 칸 중앙에 그립니다.
+
+테스트: `BoardTest`, `PlayerEngineTest`, `TetrominoTypeTest`, `TextRendererTest`, `TextFramePanelTest`
 
 ### R1-09 1초 낙하와 가속
 
@@ -344,7 +346,7 @@ PlayerEngine.lockActivePieceAndSpawnNext
 고정 시 발동하는 새 아이템은 아래 두 곳을 고치면 게임에 나옵니다. 무게추처럼 이동 규칙이 다른 아이템은 엔진의 이동 처리도 확장합니다.
 
 1. `core/item/`에 `Item` 구현 클래스 추가: `symbol()`과 `onLock(ItemContext, Position)`
-2. `core/item/ItemCatalog.all()`에 한 줄 추가
+2. `core/item/ItemCatalog.entries()`에 `new Entry("표시 이름", 생성 방식)` 추가 (`all()`이 게임 공급자용 목록으로 변환)
    - 블록에 붙는 아이템: `new AttachedItem(new 새아이템())`
    - 1칸 블록 아이템: `new SoloBlock(new 새아이템())`
    - 다른 모양의 블록: `ItemKind`를 구현해 자기 `Shape`의 `Piece`를 돌려줌
@@ -359,4 +361,4 @@ PlayerEngine.lockActivePieceAndSpawnNext
 
 렌더러는 압축된 보드와 `ClearedRow.cells()`로 삭제 전 행 위치를 복원합니다. 삭제 행 전체를 150ms 흰색으로 강조하고 150ms 비운 뒤 압축된 보드·다음 활성 블록을 표시합니다. `SinglePlayerSession.update`가 연출 시간을 진행하며 그동안 이동·회전·드롭·중력은 차단합니다. 일시정지는 연출도 멈추고, 스폰 실패에 따른 종료 결과는 연출 뒤 확정합니다. `GameScreen`은 연출 중 키 입력을 버리고 반복을 소비합니다.
 
-테스트: `LineClearAnimationTest`, `LineClearRenderingTest`, `GameScreenTest`, `DebugSessionTest`, `DebugPlacementUndoTest`.
+테스트: `LineClearAnimationTest`, `LineClearRenderingTest`, `GameScreenTest`.

@@ -4,7 +4,8 @@
 
 - 상태: ✅ 충족 / 🔄 진행 중 / ❌ 미구현 / ⚠️ 보완 필요
 - 경로는 `src/main/java/team/tetris/` 기준, 테스트는 `src/test/java/team/tetris/` 아래 클래스 이름입니다.
-- 마지막 확인: 2026-10-16, 카드 12 로컬 구현 포함 (테스트 490개 통과, 라인 커버리지 93.6%)
+- 구현 확인: 2026-10-16, 카드 12와 게임 화면 모드·난이도 표시 포함
+- 전체 검증 수치는 카드 12 구현 당시 기록 기준: 테스트 490개 통과, 라인 커버리지 93.6% (이후 화면 변경의 전체 검증 수치는 별도 갱신 필요)
 
 ## 1. 1차 요구사항
 
@@ -47,7 +48,7 @@
 | N1-02 | 산출물(코드, 문서, 논의) 추적 관리 (p4, p16) | GitHub 저장소, `docs/`, PR, [프로젝트 진행 기록](project-history.md) | - | ✅ |
 | N1-03 | 이슈와 해결 상황 기록 (p16) | GitHub Issues | - | ⚠️ 이슈 미등록 ([프로젝트 관리 규칙](project-management.md) 참고) |
 | N1-04 | 팀원별 업무 분담 기록 (p16) | Trello, [백로그 진행 현황](requirements2-backlog.md), [ADR 역할 분담](architecture-decision.md) | - | ✅ |
-| N1-05 | 단위 테스트, 라인 커버리지 50~70% 이상 (p17) | JUnit 5, JaCoCo | 전체 403개 | ✅ 92.6% |
+| N1-05 | 단위 테스트, 라인 커버리지 50~70% 이상 (p17) | JUnit 5, JaCoCo | 전체 490개 (카드 12 검증 시점) | ✅ 93.6% |
 | N1-06 | 비기능 요구사항 검증 테스트 1개 이상 (p17) | `test/performance` | `ResponsivenessTest` | ✅ |
 | N1-07 | 변경 시마다 테스트를 쉽게 실행하는 체계 (p17) | `gradlew build`, GitHub Actions(`.github/workflows/ci.yml`) | - | ✅ |
 | N1-08 | 배포 패키지를 쉽게 만드는 체계, 아이콘 포함 실행 파일, 명령어 없이 실행 (p18) | `gradlew packageZip` (jpackage, JRE 포함 `SETetris.exe`) | - | ✅ v1.0.0 / 🔄 2차 반영 배포는 카드 13 |
@@ -63,7 +64,7 @@
 | R2-03 | 줄 삭제에 따른 속도 증가가 easy 20% 덜, hard 20% 더 (p3) | `SpeedPolicy(Difficulty)` (레벨당 80/100/120ms) | `SpeedPolicyTest` | ✅ |
 | R2-04 | 난이도별 추가 규칙·점수 자유 (p3) | 추가 점수 배율 없음으로 결정 | - | ✅ |
 | R2-05 | 스코어보드에서 난이도 구분 (p3) | `ScoreboardService.list(mode, difficulty)`, `ScoreboardScreen` (←→) | `ScoreboardScreenTest`, `PersistenceServicesTest` | ✅ |
-| R2-06 | 줄 삭제 애니메이션 (p3) | `SinglePlayerSession`, `LineClearAnimation`, `TextRenderer`: 150ms 흰색 강조·150ms 사라짐 후 압축 표시 | `LineClearAnimationTest`, `LineClearRenderingTest`, `GameScreenTest`, `DebugSessionTest`, `DebugPlacementUndoTest` | ✅ 로컬 구현·검증, 카드 12 리뷰·머지 대기 |
+| R2-06 | 줄 삭제 애니메이션 (p3) | `SinglePlayerSession`, `LineClearAnimation`, `TextRenderer`: 150ms 흰색 강조·150ms 사라짐 후 압축 표시 | `LineClearAnimationTest`, `LineClearRenderingTest`, `GameScreenTest` | ✅ 로컬 구현·검증, 카드 12 리뷰·머지 대기 |
 
 ### 확률에 따른 블록 생성
 
@@ -84,8 +85,8 @@
 | R2-14 | 아이템은 특징적인 모양·다른 문자, 아이템마다 다른 문자 (p7) | `BlockGlyphs.of(Item)`, `ColorPalette.itemStyle` | `ItemCatalogTest`, `TextRendererTest` | ✅ |
 | R2-15 | 줄 삭제 아이템 `L` (p8) | `LineClearItem` + `AttachedItem`, 줄 일괄 삭제·점수·누적 줄 수 반영 | `RequiredItemsTest`, `RequiredItemScoringTest` | 🔄 카드 7 (로컬 검증 완료, PR 전) |
 | R2-16 | 무게추 아이템 (p9) | `WeightBlock`, `PlayerEngine` 접촉 잠금·낙하 삭제, 세션 하강 점수 제외 | `RequiredItemsTest`, `RequiredItemScoringTest`, `TextRendererTest` | 🔄 카드 8 (로컬 검증 완료, PR 전) |
-| R2-17 | 팀 구상 아이템 3개 이상 (p7) | `ChainClearItem`(`C`), `BombItem`(`B`), `DoubleScoreItem`(`$`) | `ChainClearItemTest`, `BombItemTest`, `DoubleScoreTest`, `TeamItemsInEngineTest` | 🔄 카드 9~11 (PR 전) |
-| R2-18 | 아이템을 추가하기 쉬운 구조 (p10) | `Item` 구현 + `ItemCatalog.all()`에 한 줄 | `ItemCatalogTest` | ✅ |
+| R2-17 | 팀 구상 아이템 3개 이상 (p7) | `ChainClearItem`(`C`), `BombItem`(`B`), `DoubleScoreItem`(`$`) | `ChainClearItemTest`, `BombItemTest`, `DoubleScoreTest`, `TeamItemsInEngineTest` | ✅ 카드 9~11 (백로그 완료 기록 기준, 팀 명세 확정은 별도) |
+| R2-18 | 아이템을 추가하기 쉬운 구조 (p10) | `Item` 구현 + `ItemCatalog.entries()`에 이름과 생성 방식 | `ItemCatalogTest` | ✅ |
 | R2-19 | 1차 요구사항과 어긋나지 않는 규칙: 아이템 표시 + 색맹 모드, 난이도 설정 저장, 실행 환경 (p10) | 아이템은 문자로 구분, 설정 파일 v2에 난이도 저장 | `ColorPaletteTest`, `PropertiesSettingsRepositoryTest` | ✅ |
 | R2-20 | 팀 아이템 형태·기능 명세서를 평가팀에 제공 (p10) | [아이템 명세서](item-specification.md) | - | 🔄 5종 구현 반영, 팀 확정·평가팀 제공 대기 |
 
@@ -104,7 +105,6 @@
 | --- | --- | --- |
 | 줄 삭제 아이템 `L` PR 리뷰·머지 | R2-15 | 7 |
 | 무게추 아이템 PR 리뷰·머지 | R2-16 | 8 |
-| 팀 아이템 PR 리뷰·머지, 팀 확정 | R2-17 | 9~11 |
 | 줄 삭제 애니메이션 PR 리뷰·머지 | R2-06 | 12 |
 | 2차 반영 배포 패키지 v2.0.0 | N1-08 | 13 |
 | 아이템 명세서 확정 | R2-20 | 11 |
