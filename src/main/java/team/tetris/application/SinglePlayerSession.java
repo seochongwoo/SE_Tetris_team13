@@ -70,7 +70,7 @@ public final class SinglePlayerSession implements GameSession {
         if (initial.phase() != EnginePhase.RUNNING) {
             throw new IllegalArgumentException("A new session requires a running engine");
         }
-        view = new GameSnapshot(initial, score, level, clearedLines, gravityIntervalNanos, status, doubleScoreClears);
+        refreshView(initial);
     }
 
     @Override
@@ -211,7 +211,7 @@ public final class SinglePlayerSession implements GameSession {
 
     private void refreshView(EngineSnapshot snapshot) {
         view = new GameSnapshot(snapshot, score, level, clearedLines, gravityIntervalNanos,
-                status, doubleScoreClears, lineClearAnimation);
+                status, doubleScoreClears, lineClearAnimation, mode, difficulty);
     }
 
     /** 디버그 관찰자: 한 update 안에 여러 중력이 실행되어도 각 결과의 점수 반영 뒤 호출한다. */

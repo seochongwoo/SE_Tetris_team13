@@ -182,6 +182,9 @@ class DebugSessionTest {
         prepareIInGap(session);
         GameSnapshot before = session.snapshot();
         session.applyStats(29, Difficulty.HARD);
+        assertEquals(Difficulty.NORMAL, before.difficulty());
+        assertEquals(Difficulty.HARD, session.snapshot().difficulty());
+        assertEquals(GameMode.ITEM, session.snapshot().mode());
         assertArrayEquals(before.engine().board(), session.snapshot().engine().board());
         assertEquals(before.engine().activePiece(), session.snapshot().engine().activePiece());
         assertEquals(before.engine().nextPiece(), session.snapshot().engine().nextPiece());

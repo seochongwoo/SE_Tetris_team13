@@ -140,7 +140,8 @@ public final class DebugSession implements GameSession {
     @Override public GameSnapshot snapshot() {
         GameSnapshot state = session.snapshot();
         return new GameSnapshot(engine.snapshot(), state.score(), state.level(), state.clearedLines(),
-                state.gravityIntervalNanos(), state.status(), state.doubleScoreClears(), state.lineClearAnimation());
+                state.gravityIntervalNanos(), state.status(), state.doubleScoreClears(), state.lineClearAnimation(),
+                state.mode(), state.difficulty());
     }
 
     @Override public Optional<GameResult> result() { return session.result(); }

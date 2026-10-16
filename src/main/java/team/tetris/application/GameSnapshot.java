@@ -1,6 +1,8 @@
 package team.tetris.application;
 
 import java.util.Objects;
+import team.tetris.application.model.Difficulty;
+import team.tetris.application.model.GameMode;
 import team.tetris.core.Cell;
 import team.tetris.core.EngineSnapshot;
 
@@ -13,13 +15,23 @@ import team.tetris.core.EngineSnapshot;
 public record GameSnapshot(
         EngineSnapshot engine, long score, int level, int clearedLines,
         long gravityIntervalNanos, GameStatus status, int doubleScoreClears,
-        LineClearAnimation lineClearAnimation) {
+        LineClearAnimation lineClearAnimation, GameMode mode, Difficulty difficulty) {
     public GameSnapshot {
         engine = copyEngine(Objects.requireNonNull(engine, "engine"));
         Objects.requireNonNull(status, "status");
+        Objects.requireNonNull(mode, "mode");
+        Objects.requireNonNull(difficulty, "difficulty");
         if (doubleScoreClears < 0) {
             throw new IllegalArgumentException("doubleScoreClears must be non-negative");
         }
+    }
+
+    /** 모드·난이도를 생략하면 일반·NORMAL로 표시한다. */
+    public GameSnapshot(EngineSnapshot engine, long score, int level, int clearedLines,
+                        long gravityIntervalNanos, GameStatus status, int doubleScoreClears,
+                        LineClearAnimation lineClearAnimation) {
+        this(engine, score, level, clearedLines, gravityIntervalNanos, status, doubleScoreClears,
+                lineClearAnimation, GameMode.NORMAL, Difficulty.NORMAL);
     }
 
     /** 줄 삭제 연출이 없는 상태. */

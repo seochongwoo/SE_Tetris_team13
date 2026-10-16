@@ -4,10 +4,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import team.tetris.application.GameCommand;
 import team.tetris.application.GameSnapshot;
 import team.tetris.application.GameStatus;
 import team.tetris.application.SinglePlayerSession;
+import team.tetris.application.ScorePolicy;
+import team.tetris.application.SpeedPolicy;
+import team.tetris.application.model.Difficulty;
+import team.tetris.application.model.GameMode;
 import team.tetris.application.model.Settings;
 import team.tetris.core.Cell;
 import team.tetris.core.EngineSnapshot;
@@ -33,6 +39,22 @@ class TextRendererTest {
     private final TextRenderer renderer = new TextRenderer(palette, new InputMapper(Settings.defaults()));
     private final SinglePlayerSession session =
             new SinglePlayerSession(new PlayerEngine(10, 20, TestApplication.constant(TetrominoType.T)));
+
+    @ParameterizedTest
+    @CsvSource({"NORMAL,EASY,일반", "NORMAL,NORMAL,일반", "NORMAL,HARD,일반",
+            "ITEM,EASY,아이템", "ITEM,NORMAL,아이템", "ITEM,HARD,아이템"})
+    void showsTheSessionsModeAndDifficultyBetweenPreviewAndScore(GameMode mode, Difficulty difficulty, String label) {
+        var game = new SinglePlayerSession(
+                new PlayerEngine(10, 20, TestApplication.constant(TetrominoType.T)),
+                new ScorePolicy(), new SpeedPolicy(difficulty), mode, difficulty);
+        for (GameCommand command : new GameCommand[]{GameCommand.MOVE_LEFT, GameCommand.PAUSE,
+                GameCommand.RESUME, GameCommand.HARD_DROP, GameCommand.QUIT_GAME}) {
+            var frame = renderer.render(game.snapshot());
+            assertEquals(label + " / " + difficulty.name(), panelText(frame, 8).strip());
+            assertTrue(panelText(frame, 9).startsWith("SCORE"));
+            game.handle(command);
+        }
+    }
 
     @Test
     void drawsABorderAroundATenByTwentyBoard() {
