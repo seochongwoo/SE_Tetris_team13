@@ -129,7 +129,9 @@ public final class DebugSession implements GameSession {
     @Override public void update(long elapsedNanos) {
         if (elapsedNanos < 0) throw new IllegalArgumentException("Elapsed time must be non-negative");
         event = "GRAVITY";
-        if (!frozen && elapsedNanos > 0 && session.snapshot().status() == GameStatus.RUNNING) {
+        // 자동 낙하를 멈춰도 삭제 연출은 끝까지 진행한다. 일시정지는 연출도 멈춘다.
+        if ((!frozen || session.snapshot().lineClearAnimation() != null)
+                && elapsedNanos > 0 && session.snapshot().status() == GameStatus.RUNNING) {
             history.add(target -> target.update(elapsedNanos));
             session.update(elapsedNanos);
         }
@@ -138,7 +140,7 @@ public final class DebugSession implements GameSession {
     @Override public GameSnapshot snapshot() {
         GameSnapshot state = session.snapshot();
         return new GameSnapshot(engine.snapshot(), state.score(), state.level(), state.clearedLines(),
-                state.gravityIntervalNanos(), state.status(), state.doubleScoreClears());
+                state.gravityIntervalNanos(), state.status(), state.doubleScoreClears(), state.lineClearAnimation());
     }
 
     @Override public Optional<GameResult> result() { return session.result(); }

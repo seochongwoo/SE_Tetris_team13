@@ -78,11 +78,20 @@ public final class TextRenderer implements Renderer {
         TextFrame frame = TextFrame.blank(palette.base());
         EngineSnapshot engine = snapshot.engine();
         Cell[][] board = engine.board();
+        var animation = snapshot.lineClearAnimation();
+        if (animation != null) board = animation.boardBeforeClear(board);
         drawBoard(frame, board);
-        if (showLanding && (engine.phase() == EnginePhase.RUNNING || engine.phase() == EnginePhase.PAUSED)) {
-            drawLanding(frame, board, engine.activePiece());
+        if (animation != null) {
+            for (var row : animation.rows()) {
+                frame.fill(columnOf(0), rowOf(row.rowIndex()), board[0].length * CELL_WIDTH, 1,
+                        animation.flashing() ? palette.lineClearStyle() : palette.base());
+            }
+        } else {
+            if (showLanding && (engine.phase() == EnginePhase.RUNNING || engine.phase() == EnginePhase.PAUSED)) {
+                drawLanding(frame, board, engine.activePiece());
+            }
+            drawActivePiece(frame, engine.activePiece(), board[0].length, board.length);
         }
-        drawActivePiece(frame, engine.activePiece(), board[0].length, board.length);
         drawNext(frame, engine.nextPiece());
         drawStats(frame, snapshot);
         drawHelp(frame);

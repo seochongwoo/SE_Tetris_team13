@@ -110,6 +110,10 @@ public final class GameScreen implements Screen {
         if (!repeats.press(key, clockNanos, InputMapper.isRepeatable(command))) {
             return; // 떼지 않은 키가 다시 들어온 것 = OS 자동 반복이므로 무시 (반복은 직접 만든다)
         }
+        if (session.snapshot().lineClearAnimation() != null
+                && command != GameCommand.PAUSE && command != GameCommand.QUIT_GAME) {
+            return;
+        }
         pending.add(command == GameCommand.QUIT_GAME ? GameCommand.PAUSE : command);
     }
 
@@ -170,10 +174,14 @@ public final class GameScreen implements Screen {
             return;
         }
         clockNanos += elapsedNanos;
+        boolean wasClearing = session.snapshot().lineClearAnimation() != null;
         session.update(elapsedNanos);
         if (session.snapshot().status() == GameStatus.RUNNING) {
             for (String key : repeats.due(clockNanos)) {
-                keys.commandFor(key, GameStatus.RUNNING).filter(InputMapper::isRepeatable).ifPresent(pending::add);
+                // 연출 중 발생한 반복도 소비해 종료 직후 한꺼번에 이동하지 않게 한다.
+                if (!wasClearing && session.snapshot().lineClearAnimation() == null) {
+                    keys.commandFor(key, GameStatus.RUNNING).filter(InputMapper::isRepeatable).ifPresent(pending::add);
+                }
             }
         }
         while (!pending.isEmpty()) {

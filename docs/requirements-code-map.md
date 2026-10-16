@@ -353,8 +353,10 @@ PlayerEngine.lockActivePieceAndSpawnNext
 
 ---
 
-## 3. 아직 없는 요구사항: 구현할 위치
+## 3. R2-06 줄 삭제 애니메이션
 
-| 요구사항 | 이미 있는 것 | 추가할 곳 |
-| --- | --- | --- |
-| R2-06 줄 삭제 애니메이션 | `ClearResult`의 `ClearedRow.cells()`(지워지기 직전 칸 내용) | 세션 또는 `GameScreen`에서 연출 시간 동안 대기하며 지운 줄을 반짝이게 그리기 (`TextRenderer`) |
+`Board.clearRows` → `ClearResult.clearedRows()` → `SinglePlayerSession.accept`에서 점수 반영·`LineClearAnimation` 시작 → `GameSnapshot.lineClearAnimation()` → `TextRenderer.render`.
+
+렌더러는 압축된 보드와 `ClearedRow.cells()`로 삭제 전 행 위치를 복원합니다. 삭제 행 전체를 150ms 흰색으로 강조하고 150ms 비운 뒤 압축된 보드·다음 활성 블록을 표시합니다. `SinglePlayerSession.update`가 연출 시간을 진행하며 그동안 이동·회전·드롭·중력은 차단합니다. 일시정지는 연출도 멈추고, 스폰 실패에 따른 종료 결과는 연출 뒤 확정합니다. `GameScreen`은 연출 중 키 입력을 버리고 반복을 소비합니다.
+
+테스트: `LineClearAnimationTest`, `LineClearRenderingTest`, `GameScreenTest`, `DebugSessionTest`, `DebugPlacementUndoTest`.

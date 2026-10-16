@@ -4,7 +4,7 @@
 
 - 상태: ✅ 충족 / 🔄 진행 중 / ❌ 미구현 / ⚠️ 보완 필요
 - 경로는 `src/main/java/team/tetris/` 기준, 테스트는 `src/test/java/team/tetris/` 아래 클래스 이름입니다.
-- 마지막 확인: 2026-10-14, 카드 7·8 로컬 구현 포함 (테스트 421개 통과, 라인 커버리지 92.7%)
+- 마지막 확인: 2026-10-16, 카드 12 로컬 구현 포함 (테스트 490개 통과, 라인 커버리지 93.6%)
 
 ## 1. 1차 요구사항
 
@@ -63,7 +63,7 @@
 | R2-03 | 줄 삭제에 따른 속도 증가가 easy 20% 덜, hard 20% 더 (p3) | `SpeedPolicy(Difficulty)` (레벨당 80/100/120ms) | `SpeedPolicyTest` | ✅ |
 | R2-04 | 난이도별 추가 규칙·점수 자유 (p3) | 추가 점수 배율 없음으로 결정 | - | ✅ |
 | R2-05 | 스코어보드에서 난이도 구분 (p3) | `ScoreboardService.list(mode, difficulty)`, `ScoreboardScreen` (←→) | `ScoreboardScreenTest`, `PersistenceServicesTest` | ✅ |
-| R2-06 | 줄 삭제 애니메이션 (p3) | 지운 줄 내용 보고(`core/result/ClearedRow`)만 준비됨 | - | ❌ 카드 12 |
+| R2-06 | 줄 삭제 애니메이션 (p3) | `SinglePlayerSession`, `LineClearAnimation`, `TextRenderer`: 150ms 흰색 강조·150ms 사라짐 후 압축 표시 | `LineClearAnimationTest`, `LineClearRenderingTest`, `GameScreenTest`, `DebugSessionTest`, `DebugPlacementUndoTest` | ✅ 로컬 구현·검증, 카드 12 리뷰·머지 대기 |
 
 ### 확률에 따른 블록 생성
 
@@ -96,7 +96,7 @@
 | N2-01 | Trello 등으로 진척 상황·할 일 배정 관리, 팀원 생산성 확인 (p11) | Trello 보드, [백로그 진행 현황](requirements2-backlog.md) | ✅ |
 | N2-02 | Git·GitHub 버전 관리, 브랜치·PR 정책 (p11) | [프로젝트 관리 규칙](project-management.md), PR #1~#7 | ⚠️ PR 리뷰 기록 없음 |
 | N2-03 | 이슈를 GitHub Issue로 등록하고 해결 내역 추적 (p11) | GitHub Issues | ⚠️ 이슈 미등록 |
-| N2-04 | 중간평가 라인 커버리지 50%, 기말 70% (p12) | JaCoCo | ✅ 92.7% |
+| N2-04 | 중간평가 라인 커버리지 50%, 기말 70% (p12) | JaCoCo | ✅ 93.6% |
 
 ## 3. 남은 작업
 
@@ -105,7 +105,7 @@
 | 줄 삭제 아이템 `L` PR 리뷰·머지 | R2-15 | 7 |
 | 무게추 아이템 PR 리뷰·머지 | R2-16 | 8 |
 | 팀 아이템 PR 리뷰·머지, 팀 확정 | R2-17 | 9~11 |
-| 줄 삭제 애니메이션 | R2-06 | 12 |
+| 줄 삭제 애니메이션 PR 리뷰·머지 | R2-06 | 12 |
 | 2차 반영 배포 패키지 v2.0.0 | N1-08 | 13 |
 | 아이템 명세서 확정 | R2-20 | 11 |
 | GitHub Issue 등록, PR에 `Closes #번호`와 상대방 리뷰 | N1-03, N2-02, N2-03 | 운영 |

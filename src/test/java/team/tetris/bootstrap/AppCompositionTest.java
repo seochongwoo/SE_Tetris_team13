@@ -113,6 +113,9 @@ class AppCompositionTest {
                     for (int i = 0; i < 10; i++) session.handle(GameCommand.MOVE_LEFT);
                     for (int i = 0; i < target; i++) session.handle(GameCommand.MOVE_RIGHT);
                     session.handle(GameCommand.HARD_DROP);
+                    if (session.snapshot().lineClearAnimation() != null) {
+                        session.update(team.tetris.application.LineClearAnimation.DURATION_NANOS);
+                    }
                 }
             }
             assertEquals(10, session.snapshot().clearedLines());
@@ -211,6 +214,9 @@ class AppCompositionTest {
                 for (int i = 0; i < 10; i++) session.handle(GameCommand.MOVE_LEFT);
                 for (int i = 0; i < target; i++) session.handle(GameCommand.MOVE_RIGHT);
                 session.handle(GameCommand.HARD_DROP);
+                if (session.snapshot().lineClearAnimation() != null) {
+                    session.update(team.tetris.application.LineClearAnimation.DURATION_NANOS);
+                }
             }
         }
     }

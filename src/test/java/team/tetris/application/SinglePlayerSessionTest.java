@@ -44,6 +44,7 @@ class SinglePlayerSessionTest {
         session.handle(GameCommand.HARD_DROP);
         assertEquals(53, session.snapshot().score());
         assertEquals(3, session.snapshot().level());
+        session.update(LineClearAnimation.DURATION_NANOS);
         session.update(SECOND / 3 - 1);
         assertEquals(0, engine.ticks);
         session.update(1);
@@ -107,6 +108,7 @@ class SinglePlayerSessionTest {
         assertEquals(0, session.snapshot().clearedLines());
         engine.enqueue(2, 2, true, EnginePhase.GAME_OVER);
         session.handle(GameCommand.HARD_DROP);
+        session.update(LineClearAnimation.DURATION_NANOS);
         GameResult result = session.result().orElseThrow();
         assertEquals(402, result.score());
         assertEquals(2, result.clearedLines());
@@ -260,6 +262,7 @@ class SinglePlayerSessionTest {
         for (int lines : new int[]{4, 4, 1}) {
             engine.enqueue(0, lines, true, EnginePhase.RUNNING);
             session.handle(GameCommand.HARD_DROP);
+            session.update(LineClearAnimation.DURATION_NANOS);
         }
         assertEquals(9, session.snapshot().clearedLines());
         long previousScore = session.snapshot().score();
@@ -269,6 +272,7 @@ class SinglePlayerSessionTest {
         assertEquals(10, session.snapshot().clearedLines());
         assertEquals(1, session.snapshot().level());
         assertEquals(900_000_000, session.snapshot().gravityIntervalNanos());
+        session.update(LineClearAnimation.DURATION_NANOS);
         session.update(899_999_999);
         assertEquals(0, engine.ticks);
         session.update(1);
@@ -284,6 +288,7 @@ class SinglePlayerSessionTest {
         assertEquals(1, engine.ticks);
         assertEquals(103, session.snapshot().score());
         assertNull(session.snapshot().engine().activePiece());
+        session.update(LineClearAnimation.DURATION_NANOS);
         GameResult result = session.result().orElseThrow();
         assertEquals(103, result.score());
         assertEquals(1, result.clearedLines());
@@ -339,6 +344,7 @@ class SinglePlayerSessionTest {
         if (reason == GameStatus.GAME_OVER) {
             engine.enqueue(0, 1, true, EnginePhase.GAME_OVER);
             session.handle(GameCommand.HARD_DROP);
+            session.update(LineClearAnimation.DURATION_NANOS);
         } else {
             session.handle(GameCommand.QUIT_GAME);
         }

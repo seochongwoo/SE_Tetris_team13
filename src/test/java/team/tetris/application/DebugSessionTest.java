@@ -63,6 +63,17 @@ class DebugSessionTest {
         session.stepGravity();
         assertEquals(4, session.snapshot().clearedLines());
         assertEquals(1600, session.snapshot().score() - before);
+        assertNotNull(session.snapshot().lineClearAnimation());
+        assertTrue(session.frozen());
+        var active = session.snapshot().engine().activePiece();
+        session.stepGravity();
+        assertEquals(active, session.snapshot().engine().activePiece());
+        session.update(LineClearAnimation.DURATION_NANOS - 1);
+        assertNotNull(session.snapshot().lineClearAnimation());
+        session.update(1);
+        assertNull(session.snapshot().lineClearAnimation());
+        session.update(Long.MAX_VALUE);
+        assertEquals(active, session.snapshot().engine().activePiece());
     }
 
     @Test void ninthLinePresetSynchronizesSpeedAndItemThreshold() {

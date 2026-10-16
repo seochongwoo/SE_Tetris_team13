@@ -23,6 +23,7 @@ class RequiredItemScoringTest {
         assertEquals(216, session.snapshot().score()); // (8칸 하강 + 100) × 2
         assertEquals(1, session.snapshot().clearedLines());
         assertEquals(2, session.snapshot().doubleScoreClears());
+        session.update(LineClearAnimation.DURATION_NANOS);
         session.handle(GameCommand.HARD_DROP);
         assertEquals(430, session.snapshot().score()); // (7칸 하강 + 100) × 2
         assertEquals(2, session.snapshot().clearedLines());

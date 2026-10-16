@@ -91,6 +91,7 @@
 | 10-13 | 확인 | 1·2차 요구사항 전수 점검. 미구현: 줄 삭제 `L`(카드 7), 무게추(카드 8), 줄 삭제 애니메이션(카드 12). 보완 필요: GitHub Issue 미등록, PR 리뷰 기록 없음, README 비어 있음 |
 | 10-13 | 문서 | README, [아이템 명세서](item-specification.md), [요구사항 추적표](requirements-traceability.md), [프로젝트 관리 규칙](project-management.md), [평가 준비와 데모 순서](evaluation-guide.md) 추가 (`deb8202`) |
 | 10-13 | 문서 | [요구사항별 코드 흐름](requirements-code-map.md) 추가 (`648d4f9`) |
+| 10-16 | 구현·검증 | 카드 12: 일반·아이템 줄 삭제에 300ms 연출 추가. 일시정지·입력 차단·디버그 되돌리기 연동. 전체 테스트 490개 통과, 라인 커버리지 93.6%, 기본 ZIP/TAR 빌드 성공. 로컬 구현 완료, PR 리뷰·머지 대기 |
 
 ## 3. Pull Request와 릴리즈
 
