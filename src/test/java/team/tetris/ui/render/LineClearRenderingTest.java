@@ -45,9 +45,7 @@ class LineClearRenderingTest {
             assertCell(frame, 0, 16, BlockGlyphs.of(TetrominoType.J));
             assertCell(frame, 0, 18, BlockGlyphs.of(TetrominoType.Z));
             assertCell(frame, 4, 0, BlockGlyphs.EMPTY); // 다음 블록은 아직 표시하지 않는다.
-            for (int y = 0; y < 20; y++) {
-                assertFalse(frame.rowText(TextRenderer.rowOf(y)).substring(2, 22).contains(BlockGlyphs.GHOST));
-            }
+            assertFalse(frame.text().contains(BlockGlyphs.GHOST));
             assertEquals('│', frame.codePointAt(TextRenderer.BOARD_LEFT, TextRenderer.rowOf(19)));
         }
         var finished = renderer.render(snapshot(engine, null));
@@ -62,6 +60,11 @@ class LineClearRenderingTest {
 
     private static void assertCell(TextFrame frame, int x, int y, String glyph) {
         int col = TextRenderer.columnOf(x);
-        assertEquals(glyph, frame.rowText(TextRenderer.rowOf(y)).substring(col, col + 2));
+        int row = TextRenderer.rowOf(y);
+        StringBuilder actual = new StringBuilder();
+        for (int i = 0; i < TextRenderer.CELL_WIDTH; i++) {
+            if (!frame.isContinuation(col + i, row)) actual.appendCodePoint(frame.codePointAt(col + i, row));
+        }
+        assertEquals(glyph, actual.toString());
     }
 }

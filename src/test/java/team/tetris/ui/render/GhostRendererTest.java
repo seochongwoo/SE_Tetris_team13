@@ -157,7 +157,12 @@ class GhostRendererTest {
 
     private static String glyphAt(TextFrame frame, Position cell) {
         int column = TextRenderer.columnOf(cell.x());
-        return frame.rowText(TextRenderer.rowOf(cell.y())).substring(column, column + TextRenderer.CELL_WIDTH);
+        int row = TextRenderer.rowOf(cell.y());
+        StringBuilder glyph = new StringBuilder();
+        for (int i = 0; i < TextRenderer.CELL_WIDTH; i++) {
+            if (!frame.isContinuation(column + i, row)) glyph.appendCodePoint(frame.codePointAt(column + i, row));
+        }
+        return glyph.toString();
     }
 
     private static Cell[][] emptyBoard() {

@@ -11,8 +11,8 @@ import team.tetris.core.item.Item;
  */
 public final class BlockGlyphs {
 
-    /** 빈 칸. */
-    public static final String EMPTY = " .";
+    /** 빈 칸: 블록 한 칸과 같은 두 글자 폭의 전각 가운뎃점. */
+    public static final String EMPTY = "・";
 
     /** 디버그 모드의 하드 드롭 착지 그림자. */
     public static final String GHOST = "░░";

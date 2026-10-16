@@ -54,7 +54,8 @@ class TextRendererTest {
         assertEquals('<', frame.codePointAt(col, row));
         assertEquals('>', frame.codePointAt(col + 1, row));
         assertEquals(palette.block(TetrominoType.T), frame.styleAt(col, row).foreground());
-        assertEquals('.', frame.codePointAt(TextRenderer.columnOf(0) + 1, TextRenderer.rowOf(0)));
+        assertEquals('・', frame.codePointAt(TextRenderer.columnOf(0), TextRenderer.rowOf(0)));
+        assertTrue(frame.isContinuation(TextRenderer.columnOf(0) + 1, TextRenderer.rowOf(0)));
         assertEquals(palette.dim(), frame.styleAt(TextRenderer.columnOf(0), TextRenderer.rowOf(19)).foreground());
     }
 
@@ -91,7 +92,7 @@ class TextRendererTest {
 
         boolean found = false;
         for (int row = TextRenderer.BOARD_TOP + 2; row < TextRenderer.BOARD_TOP + 6; row++) {
-            found |= frame.rowText(row).substring(TextRenderer.PANEL_LEFT).contains("<>");
+            found |= panelText(frame, row).contains("<>");
         }
         assertTrue(found);
         assertTrue(frame.rowText(TextRenderer.BOARD_TOP).contains("NEXT"));
@@ -153,7 +154,7 @@ class TextRendererTest {
         assertEquals('<', frame.codePointAt(TextRenderer.columnOf(3), TextRenderer.rowOf(1)));
         boolean previewHasItem = false;
         for (int r = TextRenderer.BOARD_TOP + 2; r < TextRenderer.BOARD_TOP + 6; r++) {
-            previewHasItem |= frame.rowText(r).substring(TextRenderer.PANEL_LEFT).contains("K");
+            previewHasItem |= panelText(frame, r).contains("K");
         }
         assertTrue(previewHasItem);
     }
@@ -220,10 +221,18 @@ class TextRendererTest {
                         TextRenderer.columnOf(position.x()), TextRenderer.rowOf(position.y())));
                 boolean previewHasSymbol = false;
                 for (int row = TextRenderer.BOARD_TOP + 2; row < TextRenderer.BOARD_TOP + 6; row++) {
-                    previewHasSymbol |= frame.rowText(row).substring(TextRenderer.PANEL_LEFT).contains("" + symbol);
+                    previewHasSymbol |= panelText(frame, row).contains("" + symbol);
                 }
                 assertTrue(previewHasSymbol);
             }
         }
+    }
+    /** 전각 문자도 격자 열 좌표를 기준으로 정보 영역을 읽는다. */
+    private static String panelText(TextFrame frame, int row) {
+        StringBuilder text = new StringBuilder();
+        for (int col = TextRenderer.PANEL_LEFT; col < frame.columns(); col++) {
+            if (!frame.isContinuation(col, row)) text.appendCodePoint(frame.codePointAt(col, row));
+        }
+        return text.toString();
     }
 }
