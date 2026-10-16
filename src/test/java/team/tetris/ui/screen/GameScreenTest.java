@@ -186,6 +186,119 @@ class GameScreenTest {
     }
 
     @ParameterizedTest
+    @CsvSource({
+            "MOVE_LEFT, A, -1, 0",
+            "MOVE_LEFT, LEFT, -1, 0",
+            "MOVE_RIGHT, D, 1, 0",
+            "MOVE_RIGHT, RIGHT, 1, 0",
+            "SOFT_DROP, S, 0, 1",
+            "SOFT_DROP, DOWN, 0, 1"
+    })
+    void movementHeldBeforePauseRequiresReleaseAfterResume(GameCommand command, String key,
+            int dx, int dy) throws StorageException {
+        Settings defaults = Settings.defaults();
+        var bindings = new EnumMap<>(defaults.keyBindings());
+        bindings.put(command, key);
+        app.settings().update(new Settings(defaults.screenSize(), bindings, defaults.colorBlindMode()));
+        GameScreen game = start();
+        router.keyPressed(key);
+        router.update(FRAME);
+        Position pausedAt = origin(game);
+        TestApplication.tap(router, "P");
+        router.update(FRAME);
+
+        router.update(5_000_000_000L);
+        router.keyPressed(key); // 일시정지 전부터 누른 키의 OS 자동 반복
+        assertEquals(0, game.pauseCursor());
+        TestApplication.tap(router, "P");
+        router.update(FRAME);
+        assertEquals(GameStatus.RUNNING, status(game));
+        router.keyPressed(key);
+        router.update(200_000_000L);
+        assertEquals(pausedAt, origin(game));
+
+        router.keyReleased(key);
+        router.keyPressed(key);
+        router.update(FRAME);
+        assertEquals(pausedAt.translate(dx, dy), origin(game));
+        router.update(170_000_000L);
+        assertEquals(pausedAt.translate(dx * 2, dy * 2), origin(game));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "MOVE_LEFT, A",
+            "MOVE_LEFT, LEFT",
+            "SOFT_DROP, DOWN",
+            "ROTATE_CW, UP",
+            "HARD_DROP, SPACE"
+    })
+    void customResumeKeyCannotRepeatAsAGameCommand(GameCommand command, String key)
+            throws StorageException {
+        Settings defaults = Settings.defaults();
+        var bindings = new EnumMap<>(defaults.keyBindings());
+        bindings.put(command, key);
+        bindings.put(GameCommand.RESUME, key);
+        app.settings().update(new Settings(defaults.screenSize(), bindings, defaults.colorBlindMode()));
+        GameScreen game = start();
+        TestApplication.tap(router, "P");
+        router.update(FRAME);
+        var active = game.session().snapshot().engine().activePiece();
+        long score = game.session().snapshot().score();
+
+        router.keyPressed(key);
+        router.update(FRAME);
+        assertEquals(GameStatus.RUNNING, status(game));
+        router.keyPressed(key);
+        router.update(200_000_000L);
+
+        assertEquals(active, game.session().snapshot().engine().activePiece());
+        assertEquals(score, game.session().snapshot().score());
+    }
+
+    @Test
+    void pauseMenuKeysCannotBecomeGameInputWhenHeldThroughResume() {
+        GameScreen game = start();
+        TestApplication.tap(router, "P");
+        router.update(FRAME);
+        var active = game.session().snapshot().engine().activePiece();
+        long score = game.session().snapshot().score();
+
+        router.keyPressed("DOWN");
+        router.keyPressed("UP");
+        router.keyPressed("SPACE");
+        assertEquals(0, game.pauseCursor());
+        router.keyPressed("ENTER");
+        router.update(FRAME);
+        assertEquals(GameStatus.RUNNING, status(game));
+        router.keyPressed("DOWN");
+        router.keyPressed("UP");
+        router.keyPressed("SPACE");
+        router.update(200_000_000L);
+
+        assertEquals(active, game.session().snapshot().engine().activePiece());
+        assertEquals(score, game.session().snapshot().score());
+    }
+
+    @Test
+    void movementQueuedAfterPauseCannotStartRepeatingAfterResume() {
+        GameScreen game = start();
+        Position initial = origin(game);
+        TestApplication.tap(router, "P");
+        router.keyPressed("LEFT");
+        router.update(FRAME);
+        assertEquals(GameStatus.PAUSED, status(game));
+        assertEquals(initial, origin(game));
+
+        TestApplication.tap(router, "P");
+        router.update(FRAME);
+        router.update(200_000_000L);
+
+        assertEquals(GameStatus.RUNNING, status(game));
+        assertEquals(initial, origin(game));
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = {"UP", "DOWN", "ENTER"})
     void customResumeKeyTakesPriorityOverPauseMenuControls(String key) throws StorageException {
         Settings defaults = Settings.defaults();
@@ -356,6 +469,42 @@ class GameScreenTest {
     @Test
     void losingFocusPausesTheGame() {
         GameScreen game = start();
+
+        router.focusLost();
+        router.update(FRAME);
+
+        assertEquals(GameStatus.PAUSED, status(game));
+    }
+
+    @Test
+    void losingFocusDiscardsGameCommandsWaitingForTheNextFrame() {
+        GameScreen game = start();
+        Position initial = origin(game);
+        router.keyPressed("LEFT");
+        router.keyPressed("SPACE");
+
+        router.focusLost();
+        router.update(FRAME);
+
+        assertEquals(GameStatus.PAUSED, status(game));
+        assertEquals(initial, origin(game));
+        assertEquals(0, game.session().snapshot().score());
+        TestApplication.tap(router, "P");
+        router.update(FRAME);
+        router.update(200_000_000L);
+        assertEquals(initial, origin(game));
+
+        TestApplication.tap(router, "LEFT");
+        router.update(FRAME);
+        assertEquals(initial.translate(-1, 0), origin(game));
+    }
+
+    @Test
+    void losingFocusDiscardsQueuedResume() {
+        GameScreen game = start();
+        TestApplication.tap(router, "P");
+        router.update(FRAME);
+        TestApplication.tap(router, "P");
 
         router.focusLost();
         router.update(FRAME);

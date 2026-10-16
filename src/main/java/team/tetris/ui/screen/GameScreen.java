@@ -162,7 +162,7 @@ public final class GameScreen implements Screen {
 
     @Override
     public void onFocusLost() {
-        repeats.releaseAll();
+        clearPendingInput();
         if (!finished && session.snapshot().status() == GameStatus.RUNNING) {
             pending.add(GameCommand.PAUSE);
         }
@@ -185,7 +185,14 @@ public final class GameScreen implements Screen {
             }
         }
         while (!pending.isEmpty()) {
+            GameStatus before = session.snapshot().status();
             session.handle(pending.poll());
+            GameStatus after = session.snapshot().status();
+            if (before != after && (before == GameStatus.PAUSED || after == GameStatus.PAUSED)) {
+                // 일시정지 메뉴와 게임 사이에 이전 입력이 넘어가지 않도록 새로 눌러야 한다.
+                clearPendingInput();
+                router.ignoreHeldKeys();
+            }
         }
         if (session.snapshot().status() != GameStatus.PAUSED) {
             pauseCursor = RESUME_ITEM;
