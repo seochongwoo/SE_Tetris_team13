@@ -13,6 +13,11 @@ public final class LineClearItem implements Item {
 
     @Override
     public void onLock(ItemContext context, Position position) {
+        previewOnLock(context, position);
+    }
+
+    @Override
+    public void previewOnLock(ItemContext context, Position position) {
         context.clearRow(position.y());
     }
 }

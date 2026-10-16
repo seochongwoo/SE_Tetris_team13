@@ -399,13 +399,19 @@ lineBonus = 100 × clearedLinesInThisStep²
 
 디버그의 자동 낙하 정지 상태에서도 삭제 연출은 진행합니다. 한 칸 진행은 연출 중 무시하고, 연출 경과 시간은 배치 되돌리기 재생 이력에 포함합니다. UI는 연출 중 키 반복을 소비해 종료 직후 밀린 입력이 몰리지 않게 합니다.
 
+### 디버그 삭제 범위 미리보기
+
+디버그 화면은 `HardDropPreview.project`로 현재 위치·회전에서 하드 드롭했을 때 사라질 기존 보드 칸을 계산합니다. `L`의 삭제 행, `B`의 3×3 폭발, `C`의 같은 종류 연결 덩어리, `W`의 낙하 경로와 완성 줄 삭제를 반영합니다. 압축으로 아래로 이동할 뿐인 칸과 빈 공간은 강조하지 않습니다. 블록의 문자와 고유 색을 유지하고 배경에 흰색을 25% 섞어 표시합니다. 일반·색맹 모드 모두 같은 흰색 강조를 사용합니다. 일반 화면·게임 종료·줄 삭제 애니메이션 중에는 이 예고를 표시하지 않습니다.
+
+미리보기는 복사한 `Board`와 `Item.previewOnLock`만 사용하며 실제 발동 콜백, 생성기, 점수, 난수 상태를 바꾸지 않습니다. 새 보드 효과 아이템은 `previewOnLock`에 외부 상태를 바꾸지 않는 효과 계산을 구현하고 `onLock`과 공유합니다. 기본 미리보기 콜백은 효과가 없습니다. 무게추의 관통 낙하는 엔진과 미리보기가 `DropRule.descend`를 공유하므로 착지 그림자도 실제 바닥 위치를 표시합니다.
+
 ### 확장 지점
 
 - 점수·속도: `ScoreRule`과 `SpeedRule`을 구현하고 `AppComposition(Path, Supplier<? extends PieceGenerator>, ScoreRule, SpeedRule)`에 전달합니다. 순수 계산으로 구현하며 실행 중 외부에서 변경하지 않습니다. 이 생성자의 명시적 `SpeedRule`은 난이도와 무관하게 그대로 사용합니다. 난이도에 맞춰 만들려면 마지막 인자에 `Function<Difficulty, ? extends SpeedRule>` (예: `SpeedPolicy::new`)을 전달합니다.
 - 블록 생성: `PieceGenerator`를 구현하고 생성자에 팩터리를 전달합니다. 난이도별로 다르게 만들려면 `Function<Difficulty, PieceGenerator>`를 받는 생성자를, 난이도와 무관하면 `Supplier`를 받는 생성자를 씁니다. 새 게임마다 독립된 생성기를 반환해야 합니다.
 - 코어: `TetrisEnginePort`는 `snapshot()`, `apply(GameAction)`, `tick()`을 제공합니다. 세션은 이 포트에 의존하며 실제 엔진 생성은 bootstrap에서 수행합니다. `EngineStep`의 drop/lock/clear 결과는 없으면 null일 수 있고, `itemActivations()`는 아이템이 발동하지 않으면 빈 목록입니다. `ClearedRow.cells()`에 지워지기 직전 칸 내용이 있어 삭제 애니메이션에 쓸 수 있습니다.
 - 블록 모양: 테트로미노가 아닌 블록은 `core.Shape`를 구현합니다. 회전해도 같은 인덱스가 같은 칸을 가리키도록 좌표를 정렬하고, 회전하지 않는 블록은 `rotationStates()`를 1로 둡니다.
-- 블록 이동: `core.rule.PieceMovementRule`을 구현하고 `Shape.movementRule()`에서 반환합니다. 기본값은 일반 충돌 규칙입니다. 좌우 이동·회전 허용 여부와 한 칸 낙하를 재정의할 수 있으며, 허용된 좌우 이동·회전에는 기존 충돌 판정을 적용합니다. 최초 아래쪽 접촉 상태는 엔진이 초기 배치·스폰·이동·회전·낙하 시 갱신하고 다음 블록에서 초기화합니다. 규칙은 상태를 저장하지 않고 전달받은 접촉 여부를 사용해야 합니다. `descend`는 성공 시 한 칸 아래 위치, 실패 시 null을 반환하며 실패 시 보드를 변경하지 않습니다. 실제 낙하와 착지 미리보기가 같은 규칙을 사용하므로 성공 시에도 전달받은 보드 외부의 상태를 바꾸면 안 됩니다. 무게추는 `WeightMovementRule`로 접촉 후 이동 제한·회전 금지·낙하 중 삭제를 구현합니다. 점수 계산은 기존처럼 application의 책임입니다.
+- 블록 이동: `core.rule.PieceMovementRule`을 구현하고 `Shape.movementRule()`에서 반환합니다. 기본값은 일반 충돌 규칙입니다. 좌우 이동·회전 허용 여부와 한 칸 낙하를 재정의할 수 있으며, 허용된 좌우 이동·회전에는 기존 충돌 판정을 적용합니다. 최초 아래쪽 접촉 상태는 엔진이 초기 배치·스폰·이동·회전·낙하 시 갱신하고 다음 블록에서 초기화합니다. 규칙은 상태를 저장하지 않고 전달받은 접촉 여부를 사용해야 합니다. `descend`는 성공 시 한 칸 아래 위치, 실패 시 null을 반환하며 실패 시 보드를 변경하지 않습니다. 실제 낙하와 두 미리보기가 같은 규칙을 사용하므로 성공 시에도 전달받은 보드 외부의 상태를 바꾸면 안 됩니다. 무게추는 `WeightMovementRule`로 접촉 후 이동 제한·회전 금지·낙하 중 삭제를 구현합니다. 점수 계산은 기존처럼 application의 책임입니다.
 - 아이템: `core.item.Item`을 구현합니다. 블록이 고정되면 아이템이 실린 칸마다 `onLock(ItemContext, Position)`이 한 번 호출되고 아이템은 소모됩니다. 처리 순서는 보드 기록 → 아이템 효과 → 꽉 찬 줄과 `ItemContext.clearRow`로 지정한 줄 일괄 삭제이며, 지운 줄은 모두 `clearResult`로 보고되어 기존 방식대로 점수가 계산됩니다. 점수 배율처럼 보드 밖 효과는 `itemActivations()`를 보고 application에서 처리합니다.
 - 아이템 공급: `core.rule.PieceSource`를 구현해 `PlayerEngine(width, height, source)`에 전달합니다. 블록 모양은 기존처럼 `PieceGenerator`가 정하고, 아이템을 실을지는 공급자가 정합니다. 줄이 지워지면 다음 블록을 꺼내기 전에 `onLinesCleared(lines)`가 호출되므로 "10줄마다 아이템"을 바로 미리보기에 반영할 수 있습니다. 일반 모드는 `PlainPieceSource`를, 아이템 모드는 이를 감싼 `ItemPieceSource`를 씁니다. `ItemPieceSource`는 게임 전체 누적 삭제 줄 수가 10의 배수를 넘을 때마다 다음에 새로 나타나는 미리보기 블록에 아이템을 싣습니다.
 - 새 아이템 등록: `core.item.Item`을 구현하고 `core.item.ItemCatalog.all()`에 한 줄을 추가합니다. 블록의 한 칸에 붙는 아이템은 `new AttachedItem(item)`(무작위 칸), 블록 자체가 아이템이면 `ItemKind`를 직접 구현해 자기 모양의 블록을 돌려줍니다(1칸짜리 블록은 `new SoloBlock(item)`). 아이템이 나올 차례에는 목록에서 균등 확률로 하나를 고르며, 목록이 비어 있으면 아이템 없이 진행합니다.

@@ -17,6 +17,7 @@ import team.tetris.core.*;
 import team.tetris.core.item.ChainClearItem;
 import team.tetris.core.item.BombItem;
 import team.tetris.core.item.SoloBlock;
+import team.tetris.core.item.WeightBlock;
 import team.tetris.ui.ScreenRouter;
 import team.tetris.ui.input.InputMapper;
 import team.tetris.ui.render.palette.BlockGlyphs;
@@ -94,6 +95,54 @@ class GhostRendererTest {
         ActivePiece active = new ActivePiece(TetrominoType.T, 0, new Position(3, 0));
         assertFalse(render(emptyBoard(), active, EnginePhase.GAME_OVER).text().contains(BlockGlyphs.GHOST));
         assertFalse(render(emptyBoard(), null, EnginePhase.RUNNING).text().contains(BlockGlyphs.GHOST));
+    }
+
+    @Test void removalPreviewIsSubtlePreservesGlyphsAndFollowsTheItemInBothPalettes() {
+        Cell[][] board = emptyBoard();
+        board[18][4] = Cell.occupiedBy(TetrominoType.J);
+        board[19][4] = Cell.occupiedBy(TetrominoType.Z);
+        var active = new ActivePiece(new SoloBlock(new BombItem()).toItemPiece(null, null),
+                0, new Position(4, 0));
+        Position target = new Position(4, 18);
+        int col = TextRenderer.columnOf(4), row = TextRenderer.rowOf(18);
+        for (boolean colorBlind : new boolean[]{false, true}) {
+            var palette = ColorPalette.of(colorBlind);
+            var debug = new TextRenderer(palette, new InputMapper(Settings.defaults()), true);
+            for (EnginePhase phase : new EnginePhase[]{EnginePhase.RUNNING, EnginePhase.PAUSED}) {
+                var frame = debug.render(snapshot(board, active, phase));
+                assertEquals(BlockGlyphs.of(TetrominoType.J), glyphAt(frame, target));
+                assertEquals(palette.removalPreviewStyle(TetrominoType.J), frame.styleAt(col, row));
+                assertEquals(frame.styleAt(col, row), frame.styleAt(col + 1, row));
+                assertEquals(new java.awt.Color(63, 63, 63), frame.styleAt(col, row).background());
+                assertEquals(palette.blockStyle(TetrominoType.Z), frame.styleAt(col, row + 1));
+            }
+            // 지금 위치에 이미 착지했어도 고정 전에 삭제 범위를 보여준다.
+            var landed = debug.render(snapshot(board, active.movedTo(new Position(4, 17)), EnginePhase.RUNNING));
+            assertEquals(palette.removalPreviewStyle(TetrominoType.J), landed.styleAt(col, row));
+            var moved = debug.render(snapshot(board, active.movedTo(new Position(7, 0)), EnginePhase.RUNNING));
+            assertEquals(palette.blockStyle(TetrominoType.J), moved.styleAt(col, row));
+            var over = debug.render(snapshot(board, active, EnginePhase.GAME_OVER));
+            assertEquals(palette.blockStyle(TetrominoType.J), over.styleAt(col, row));
+            var normal = new TextRenderer(palette, new InputMapper(Settings.defaults()))
+                    .render(snapshot(board, active, EnginePhase.RUNNING));
+            assertEquals(palette.blockStyle(TetrominoType.J), normal.styleAt(col, row));
+        }
+    }
+
+    @Test void weightGhostDoesNotCoverHighlightedBlocksAtItsLandingPosition() {
+        Cell[][] board = emptyBoard();
+        board[10][4] = Cell.occupiedBy(TetrominoType.J);
+        board[19][4] = Cell.occupiedBy(TetrominoType.Z);
+        var active = new ActivePiece(new WeightBlock().toItemPiece(null, null), 0, new Position(3, 0));
+        var frame = render(board, active, EnginePhase.RUNNING);
+        var palette = ColorPalette.standard();
+        for (int y : new int[]{10, 19}) {
+            var type = board[y][4].occupiedBy();
+            assertEquals(BlockGlyphs.of(type), glyphAt(frame, new Position(4, y)));
+            assertEquals(palette.removalPreviewStyle(type),
+                    frame.styleAt(TextRenderer.columnOf(4), TextRenderer.rowOf(y)));
+        }
+        assertEquals(BlockGlyphs.GHOST, glyphAt(frame, new Position(3, 19)));
     }
 
     private static GameSnapshot snapshot(Cell[][] board, ActivePiece active, EnginePhase phase) {

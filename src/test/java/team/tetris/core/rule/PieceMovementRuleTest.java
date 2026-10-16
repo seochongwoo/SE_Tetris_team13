@@ -2,6 +2,7 @@ package team.tetris.core.rule;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -32,7 +33,7 @@ class PieceMovementRuleTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"gravity", "soft", "hard"})
-    void customDescentIsSharedByEveryDropAndLandingPreview(String mode) {
+    void customDescentIsSharedByEveryDropAndBothPreviews(String mode) {
         // 무게추가 아닌 새 블록: 경로의 칸을 지우지만 3행에서 멈춘다.
         PieceMovementRule rule = new PieceMovementRule() {
             public ActivePiece descend(Board board, ActivePiece piece) {
@@ -49,8 +50,10 @@ class PieceMovementRuleTest {
         ActivePiece initial = new ActivePiece(shape, 0, new Position(2, 0));
         PlayerEngine engine = engine(cells, initial);
 
-        var landing = DropRule.landingPiece(cells, initial);
-        assertEquals(new Position(2, 3), landing.origin());
+        var preview = HardDropPreview.project(cells, initial);
+        assertEquals(new Position(2, 3), preview.landing().origin());
+        assertEquals(Set.of(new Position(2, 2)), preview.removedCells());
+        assertEquals(preview.landing(), DropRule.landingPiece(cells, initial));
         assertArrayEquals(cells, engine.snapshot().board());
         assertEquals(TetrominoType.J, cells[2][2].occupiedBy());
 
@@ -67,7 +70,7 @@ class PieceMovementRuleTest {
         }
         assertNotNull(step.lockResult());
         assertEquals(3, distance);
-        assertEquals(landing.origin(), step.lockResult().origin());
+        assertEquals(preview.landing().origin(), step.lockResult().origin());
         assertTrue(step.snapshot().board()[2][2].isEmpty());
         assertSame(shape, step.snapshot().board()[3][2].occupiedBy());
         assertEquals(TetrominoType.Z, step.snapshot().board()[6][2].occupiedBy());

@@ -11,7 +11,7 @@ import team.tetris.core.Piece;
 import team.tetris.core.Position;
 import team.tetris.core.Shape;
 import team.tetris.core.item.Item;
-import team.tetris.core.rule.DropRule;
+import team.tetris.core.rule.HardDropPreview;
 import team.tetris.ui.input.InputMapper;
 import team.tetris.ui.input.KeyNames;
 import team.tetris.ui.render.palette.BlockGlyphs;
@@ -88,7 +88,9 @@ public final class TextRenderer implements Renderer {
             }
         } else {
             if (showLanding && (engine.phase() == EnginePhase.RUNNING || engine.phase() == EnginePhase.PAUSED)) {
-                drawLanding(frame, board, engine.activePiece());
+                var preview = HardDropPreview.project(board, engine.activePiece());
+                drawRemovalPreview(frame, board, preview);
+                drawLanding(frame, board, engine.activePiece(), preview);
             }
             drawActivePiece(frame, engine.activePiece(), board[0].length, board.length);
         }
@@ -128,11 +130,22 @@ public final class TextRenderer implements Renderer {
         }
     }
 
-    private void drawLanding(TextFrame frame, Cell[][] board, ActivePiece piece) {
-        ActivePiece landing = DropRule.landingPiece(board, piece);
+    private void drawRemovalPreview(TextFrame frame, Cell[][] board, HardDropPreview preview) {
+        for (Position position : preview.removedCells()) {
+            Cell cell = board[position.y()][position.x()];
+            String glyph = cell.item() == null ? BlockGlyphs.of(cell.occupiedBy()) : BlockGlyphs.of(cell.item());
+            frame.put(columnOf(position.x()), rowOf(position.y()), glyph,
+                    palette.removalPreviewStyle(cell.occupiedBy()));
+        }
+    }
+
+    private void drawLanding(TextFrame frame, Cell[][] board, ActivePiece piece, HardDropPreview preview) {
+        ActivePiece landing = preview.landing();
         if (landing == null || landing.origin().equals(piece.origin())) return;
         for (Position cell : landing.cells()) {
             if (cell.x() >= 0 && cell.x() < board[0].length && cell.y() >= 0 && cell.y() < board.length) {
+                // 무게추 착지 위치에 있는 기존 블록의 삭제 강조를 그림자로 덮지 않는다.
+                if (preview.removedCells().contains(cell)) continue;
                 frame.put(columnOf(cell.x()), rowOf(cell.y()), BlockGlyphs.GHOST, palette.blockStyle(piece.shape()));
             }
         }

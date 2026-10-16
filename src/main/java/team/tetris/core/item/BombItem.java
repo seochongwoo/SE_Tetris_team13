@@ -22,6 +22,11 @@ public final class BombItem implements Item {
 
     @Override
     public void onLock(ItemContext context, Position position) {
+        previewOnLock(context, position);
+    }
+
+    @Override
+    public void previewOnLock(ItemContext context, Position position) {
         for (int dy = -RADIUS; dy <= RADIUS; dy++) {
             for (int dx = -RADIUS; dx <= RADIUS; dx++) {
                 int x = position.x() + dx;
