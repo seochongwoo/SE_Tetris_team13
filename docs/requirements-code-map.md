@@ -337,13 +337,13 @@ PlayerEngine.lockActivePieceAndSpawnNext
 | 아이템 | 코드 흐름 |
 | --- | --- |
 | `L` 줄 삭제 | `LineClearItem.onLock` → `ItemContext.clearRow(position.y())` → `Board.clearRows`에서 완성 줄과 합산·중복 제거 → 일반 점수·누적 줄 수 반영 |
-| `W` 무게추 | `WeightBlock`의 폭 4칸 모양 → `PlayerEngine.updateWeightContact`가 아래 접촉 즉시 좌우 잠금 → `descendOneCell`에서 다음 위치의 칸 삭제 → 바닥 고정. `SinglePlayerSession.accept`는 동작 전 블록이 무게추이면 하강 점수 제외 |
+| `W` 무게추 | `WeightBlock.SHAPE.movementRule()` → `WeightMovementRule` 선택. `PlayerEngine.updateContact`가 최초 아래 접촉을 기억하고, 이동 규칙이 접촉 후 좌우 이동을 차단하며 회전은 항상 금지. 낙하는 `PlayerEngine.descendOneCell` → `DropRule.descend` → `WeightMovementRule.descend`에서 다음 위치의 칸 삭제·한 칸 하강 → 바닥 고정. `SinglePlayerSession.accept`는 동작 전 블록이 무게추이면 하강 점수 제외 |
 
 두 아이템은 `ItemCatalog`에 등록되어 기존 미리보기·아이템 문자 렌더링을 사용합니다. 테스트: `RequiredItemsTest`, `RequiredItemScoringTest`, `TextRendererTest`.
 
 ### R2-18 아이템을 추가하기 쉬운 구조
 
-고정 시 발동하는 새 아이템은 아래 두 곳을 고치면 게임에 나옵니다. 무게추처럼 이동 규칙이 다른 아이템은 엔진의 이동 처리도 확장합니다.
+고정 시 발동하는 새 아이템은 아래 두 곳을 고치면 게임에 나옵니다. 무게추처럼 이동 규칙이 다른 아이템은 `PieceMovementRule`을 구현하고 해당 `Shape.movementRule()`에서 반환합니다. 엔진은 최초 접촉 상태를 관리하고 이동·회전 허용 여부와 한 칸 낙하를 이 규칙에 위임합니다.
 
 1. `core/item/`에 `Item` 구현 클래스 추가: `symbol()`과 `onLock(ItemContext, Position)`
 2. `core/item/ItemCatalog.entries()`에 `new Entry("표시 이름", 생성 방식)` 추가 (`all()`이 게임 공급자용 목록으로 변환)

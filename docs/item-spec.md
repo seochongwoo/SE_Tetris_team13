@@ -54,7 +54,7 @@
 - 닿은 뒤에는 좌우 이동 불가. 이후 자동 하강(또는 내리기)마다 아래 4칸 폭의 블럭을 지우며 한 칸씩 내려가 바닥에서 고정
 - 요구사항 예시 화면처럼 고정된 무게추는 일반 칸으로 보드에 남음
 - 지운 칸과 무게추의 하강 거리에는 점수 없음. 고정 후 꽉 찬 줄이 생기면 일반 줄 삭제 점수는 적용
-- 구현: `WeightBlock`은 `ItemKind`·`Item`을 구현하고 전용 `SHAPE`(위 2칸/아래 4칸, 회전 상태 1개)를 사용한다. `PlayerEngine.descendOneCell`이 낙하 중 삭제를 처리하고, `updateWeightContact`가 스폰·좌우 이동·하강 직후 아래 접촉을 확인해 다음 스폰까지 좌우 이동을 잠근다. 낙하 거리는 그대로 보고하며, `SinglePlayerSession`은 동작 전 블록이 무게추일 때 하강 점수를 제외한다.
+- 구현: `WeightBlock`은 `ItemKind`·`Item`을 구현하고 전용 `SHAPE`(위 2칸/아래 4칸, 회전 상태 1개)의 `movementRule()`에서 `WeightMovementRule`을 반환한다. `PlayerEngine.updateContact`가 초기 배치·스폰·이동·회전·하강 후 최초 아래쪽 접촉을 기억하며, `WeightMovementRule.allowsHorizontalMovement`는 접촉 후 좌우 이동을 막고 `allowsRotation`은 항상 회전을 막는다. `PlayerEngine.descendOneCell` → `DropRule.descend` → `WeightMovementRule.descend` 순서로 다음 위치의 칸을 지우고 한 칸 내려간다. 낙하 거리는 그대로 보고하며, `SinglePlayerSession`은 동작 전 블록이 무게추일 때 하강 점수를 제외한다.
 
 ### 연쇄 삭제(`C`) 구현 메모
 
@@ -101,7 +101,7 @@
   - 구현됨 (카드 6): `rule/ItemPieceSource`(10줄마다 아이템, 일반 공급자를 감싸는 형태), `item/ItemKind`·`item/AttachedItem`(아이템이 블럭에 실리는 방식), `item/ItemCatalog`(등장 아이템 목록, 새 아이템은 여기에 한 줄 추가)
   - 구현됨 (카드 3): `rule/WeightedRandomGenerator`(7-bag 대체, 블럭별 가중치를 생성자로 받음), 난이도별 가중치는 application의 `PieceWeightPolicy`
   - 구현됨 (카드 9~11): `item/ChainClearItem`(`C`), `item/BombItem`(`B`)·`item/SoloBlock`(1칸 블럭), `item/DoubleScoreItem`(`$`, 점수 처리는 `SinglePlayerSession`)
-  - 구현됨 (카드 7~8): `item/LineClearItem`(`L`), `item/WeightBlock`(`W`), `PlayerEngine`의 접촉 잠금·낙하 삭제, `SinglePlayerSession`의 무게추 하강 점수 제외
+  - 구현됨 (카드 7~8): `item/LineClearItem`(`L`), `item/WeightBlock`(`W`), `PlayerEngine`의 최초 접촉 상태 관리, `item/WeightMovementRule`의 접촉 후 이동 제한·낙하 삭제, `SinglePlayerSession`의 무게추 하강 점수 제외
 - **application**: `Difficulty`, `GameMode`, `Settings`(난이도), `GameResult`·`ScoreEntry`(모드·난이도), `ScoreboardService`(모드·난이도별 순위), `SpeedPolicy`(난이도별 증가율), `ApplicationContext.newGame`(모드·난이도 전달), `SinglePlayerSession`(줄 삭제 애니메이션 동안 대기, `$` 같은 보드 밖 아이템 효과)
 - **storage**: `PropertiesSettingsRepository`(설정 파일 `schemaVersion` 2), `BinaryScoreRepository`(점수 파일 버전 2, 기존 기록은 일반 모드·normal로 변환)
 - **bootstrap**: `AppComposition`(모드·난이도에 맞는 생성기·공급자·규칙 조립)
