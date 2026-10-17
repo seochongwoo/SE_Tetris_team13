@@ -12,10 +12,12 @@ import team.tetris.core.result.ClearedRow;
  * @param doubleScoreClears 점수 2배가 남은 줄 삭제 횟수 (아이템 모드의 {@code $}, 없으면 0)
  * @param clearingRows      줄 삭제 애니메이션 중이면 방금 지운 줄들(지워지기 직전 내용), 아니면 빈 목록.
  *                          엔진 보드는 이미 줄이 지워진 상태다.
+ * @param clearingProgress  줄 삭제 애니메이션의 진행 정도. 0(시작)부터 1 미만까지, 애니메이션이 없으면 0
  */
 public record GameSnapshot(
         EngineSnapshot engine, long score, int level, int clearedLines,
-        long gravityIntervalNanos, GameStatus status, int doubleScoreClears, List<ClearedRow> clearingRows) {
+        long gravityIntervalNanos, GameStatus status, int doubleScoreClears, List<ClearedRow> clearingRows,
+        double clearingProgress) {
     public GameSnapshot {
         engine = copyEngine(Objects.requireNonNull(engine, "engine"));
         Objects.requireNonNull(status, "status");
@@ -23,6 +25,16 @@ public record GameSnapshot(
             throw new IllegalArgumentException("doubleScoreClears must be non-negative");
         }
         clearingRows = List.copyOf(clearingRows);
+        if (!(clearingProgress >= 0 && clearingProgress < 1)) {
+            throw new IllegalArgumentException("clearingProgress must be in [0, 1)");
+        }
+    }
+
+    /** 줄 삭제 애니메이션이 막 시작한 상태 (진행 정도 0). */
+    public GameSnapshot(EngineSnapshot engine, long score, int level, int clearedLines,
+                        long gravityIntervalNanos, GameStatus status, int doubleScoreClears,
+                        List<ClearedRow> clearingRows) {
+        this(engine, score, level, clearedLines, gravityIntervalNanos, status, doubleScoreClears, clearingRows, 0);
     }
 
     /** 줄 삭제 애니메이션이 없는 상태. */

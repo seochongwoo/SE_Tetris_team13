@@ -241,24 +241,25 @@ SinglePlayerSession.accept(EngineStep)
 블록 고정 → PlayerEngine: 줄 삭제(Board.clearRows), 지운 줄의 직전 내용을 ClearedRow로 보고, 다음 블록 스폰
   → SinglePlayerSession.accept: 점수·줄 수·레벨 반영
        지운 줄이 있고 게임이 계속되면 clearingRows = 지운 줄, clearingNanos = LINE_CLEAR_FLASH_NANOS(0.3초)
-       → GameSnapshot.clearingRows / isClearing()
+       → GameSnapshot.clearingRows / isClearing(), 시간이 흐르면 clearingProgress(0~1) 갱신
 매 프레임 GameScreen.update
   → SinglePlayerSession.update: 애니메이션 중이면 시간을 애니메이션에만 쓰고(중력 정지), 다 쓰면 endLineClear
   → 애니메이션 중에는 키 큐(pending)를 처리하지 않고 기다림, 키 자동 반복은 버림
   → 끝나면 쌓인 키를 순서대로 SinglePlayerSession.handle
 TextRenderer.render
   isClearing() → beforeClear: 지워진 보드에 지운 줄을 원래 자리에 다시 넣어 지우기 직전 보드를 만듦
-               → drawClearingRows: 그 줄들을 흰색(ColorPalette.flashStyle)으로 칠함, 새 블록은 그리지 않음
+               → drawClearingRows: 진행 20%까지는 줄 전체를 흰색(ColorPalette.flashStyle)으로,
+                 그 뒤로는 가운데 두 칸부터 양쪽 끝으로 한 쌍씩 빈 칸으로 바꿈(ringOf). 새 블록은 그리지 않음
 ```
 
 | 요구사항 | 코드 |
 | --- | --- |
-| 지워지는 줄이 잘 구분되는 애니메이션 | `TextRenderer.drawClearingRows`: 0.3초 동안 흰색 줄 |
+| 지워지는 줄이 잘 구분되는 애니메이션 | `TextRenderer.drawClearingRows`: 흰색으로 한 번 번쩍인 뒤 가운데부터 지워짐 (0.3초) |
 | 꽉 찬 줄과 아이템으로 지운 줄 모두 | 엔진이 둘 다 같은 `ClearResult`로 보고 → 세션이 구분 없이 처리 |
 | 입력을 무시하지 않음 (1차 p8) | `GameScreen`이 애니메이션 동안의 키를 큐에 보관, 세션은 애니메이션 중 명령이 오면 끝내고 처리 |
 | 게임 화면의 모드·난이도 표시 | `GameSession.mode()`·`difficulty()` → `GameScreen.modeLabel()` (화면 맨 위, 예: "아이템 · HARD") |
 
-테스트: `LineClearAnimationTest`(애니메이션 시간·중력 정지·명령 처리·일시정지·게임 오버), `TextRendererTest`(흰색 줄, 새 블록 숨김, 지우기 직전 보드 복원), `GameScreenTest`(애니메이션 중 키 보관, 모드·난이도 표시)
+테스트: `LineClearAnimationTest`(애니메이션 시간·진행 정도·중력 정지·명령 처리·일시정지·게임 오버), `TextRendererTest`(흰색 번쩍임, 가운데부터 지워짐, 새 블록 숨김, 지우기 직전 보드 복원), `GameScreenTest`(애니메이션 중 키 보관, 모드·난이도 표시)
 
 ### R2-01~05 난이도
 

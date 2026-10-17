@@ -115,6 +115,9 @@ public final class SinglePlayerSession implements GameSession {
             // 애니메이션 동안의 시간은 중력에 쓰지 않는다 (줄이 지워진 고정 직후라 쌓인 시간도 없다).
             if (elapsedNanos < clearingNanos) {
                 clearingNanos -= elapsedNanos;
+                double progress = 1.0 - (double) clearingNanos / LINE_CLEAR_FLASH_NANOS;
+                view = new GameSnapshot(view.engine(), score, level, clearedLines, gravityIntervalNanos, status,
+                        doubleScoreClears, clearingRows, progress);
             } else {
                 endLineClear();
             }

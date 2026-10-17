@@ -1,5 +1,6 @@
 package team.tetris.ui.render;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -228,5 +229,38 @@ class TextRendererTest {
         assertEquals(top, before[0][0]);
         assertEquals(cleared, before[1][0]);
         assertEquals(bottom, before[2][0]);
+    }
+
+    @Test
+    void afterTheWhiteFlashTheRowsAreWipedFromTheMiddleOutward() {
+        SinglePlayerSession game = clearTwoRowsWithOs();
+        game.update(SinglePlayerSession.LINE_CLEAR_FLASH_NANOS / 2); // 진행 0.5: 가운데 두 쌍(x=3~6)이 지워짐
+
+        TextFrame frame = renderer.render(game.snapshot());
+
+        for (int row : new int[] {18, 19}) {
+            for (int x = 3; x <= 6; x++) {
+                assertEquals('.', frame.codePointAt(TextRenderer.columnOf(x) + 1, TextRenderer.rowOf(row)), "x=" + x);
+            }
+            for (int x : new int[] {0, 1, 2, 7, 8, 9}) {
+                assertEquals('#', frame.codePointAt(TextRenderer.columnOf(x), TextRenderer.rowOf(row)), "x=" + x);
+                assertEquals(palette.base().background(),
+                        frame.styleAt(TextRenderer.columnOf(x), TextRenderer.rowOf(row)).background());
+            }
+        }
+    }
+
+    @Test
+    void columnsAreWipedInPairsFromTheCenter() {
+        int[] even = new int[10];
+        for (int x = 0; x < 10; x++) {
+            even[x] = TextRenderer.ringOf(x, 10);
+        }
+        assertArrayEquals(new int[] {4, 3, 2, 1, 0, 0, 1, 2, 3, 4}, even);
+        int[] odd = new int[5];
+        for (int x = 0; x < 5; x++) {
+            odd[x] = TextRenderer.ringOf(x, 5);
+        }
+        assertArrayEquals(new int[] {2, 1, 0, 1, 2}, odd);
     }
 }

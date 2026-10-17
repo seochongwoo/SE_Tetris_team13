@@ -25,8 +25,8 @@ import team.tetris.ui.render.palette.ColorPalette;
  * <p>보드에는 고정된 칸만 들어 있으므로, 낙하 중인 블록은 각 칸의 보드 좌표를 구해 따로 겹쳐
  * 그린다. 아이템이 실린 칸은 아이템 문자를 반전 색으로 그려 일반 무늬와 구분한다.
  *
- * <p>줄 삭제 애니메이션 중({@link GameSnapshot#isClearing()})에는 지우기 직전 보드를 그리고 지운 줄을
- * 흰색으로 칠한다.
+ * <p>줄 삭제 애니메이션 중({@link GameSnapshot#isClearing()})에는 지우기 직전 보드를 그린다. 지운 줄은
+ * 처음 잠깐 흰색으로 번쩍인 뒤, 가운데 두 칸부터 양쪽 끝으로 한 쌍씩 지워진다.
  */
 public final class TextRenderer implements Renderer {
 
@@ -37,6 +37,9 @@ public final class TextRenderer implements Renderer {
     public static final int CELL_WIDTH = 2;
     /** 오른쪽 정보 영역이 시작하는 열. */
     public static final int PANEL_LEFT = 25;
+
+    /** 줄 삭제 애니메이션 중 줄 전체가 흰색으로 번쩍이는 앞부분의 비율. 나머지 동안 가운데부터 지워진다. */
+    static final double CLEAR_FLASH_PART = 0.2;
 
     private static final int NEXT_BOX_WIDTH = 10;
     private static final int NEXT_BOX_HEIGHT = 6;
@@ -79,7 +82,7 @@ public final class TextRenderer implements Renderer {
             // 엔진은 이미 줄을 지웠으므로 지우기 직전 보드를 다시 만들어 지운 줄을 반짝이게 그린다.
             // 새로 나온 블록은 애니메이션이 끝난 뒤에 보인다.
             drawBoard(frame, beforeClear(board, snapshot.clearingRows()));
-            drawClearingRows(frame, snapshot.clearingRows(), board[0].length);
+            drawClearingRows(frame, snapshot.clearingRows(), board[0].length, snapshot.clearingProgress());
         } else {
             drawBoard(frame, board);
             drawActivePiece(frame, engine.activePiece(), board[0].length, board.length);
@@ -125,12 +128,37 @@ public final class TextRenderer implements Renderer {
         return before;
     }
 
-    private void drawClearingRows(TextFrame frame, List<ClearedRow> cleared, int width) {
+    /**
+     * 지운 줄을 진행 정도에 따라 그린다. 앞부분(CLEAR_FLASH_PART)에는 줄 전체를 흰색으로 칠하고, 그 뒤에는
+     * 가운데에서 가까운 칸부터 빈 칸으로 바꿔 양쪽 끝으로 지워 나간다. 남은 칸은 원래 블록 무늬 그대로다.
+     */
+    private void drawClearingRows(TextFrame frame, List<ClearedRow> cleared, int width, double progress) {
+        if (progress < CLEAR_FLASH_PART) {
+            for (ClearedRow row : cleared) {
+                for (int x = 0; x < width; x++) {
+                    frame.put(columnOf(x), rowOf(row.rowIndex()), "  ", palette.flashStyle());
+                }
+            }
+            return;
+        }
+        int rings = (width + 1) / 2;
+        int removedRings = Math.min(rings, 1 + (int) ((progress - CLEAR_FLASH_PART) / (1 - CLEAR_FLASH_PART) * rings));
         for (ClearedRow row : cleared) {
             for (int x = 0; x < width; x++) {
-                frame.put(columnOf(x), rowOf(row.rowIndex()), "  ", palette.flashStyle());
+                if (ringOf(x, width) < removedRings) {
+                    frame.put(columnOf(x), rowOf(row.rowIndex()), BlockGlyphs.EMPTY, palette.dimStyle());
+                }
             }
         }
+    }
+
+    /** 가운데에서 몇 번째 쌍인가: 가운데 두 칸(폭이 홀수면 가운데 한 칸)이 0, 그 바깥이 1, … 양 끝이 가장 크다. */
+    static int ringOf(int x, int width) {
+        if (width % 2 == 1) {
+            return Math.abs(x - width / 2);
+        }
+        int half = width / 2;
+        return x < half ? half - 1 - x : x - half;
     }
 
     private void drawActivePiece(TextFrame frame, ActivePiece piece, int width, int height) {

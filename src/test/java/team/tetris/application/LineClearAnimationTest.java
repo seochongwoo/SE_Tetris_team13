@@ -149,4 +149,20 @@ class LineClearAnimationTest {
             return step;
         }
     }
+
+    @Test
+    void theFlashReportsHowFarItHasProgressed() {
+        clear(EnginePhase.RUNNING, 19);
+        assertEquals(0.0, session.snapshot().clearingProgress());
+
+        session.update(FLASH / 4);
+        assertEquals(0.25, session.snapshot().clearingProgress(), 1e-9);
+
+        session.update(FLASH / 2);
+        assertEquals(0.75, session.snapshot().clearingProgress(), 1e-9);
+
+        session.update(FLASH / 4);
+        assertFalse(session.snapshot().isClearing());
+        assertEquals(0.0, session.snapshot().clearingProgress());
+    }
 }
