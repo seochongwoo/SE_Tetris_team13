@@ -105,6 +105,9 @@ class AppCompositionTest {
         }
         assertEquals(920_000_000L, easy.snapshot().gravityIntervalNanos());
         assertEquals(880_000_000L, hard.snapshot().gravityIntervalNanos());
+        if (hard.snapshot().isClearing()) {
+            hard.update(SinglePlayerSession.LINE_CLEAR_FLASH_NANOS); // 줄 삭제 애니메이션
+        }
         var before = hard.snapshot().engine().activePiece().origin();
         hard.update(879_999_999L);
         assertEquals(before, hard.snapshot().engine().activePiece().origin());

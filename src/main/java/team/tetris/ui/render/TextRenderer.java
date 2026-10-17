@@ -1,6 +1,8 @@
 package team.tetris.ui.render;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import team.tetris.application.GameCommand;
 import team.tetris.application.GameSnapshot;
 import team.tetris.core.ActivePiece;
@@ -10,6 +12,7 @@ import team.tetris.core.Piece;
 import team.tetris.core.Position;
 import team.tetris.core.Shape;
 import team.tetris.core.item.Item;
+import team.tetris.core.result.ClearedRow;
 import team.tetris.ui.input.InputMapper;
 import team.tetris.ui.input.KeyNames;
 import team.tetris.ui.render.palette.BlockGlyphs;
@@ -21,6 +24,9 @@ import team.tetris.ui.render.palette.ColorPalette;
  *
  * <p>보드에는 고정된 칸만 들어 있으므로, 낙하 중인 블록은 각 칸의 보드 좌표를 구해 따로 겹쳐
  * 그린다. 아이템이 실린 칸은 아이템 문자를 반전 색으로 그려 일반 무늬와 구분한다.
+ *
+ * <p>줄 삭제 애니메이션 중({@link GameSnapshot#isClearing()})에는 지우기 직전 보드를 그리고 지운 줄을
+ * 흰색으로 칠한다.
  */
 public final class TextRenderer implements Renderer {
 
@@ -69,8 +75,15 @@ public final class TextRenderer implements Renderer {
         TextFrame frame = TextFrame.blank(palette.base());
         EngineSnapshot engine = snapshot.engine();
         Cell[][] board = engine.board();
-        drawBoard(frame, board);
-        drawActivePiece(frame, engine.activePiece(), board[0].length, board.length);
+        if (snapshot.isClearing()) {
+            // 엔진은 이미 줄을 지웠으므로 지우기 직전 보드를 다시 만들어 지운 줄을 반짝이게 그린다.
+            // 새로 나온 블록은 애니메이션이 끝난 뒤에 보인다.
+            drawBoard(frame, beforeClear(board, snapshot.clearingRows()));
+            drawClearingRows(frame, snapshot.clearingRows(), board[0].length);
+        } else {
+            drawBoard(frame, board);
+            drawActivePiece(frame, engine.activePiece(), board[0].length, board.length);
+        }
         drawNext(frame, engine.nextPiece());
         drawStats(frame, snapshot);
         drawHelp(frame);
@@ -89,6 +102,33 @@ public final class TextRenderer implements Renderer {
                 } else {
                     drawCell(frame, columnOf(x), rowOf(y), cell.occupiedBy(), cell.item());
                 }
+            }
+        }
+    }
+
+    /**
+     * 줄이 지워진 보드(after)에 지운 줄을 원래 자리에 다시 넣어 지우기 직전 보드를 만든다. 줄이 지워지면
+     * 남은 줄은 순서를 유지한 채 아래로 내려오고 맨 위에 지운 줄 수만큼 빈 줄이 생긴다.
+     */
+    static Cell[][] beforeClear(Cell[][] after, List<ClearedRow> cleared) {
+        int height = after.length;
+        Cell[][] before = new Cell[height][];
+        Map<Integer, ClearedRow> byRow = new HashMap<>();
+        for (ClearedRow row : cleared) {
+            byRow.put(row.rowIndex(), row);
+        }
+        int remaining = cleared.size();
+        for (int y = 0; y < height; y++) {
+            ClearedRow row = byRow.get(y);
+            before[y] = row != null ? row.cells().toArray(new Cell[0]) : after[remaining++];
+        }
+        return before;
+    }
+
+    private void drawClearingRows(TextFrame frame, List<ClearedRow> cleared, int width) {
+        for (ClearedRow row : cleared) {
+            for (int x = 0; x < width; x++) {
+                frame.put(columnOf(x), rowOf(row.rowIndex()), "  ", palette.flashStyle());
             }
         }
     }

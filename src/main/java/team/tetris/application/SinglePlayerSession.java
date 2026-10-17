@@ -1,5 +1,6 @@
 package team.tetris.application;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -9,6 +10,7 @@ import team.tetris.core.EnginePhase;
 import team.tetris.core.GameAction;
 import team.tetris.core.item.DoubleScoreItem;
 import team.tetris.core.port.TetrisEnginePort;
+import team.tetris.core.result.ClearedRow;
 import team.tetris.core.result.EngineStep;
 import team.tetris.core.result.ItemActivation;
 
@@ -17,6 +19,8 @@ public final class SinglePlayerSession implements GameSession {
     private static final int MAX_TICKS_PER_UPDATE = 5;
     /** 점수 2배 아이템({@code $}) 하나가 적용되는 줄 삭제 횟수. */
     public static final int DOUBLE_SCORE_CLEARS = 3;
+    /** 줄 삭제 애니메이션 시간. 이 동안 지운 줄이 반짝이고 블록은 내려오지 않는다. */
+    public static final long LINE_CLEAR_FLASH_NANOS = 300_000_000L;
 
     private final TetrisEnginePort engine;
     private final UUID gameId = UUID.randomUUID();
@@ -28,6 +32,8 @@ public final class SinglePlayerSession implements GameSession {
     private int level;
     private int clearedLines;
     private int doubleScoreClears;
+    private List<ClearedRow> clearingRows = List.of();
+    private long clearingNanos;
     private long gravityIntervalNanos;
     private long accumulatedNanos;
     private GameStatus status = GameStatus.RUNNING;
@@ -67,6 +73,8 @@ public final class SinglePlayerSession implements GameSession {
         if (result != null) {
             return;
         }
+        // 애니메이션 중에 들어온 명령은 버리지 않는다: 애니메이션을 끝내고 바로 처리한다.
+        endLineClear();
         if (command == GameCommand.QUIT_GAME) {
             finish(GameStatus.ABORTED);
             view = new GameSnapshot(view.engine(), score, level, clearedLines, gravityIntervalNanos, status, doubleScoreClears);
@@ -101,6 +109,15 @@ public final class SinglePlayerSession implements GameSession {
             throw new IllegalArgumentException("Elapsed time must be non-negative");
         }
         if (status != GameStatus.RUNNING || elapsedNanos == 0) {
+            return;
+        }
+        if (!clearingRows.isEmpty()) {
+            // 애니메이션 동안의 시간은 중력에 쓰지 않는다 (줄이 지워진 고정 직후라 쌓인 시간도 없다).
+            if (elapsedNanos < clearingNanos) {
+                clearingNanos -= elapsedNanos;
+            } else {
+                endLineClear();
+            }
             return;
         }
         long cap = gravityIntervalNanos > Long.MAX_VALUE / MAX_TICKS_PER_UPDATE
@@ -157,7 +174,22 @@ public final class SinglePlayerSession implements GameSession {
         if (status == GameStatus.GAME_OVER) {
             finish(status);
         }
-        view = new GameSnapshot(step.snapshot(), score, level, clearedLines, gravityIntervalNanos, status, doubleScoreClears);
+        if (lines > 0 && status == GameStatus.RUNNING) {
+            clearingRows = step.clearResult().clearedRows();
+            clearingNanos = LINE_CLEAR_FLASH_NANOS;
+        }
+        view = new GameSnapshot(step.snapshot(), score, level, clearedLines, gravityIntervalNanos, status,
+                doubleScoreClears, clearingRows);
+    }
+
+    /** 줄 삭제 애니메이션을 끝내고 화면을 실제 보드로 되돌린다. 애니메이션 중이 아니면 아무것도 하지 않는다. */
+    private void endLineClear() {
+        if (clearingRows.isEmpty()) {
+            return;
+        }
+        clearingRows = List.of();
+        clearingNanos = 0;
+        view = new GameSnapshot(view.engine(), score, level, clearedLines, gravityIntervalNanos, status, doubleScoreClears);
     }
 
     /**
@@ -199,5 +231,15 @@ public final class SinglePlayerSession implements GameSession {
     @Override
     public Optional<GameResult> result() {
         return Optional.ofNullable(result);
+    }
+
+    @Override
+    public GameMode mode() {
+        return mode;
+    }
+
+    @Override
+    public Difficulty difficulty() {
+        return difficulty;
     }
 }

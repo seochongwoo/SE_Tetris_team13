@@ -44,6 +44,7 @@ class SinglePlayerSessionTest {
         session.handle(GameCommand.HARD_DROP);
         assertEquals(53, session.snapshot().score());
         assertEquals(3, session.snapshot().level());
+        session.update(SinglePlayerSession.LINE_CLEAR_FLASH_NANOS); // 줄 삭제 애니메이션
         session.update(SECOND / 3 - 1);
         assertEquals(0, engine.ticks);
         session.update(1);
@@ -269,6 +270,7 @@ class SinglePlayerSessionTest {
         assertEquals(10, session.snapshot().clearedLines());
         assertEquals(1, session.snapshot().level());
         assertEquals(900_000_000, session.snapshot().gravityIntervalNanos());
+        session.update(SinglePlayerSession.LINE_CLEAR_FLASH_NANOS); // 줄 삭제 애니메이션
         session.update(899_999_999);
         assertEquals(0, engine.ticks);
         session.update(1);

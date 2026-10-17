@@ -3,6 +3,8 @@ package team.tetris.ui.render;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.awt.Color;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import team.tetris.application.GameCommand;
 import team.tetris.application.GameSnapshot;
@@ -18,6 +20,7 @@ import team.tetris.core.Shape;
 import team.tetris.core.TetrominoType;
 import team.tetris.core.item.Item;
 import team.tetris.core.item.ItemContext;
+import team.tetris.core.result.ClearedRow;
 import team.tetris.core.rule.PieceSource;
 import team.tetris.ui.TestApplication;
 import team.tetris.ui.input.InputMapper;
@@ -175,5 +178,55 @@ class TextRendererTest {
 
         assertTrue(renderer.render(doubled).text().contains("x2 (2)"));
         assertTrue(!renderer.render(plain).text().contains("x2 ("));
+    }
+
+    /** O 다섯 개로 맨 아래 두 줄을 채워 지운다 (O는 x=4~5에 스폰). */
+    private static SinglePlayerSession clearTwoRowsWithOs() {
+        SinglePlayerSession game = new SinglePlayerSession(new PlayerEngine(10, 20, TestApplication.constant(TetrominoType.O)));
+        for (int target : new int[] {0, 2, 4, 6, 8}) {
+            for (int i = 0; i < 5; i++) {
+                game.handle(GameCommand.MOVE_LEFT);
+            }
+            for (int i = 0; i < target; i++) {
+                game.handle(GameCommand.MOVE_RIGHT);
+            }
+            game.handle(GameCommand.HARD_DROP);
+        }
+        return game;
+    }
+
+    @Test
+    void clearedRowsFlashWhiteAndTheNewPieceWaitsUntilTheFlashEnds() {
+        SinglePlayerSession game = clearTwoRowsWithOs();
+        assertTrue(game.snapshot().isClearing());
+
+        TextFrame flashing = renderer.render(game.snapshot());
+
+        for (int x = 0; x < 10; x++) {
+            assertEquals(Color.WHITE, flashing.styleAt(TextRenderer.columnOf(x), TextRenderer.rowOf(19)).background());
+            assertEquals(Color.WHITE, flashing.styleAt(TextRenderer.columnOf(x), TextRenderer.rowOf(18)).background());
+        }
+        assertEquals('.', flashing.codePointAt(TextRenderer.columnOf(4) + 1, TextRenderer.rowOf(0)), "새 블록은 아직 안 보임");
+
+        game.update(SinglePlayerSession.LINE_CLEAR_FLASH_NANOS);
+        TextFrame after = renderer.render(game.snapshot());
+
+        assertEquals(palette.base().background(), after.styleAt(TextRenderer.columnOf(0), TextRenderer.rowOf(19)).background());
+        assertEquals('#', after.codePointAt(TextRenderer.columnOf(4), TextRenderer.rowOf(0)), "애니메이션 뒤 새 블록이 보임");
+    }
+
+    @Test
+    void theBoardBeforeTheClearIsRebuiltWithTheClearedRowsInTheirOriginalPlace() {
+        Cell top = Cell.occupiedBy(TetrominoType.I);
+        Cell cleared = Cell.occupiedBy(TetrominoType.O);
+        Cell bottom = Cell.occupiedBy(TetrominoType.T);
+        // 지우기 전: [I, O, T] → 가운데 줄(예: L 아이템)을 지운 뒤: [빈 줄, I, T]
+        Cell[][] after = {{Cell.EMPTY}, {top}, {bottom}};
+
+        Cell[][] before = TextRenderer.beforeClear(after, List.of(new ClearedRow(1, List.of(cleared))));
+
+        assertEquals(top, before[0][0]);
+        assertEquals(cleared, before[1][0]);
+        assertEquals(bottom, before[2][0]);
     }
 }

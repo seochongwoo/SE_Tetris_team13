@@ -363,4 +363,38 @@ class GameScreenTest {
 
         assertTrue(brokenRouter.render().text().contains("기본값으로 진행합니다"));
     }
+
+    @Test
+    void keysPressedDuringTheLineClearFlashWaitAndAreAppliedAfterIt() {
+        TestApplication squares = new TestApplication().withPieces(TetrominoType.O);
+        ScreenRouter squaresRouter = squares.router();
+        squaresRouter.startGame();
+        GameScreen game = (GameScreen) squaresRouter.current();
+        for (int target : new int[] {0, 2, 4, 6, 8}) { // O 다섯 개로 맨 아래 두 줄을 지움
+            for (int i = 0; i < 5; i++) game.session().handle(GameCommand.MOVE_LEFT);
+            for (int i = 0; i < target; i++) game.session().handle(GameCommand.MOVE_RIGHT);
+            game.session().handle(GameCommand.HARD_DROP);
+        }
+        assertTrue(game.session().snapshot().isClearing());
+        int x = origin(game).x();
+
+        TestApplication.tap(squaresRouter, "LEFT");
+        squaresRouter.update(FRAME);
+        assertEquals(x, origin(game).x(), "애니메이션 중에는 아직 움직이지 않음");
+        assertTrue(game.session().snapshot().isClearing());
+
+        for (int i = 0; i < 20 && game.session().snapshot().isClearing(); i++) {
+            squaresRouter.update(FRAME);
+        }
+        assertEquals(x - 1, origin(game).x(), "애니메이션이 끝나면 눌렀던 키가 처리됨");
+    }
+
+    @Test
+    void theGameScreenShowsTheModeAndDifficulty() {
+        assertEquals("일반 · NORMAL", start().modeLabel());
+        assertTrue(start().render().rowText(0).contains("일반 · NORMAL"));
+
+        router.startItemGame();
+        assertEquals("아이템 · NORMAL", ((GameScreen) router.current()).modeLabel());
+    }
 }

@@ -1,6 +1,8 @@
 package team.tetris.application;
 
 import java.util.Optional;
+import team.tetris.application.model.Difficulty;
+import team.tetris.application.model.GameMode;
 
 /**
  * 한 판의 입력과 시간 처리. 모든 메서드는 하나의 게임 루프 스레드에서 직렬 호출.
@@ -13,4 +15,14 @@ public interface GameSession {
 
     /** 진행 중에는 empty, 종료 후에는 한 번 확정된 동일 결과 반환. */
     Optional<GameResult> result();
+
+    /** 이 판의 모드. 시작할 때 정해져 바뀌지 않는다. */
+    default GameMode mode() {
+        return GameMode.NORMAL;
+    }
+
+    /** 이 판의 난이도. 시작할 때 정해져 바뀌지 않는다. */
+    default Difficulty difficulty() {
+        return Difficulty.NORMAL;
+    }
 }

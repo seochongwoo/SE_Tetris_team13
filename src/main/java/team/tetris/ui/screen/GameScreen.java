@@ -9,6 +9,7 @@ import team.tetris.application.GameSession;
 import team.tetris.application.GameSnapshot;
 import team.tetris.application.GameStatus;
 import team.tetris.application.StartedGame;
+import team.tetris.application.model.GameMode;
 import team.tetris.application.model.Settings;
 import team.tetris.ui.ScreenRouter;
 import team.tetris.ui.input.InputMapper;
@@ -166,11 +167,16 @@ public final class GameScreen implements Screen {
         clockNanos += elapsedNanos;
         session.update(elapsedNanos);
         if (session.snapshot().status() == GameStatus.RUNNING) {
+            boolean clearing = session.snapshot().isClearing();
             for (String key : repeats.due(clockNanos)) {
-                keys.commandFor(key, GameStatus.RUNNING).filter(InputMapper::isRepeatable).ifPresent(pending::add);
+                // 줄 삭제 애니메이션 동안의 키 반복은 버린다. 쌓아 두면 끝나는 순간 한꺼번에 움직인다.
+                if (!clearing) {
+                    keys.commandFor(key, GameStatus.RUNNING).filter(InputMapper::isRepeatable).ifPresent(pending::add);
+                }
             }
         }
-        while (!pending.isEmpty()) {
+        // 애니메이션 동안 누른 키는 버리지 않고 기다렸다가 끝난 뒤 순서대로 처리한다.
+        while (!pending.isEmpty() && !session.snapshot().isClearing()) {
             session.handle(pending.poll());
         }
         if (session.snapshot().status() != GameStatus.PAUSED) {
@@ -196,6 +202,7 @@ public final class GameScreen implements Screen {
     public TextFrame render() {
         GameSnapshot snapshot = session.snapshot();
         TextFrame frame = renderer.render(snapshot);
+        frame.put(TextRenderer.PANEL_LEFT, 0, modeLabel(), palette.dimStyle());
         if (settingsWarning != null) {
             frame.put(1, TextFrame.ROWS - 1, settingsWarning, palette.warningStyle());
         }
@@ -205,6 +212,11 @@ public final class GameScreen implements Screen {
             drawGameOver(frame, snapshot.score());
         }
         return frame;
+    }
+
+    /** 화면 위쪽에 표시하는 이 판의 모드와 난이도. 예: "아이템 · HARD". */
+    String modeLabel() {
+        return (session.mode() == GameMode.ITEM ? "아이템" : "일반") + " · " + session.difficulty().name();
     }
 
     private void drawPauseMenu(TextFrame frame) {

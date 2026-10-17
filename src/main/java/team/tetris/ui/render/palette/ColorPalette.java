@@ -106,6 +106,11 @@ public record ColorPalette(
         return shape instanceof TetrominoType type ? block(type) : text;
     }
 
+    /** 줄 삭제 애니메이션에서 지워지는 줄: 흰색으로 칠한다. */
+    public TextStyle flashStyle() {
+        return new TextStyle(background, Color.WHITE, true);
+    }
+
     /** 선택된 항목처럼 강조할 줄: 배경을 칠하고 글자는 배경색으로 반전. */
     public TextStyle highlightStyle() {
         return new TextStyle(background, highlight, true);
