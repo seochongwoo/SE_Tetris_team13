@@ -330,6 +330,31 @@ PlayerEngine.lockActivePieceAndSpawnNext
 
 테스트: `ChainClearItemTest`, `BombItemTest`, `DoubleScoreTest`, `TeamItemsInEngineTest`
 
+### R2-16 무게추 `W`
+
+```
+아이템 차례 → ItemPieceSource.draw → core/item/WeightBlock.toItemPiece
+  → 너비 4칸 모양(WeightBlock.SHAPE, 회전 상태 1개)의 모든 칸에 WeightItem(DrillingItem)
+PlayerEngine.spawnNext: sidewaysLocked = false
+좌우 이동 → tryShift: sidewaysLocked면 무시
+아래로 (tick, SOFT_DROP) → descendOrLock
+  내려갈 수 있음  → 한 칸 이동, dropResult = null (관통 블록은 점수 없음)
+  막힘           → drillOneRow: sidewaysLocked = true, 한 칸 아래 자리의 칸을 Board.removeCell로 지우고 이동
+                   한 칸 아래가 보드 밖(바닥)이면 → lockActivePieceAndSpawnNext
+한 번에 떨어뜨리기 → hardDrop → drillToFloor: 내려가기·뚫기를 반복해 바닥에서 고정, dropResult = null
+고정 → 일반 고정 처리 (WeightItem.onLock은 효과 없음, 아이템 표시가 지워져 일반 칸으로 남음, 꽉 찬 줄은 삭제)
+```
+
+| 요구사항 | 코드 |
+| --- | --- |
+| 너비 4칸, 회전 불가 | `WeightBlock.SHAPE`(위 2칸, 아래 4칸), `rotationStates() == 1` → `RotationSystem`이 회전 거부 |
+| 처음 닿으면 좌우 잠금 | `PlayerEngine.drillOneRow`가 `sidewaysLocked = true`, `tryShift`가 무시 |
+| 아래 블록을 모두 지우며 내려감 | `drillOneRow`: 다음 자리의 칸을 `Board.removeCell` |
+| 점수 없음 | 관통 블록의 하강은 `dropResult = null` → `SinglePlayerSession`이 0점 |
+| 확장 지점 | `core/item/DrillingItem`: 이 인터페이스를 구현한 아이템이 실린 블록은 같은 규칙으로 움직임 |
+
+테스트: `WeightInEngineTest`(접촉 전 이동·회전 불가, 접촉 후 좌우 무시, 아래 블록 삭제와 폭 밖 블록 유지, 바닥 고정, 점수 보고 없음, 고정 후 줄 삭제), `WeightScoreTest`(세션 점수 0), `ItemCatalogTest`
+
 ### R2-18 아이템을 추가하기 쉬운 구조
 
 새 아이템은 아래 두 곳만 고치면 게임에 나옵니다.
@@ -349,5 +374,4 @@ PlayerEngine.lockActivePieceAndSpawnNext
 | 요구사항 | 이미 있는 것 | 추가할 곳 |
 | --- | --- | --- |
 | R2-15 줄 삭제 `L` | `ItemContext.clearRow`, 줄 일괄 삭제, 점수·10줄 카운트 연결 | `core/item/LineClearItem`(`onLock`에서 `clearRow(position.y())`) + `ItemCatalog`에 `new AttachedItem(new LineClearItem())` |
-| R2-16 무게추 | 4칸 너비 모양을 표현할 `Shape`, 회전 금지(`rotationStates() == 1`), 블록 대체(`ItemKind`) | 무게추 `Shape`와 `ItemKind`, `PlayerEngine`에 "닿은 뒤 좌우 이동 금지"와 "떨어지며 아래 칸 삭제" 처리, 무게추 점수 0 처리 |
 | R2-06 줄 삭제 애니메이션 | `ClearResult`의 `ClearedRow.cells()`(지워지기 직전 칸 내용) | 세션 또는 `GameScreen`에서 연출 시간 동안 대기하며 지운 줄을 반짝이게 그리기 (`TextRenderer`) |

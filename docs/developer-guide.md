@@ -401,6 +401,7 @@ lineBonus = 100 × clearedLinesInThisStep²
 - 아이템 공급: `core.rule.PieceSource`를 구현해 `PlayerEngine(width, height, source)`에 전달합니다. 블록 모양은 기존처럼 `PieceGenerator`가 정하고, 아이템을 실을지는 공급자가 정합니다. 줄이 지워지면 다음 블록을 꺼내기 전에 `onLinesCleared(lines)`가 호출되므로 "10줄마다 아이템"을 바로 미리보기에 반영할 수 있습니다. 일반 모드는 `PlainPieceSource`를, 아이템 모드는 이를 감싼 `ItemPieceSource`를 씁니다. `ItemPieceSource`는 게임 전체 누적 삭제 줄 수가 10의 배수를 넘을 때마다 다음에 새로 나타나는 미리보기 블록에 아이템을 싣습니다.
 - 새 아이템 등록: `core.item.Item`을 구현하고 `core.item.ItemCatalog.all()`에 한 줄을 추가합니다. 블록의 한 칸에 붙는 아이템은 `new AttachedItem(item)`(무작위 칸), 블록 자체가 아이템이면 `ItemKind`를 직접 구현해 자기 모양의 블록을 돌려줍니다(1칸짜리 블록은 `new SoloBlock(item)`). 아이템이 나올 차례에는 목록에서 균등 확률로 하나를 고르며, 목록이 비어 있으면 아이템 없이 진행합니다.
 - 등록된 아이템: 연쇄 삭제 `C`(`ChainClearItem`, 블록의 한 칸), 폭탄 `B`(`BombItem`, 1칸 블록), 점수 2배 `$`(`DoubleScoreItem`, 블록의 한 칸). `$`는 보드 효과가 없고, `SinglePlayerSession`이 `itemActivations()`에서 이 아이템을 보면 그 고정부터 줄을 지운 동작 3번(`DOUBLE_SCORE_CLEARS`)의 점수를 2배로 계산합니다. 남은 횟수는 `GameSnapshot.doubleScoreClears()`로 화면에 표시합니다.
+- 무게추 `W`(`WeightBlock`, 너비 4칸 블록): 모든 칸에 `WeightItem`이 실립니다. `WeightItem`은 `DrillingItem`이라, `PlayerEngine`이 이 블록을 바닥이나 다른 블록에 처음 닿으면 좌우 이동을 잠그고, 들어갈 자리의 블록을 지우며 한 칸씩 내려 보드 바닥에서 고정합니다. 이 블록의 낙하는 `dropResult`를 null로 보고해 점수가 없습니다. 떨어지는 동안 효과를 내는 새 아이템은 `DrillingItem`을 구현하면 같은 규칙으로 움직입니다.
 - 저장 방식: `SettingsRepository` 또는 `ScoreRepository`를 구현해 서비스 생성자에 전달합니다. 앱 전체에 적용하려면 bootstrap 조립도 변경합니다. 테스트용 메모리 구현은 `storage.memory`에 있습니다.
 - 순위 정책: `ScoreboardService(repository, policy, clock)`으로 보관 개수·이름 제한 등을 주입합니다. 현재 종료 조율자는 ABORTED를 항상 메뉴로 보내므로, 중도 종료 등록 정책을 바꿀 경우 종료 흐름도 함께 검토해야 합니다.
 

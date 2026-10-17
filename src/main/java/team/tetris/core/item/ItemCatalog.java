@@ -16,6 +16,7 @@ public final class ItemCatalog {
         return List.of(
                 new AttachedItem(new ChainClearItem()),
                 new SoloBlock(new BombItem()),
-                new AttachedItem(new DoubleScoreItem()));
+                new AttachedItem(new DoubleScoreItem()),
+                new WeightBlock());
     }
 }

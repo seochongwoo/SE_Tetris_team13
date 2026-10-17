@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
+import team.tetris.core.item.DrillingItem;
 import team.tetris.core.item.Item;
 import team.tetris.core.item.ItemContext;
 import team.tetris.core.port.TetrisEnginePort;
@@ -32,6 +33,10 @@ import team.tetris.core.rule.RotationSystem;
  *
  * <p>블록이 고정되면 다음 순서로 처리한다: 보드에 기록 → 아이템이 실린 칸마다 아이템 효과 →
  * 꽉 찬 줄과 아이템이 지정한 줄을 한 번에 삭제 → 공급자에 지운 줄 수 알림 → 다음 블록 스폰.
+ *
+ * <p>{@link DrillingItem}(무게추 등)이 실린 블록은 바닥이나 다른 블록에 처음 닿으면 좌우 이동이
+ * 잠기고, 그 뒤로 아래 칸을 지우며 보드 바닥까지 내려가 고정된다. 이 블록의 낙하는 점수로 보고하지
+ * 않는다.
  */
 public final class PlayerEngine implements TetrisEnginePort {
 
@@ -41,6 +46,8 @@ public final class PlayerEngine implements TetrisEnginePort {
 
     private ActivePiece activePiece;
     private EnginePhase phase = EnginePhase.READY;
+    /** 관통 블록이 바닥이나 다른 블록에 한 번 닿아 좌우로 움직일 수 없는 상태. 새 블록마다 초기화. */
+    private boolean sidewaysLocked;
 
     public PlayerEngine(int width, int height, PieceSource source) {
         this.board = new Board(width, height);
@@ -103,6 +110,9 @@ public final class PlayerEngine implements TetrisEnginePort {
     }
 
     private EngineStep tryShift(int dx, int dy) {
+        if (sidewaysLocked && dx != 0) {
+            return noEvent();
+        }
         Position moved = activePiece.origin().translate(dx, dy);
         if (board.canPlace(activePiece.shape(), activePiece.rotation(), moved)) {
             activePiece = activePiece.movedTo(moved);
@@ -125,15 +135,22 @@ public final class PlayerEngine implements TetrisEnginePort {
      * tick()과 SOFT_DROP이 이 동작을 공유한다.
      */
     private EngineStep descendOrLock() {
+        boolean drilling = isDrilling(activePiece);
         Position lowered = activePiece.origin().translate(0, 1);
         if (board.canPlace(activePiece.shape(), activePiece.rotation(), lowered)) {
             activePiece = activePiece.movedTo(lowered);
-            return new EngineStep(snapshot(), new DropResult(1), null, null);
+            return new EngineStep(snapshot(), drilling ? null : new DropResult(1), null, null);
+        }
+        if (drilling && drillOneRow()) {
+            return noEvent();
         }
         return lockActivePieceAndSpawnNext(null);
     }
 
     private EngineStep hardDrop() {
+        if (isDrilling(activePiece)) {
+            return drillToFloor();
+        }
         Position position = activePiece.origin();
         int cellsDropped = 0;
         while (board.canPlace(activePiece.shape(), activePiece.rotation(), position.translate(0, 1))) {
@@ -142,6 +159,46 @@ public final class PlayerEngine implements TetrisEnginePort {
         }
         activePiece = activePiece.movedTo(position);
         return lockActivePieceAndSpawnNext(new DropResult(cellsDropped));
+    }
+
+    /** 관통 블록을 막힘 없이 내려가고, 막히면 아래 칸을 지우며 바닥까지 내려간 뒤 고정한다. */
+    private EngineStep drillToFloor() {
+        while (true) {
+            Position lowered = activePiece.origin().translate(0, 1);
+            if (board.canPlace(activePiece.shape(), activePiece.rotation(), lowered)) {
+                activePiece = activePiece.movedTo(lowered);
+            } else if (!drillOneRow()) {
+                return lockActivePieceAndSpawnNext(null);
+            }
+        }
+    }
+
+    /**
+     * 막힌 관통 블록을 한 칸 내린다: 좌우 이동을 잠그고, 한 칸 아래 자리에 있는 블록을 지운 뒤 그 자리로
+     * 옮긴다. 한 칸 아래가 보드 바닥 밖이면 아무것도 하지 않고 false를 반환한다(고정할 차례).
+     */
+    private boolean drillOneRow() {
+        sidewaysLocked = true;
+        ActivePiece lowered = activePiece.movedTo(activePiece.origin().translate(0, 1));
+        for (Position cell : lowered.cells()) {
+            if (cell.x() < 0 || cell.x() >= board.width() || cell.y() >= board.height()) {
+                return false;
+            }
+        }
+        for (Position cell : lowered.cells()) {
+            board.removeCell(cell);
+        }
+        activePiece = lowered;
+        return true;
+    }
+
+    private static boolean isDrilling(ActivePiece piece) {
+        for (Item item : piece.piece().items().values()) {
+            if (item instanceof DrillingItem) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private EngineStep lockActivePieceAndSpawnNext(DropResult dropResult) {
@@ -189,6 +246,7 @@ public final class PlayerEngine implements TetrisEnginePort {
      * 공간이 없으면) GAME_OVER로 전환한다.
      */
     private void spawnNext() {
+        sidewaysLocked = false;
         Piece piece = source.next();
         Position origin = spawnOrigin(piece.shape());
         if (board.canPlace(piece.shape(), 0, origin)) {

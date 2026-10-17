@@ -21,7 +21,8 @@ class ItemCatalogTest {
         for (ItemKind kind : ItemCatalog.all()) {
             Piece piece = kind.toItemPiece(Piece.of(TetrominoType.L), random);
             assertTrue(piece.hasItems(), kind + " must produce an item piece");
-            piece.items().values().forEach(item -> symbols.add(item.symbol()));
+            // 무게추처럼 여러 칸에 같은 아이템이 실린 블록도 아이템 하나로 센다.
+            piece.items().values().stream().map(Item::symbol).distinct().forEach(symbols::add);
         }
         return symbols;
     }
@@ -32,6 +33,6 @@ class ItemCatalogTest {
 
         assertEquals(ItemCatalog.all().size(), symbols.size());
         assertEquals(symbols.size(), new HashSet<>(symbols).size(), "아이템마다 다른 문자");
-        assertTrue(symbols.containsAll(Set.of('C', 'B', '$')));
+        assertTrue(symbols.containsAll(Set.of('C', 'B', '$', 'W')));
     }
 }
