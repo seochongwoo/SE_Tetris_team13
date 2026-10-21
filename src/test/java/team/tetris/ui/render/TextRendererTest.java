@@ -236,16 +236,32 @@ class TextRendererTest {
                 SinglePlayerSession game = new SinglePlayerSession(new PlayerEngine(10, 20, source));
                 TextFrame frame = itemRenderer.render(game.snapshot());
                 Position position = game.snapshot().engine().activePiece().cells()[0];
-                char symbol = piece.itemAt(0).symbol();
+                boolean weight = piece.shape() == WeightBlock.SHAPE;
+                char symbol = weight ? '@' : piece.itemAt(0).symbol();
                 assertEquals(symbol, frame.codePointAt(TextRenderer.columnOf(position.x()),
                         TextRenderer.rowOf(position.y())));
-                assertEquals(colors.itemStyle(piece.shape()), frame.styleAt(
+                assertEquals(weight ? colors.blockStyle(piece.shape()) : colors.itemStyle(piece.shape()), frame.styleAt(
                         TextRenderer.columnOf(position.x()), TextRenderer.rowOf(position.y())));
                 boolean previewHasSymbol = false;
                 for (int row = TextRenderer.NEXT_TITLE_ROW + 2; row < TextRenderer.NEXT_TITLE_ROW + 6; row++) {
                     previewHasSymbol |= panelText(frame, row).contains("" + symbol);
                 }
                 assertTrue(previewHasSymbol);
+                if (weight) {
+                    assertTrue(!frame.text().contains("W"));
+                    for (Position cell : game.snapshot().engine().activePiece().cells()) {
+                        for (int offset = 0; offset < TextRenderer.CELL_WIDTH; offset++) {
+                            assertEquals('@', frame.codePointAt(TextRenderer.columnOf(cell.x()) + offset, TextRenderer.rowOf(cell.y())));
+                            assertEquals(colors.blockStyle(piece.shape()), frame.styleAt(
+                                    TextRenderer.columnOf(cell.x()) + offset, TextRenderer.rowOf(cell.y())));
+                        }
+                    }
+                    game.handle(GameCommand.HARD_DROP);
+                    TextFrame locked = itemRenderer.render(game.snapshot());
+                    assertTrue(!locked.text().contains("W"));
+                    assertEquals('@', locked.codePointAt(TextRenderer.columnOf(4), TextRenderer.rowOf(18)));
+                    assertEquals('@', locked.codePointAt(TextRenderer.columnOf(3), TextRenderer.rowOf(19)));
+                }
             }
         }
     }

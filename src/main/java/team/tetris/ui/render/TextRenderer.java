@@ -16,6 +16,7 @@ import team.tetris.core.Piece;
 import team.tetris.core.Position;
 import team.tetris.core.Shape;
 import team.tetris.core.item.Item;
+import team.tetris.core.item.WeightBlock;
 import team.tetris.core.rule.HardDropPreview;
 import team.tetris.ui.input.InputMapper;
 import team.tetris.ui.input.KeyNames;
@@ -249,7 +250,7 @@ public final class TextRenderer implements Renderer {
     }
 
     private void drawCell(TextFrame frame, int col, int row, Shape shape, Item item) {
-        if (item != null) {
+        if (item != null && !(item instanceof WeightBlock)) {
             frame.put(col, row, BlockGlyphs.of(item), palette.itemStyle(shape));
         } else {
             frame.put(col, row, BlockGlyphs.of(shape), palette.blockStyle(shape));

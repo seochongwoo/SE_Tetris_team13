@@ -4,6 +4,7 @@ import team.tetris.core.Shape;
 import team.tetris.core.TemporaryBlock;
 import team.tetris.core.TetrominoType;
 import team.tetris.core.item.Item;
+import team.tetris.core.item.WeightBlock;
 
 /**
  * 블록 한 칸을 그리는 두 글자 무늬. 색을 구분하기 어려워도 모양과 무늬만으로 블록을 알아볼 수
@@ -44,6 +45,7 @@ public final class BlockGlyphs {
 
     /** 아이템이 실린 칸: 아이템 문자 한 글자와 공백. {@code ColorPalette.itemStyle}과 함께 쓴다. */
     public static String of(Item item) {
+        if (item instanceof WeightBlock) return SPECIAL;
         return item.symbol() + " ";
     }
 }

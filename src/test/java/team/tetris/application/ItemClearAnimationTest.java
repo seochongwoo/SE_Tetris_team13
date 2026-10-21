@@ -75,6 +75,51 @@ class ItemClearAnimationTest {
         assertEquals(TetrominoType.T, game.snapshot().engine().board()[19][6].occupiedBy());
     }
 
+    @ParameterizedTest @ValueSource(booleans = {false, true})
+    void descendingWeightDeletesCellsImmediatelyAndKeepsMoving(boolean gravity) {
+        Cell[][] board = new Board(10, 20).snapshot();
+        for (int x = 3; x <= 6; x++) board[12][x] = Cell.occupiedBy(TetrominoType.J);
+        var game = game(board, new WeightBlock().toItemPiece(null, null), new Position(3, 10));
+        if (gravity) game.update(game.snapshot().gravityIntervalNanos());
+        else game.handle(GameCommand.SOFT_DROP);
+        assertNull(game.snapshot().lineClearAnimation());
+        assertEquals(new Position(3, 11), game.snapshot().engine().activePiece().origin());
+        for (int x = 3; x <= 6; x++) assertTrue(game.snapshot().engine().board()[12][x].isEmpty());
+        assertEquals(0, game.snapshot().score());
+        game.handle(GameCommand.SOFT_DROP);
+        assertEquals(new Position(3, 12), game.snapshot().engine().activePiece().origin());
+        assertNull(game.snapshot().lineClearAnimation());
+    }
+
+    @ParameterizedTest @ValueSource(booleans = {false, true})
+    void weightHardDropAnimatesOnlyCompletedRows(boolean clearsRow) {
+        Cell[][] board = new Board(10, 20).snapshot();
+        board[12][3] = Cell.occupiedBy(TetrominoType.J);
+        board[16][6] = Cell.occupiedBy(TetrominoType.Z);
+        board[19][3] = Cell.occupiedBy(TetrominoType.T);
+        if (clearsRow) {
+            for (int x : new int[]{0, 1, 2, 7, 8, 9}) board[19][x] = Cell.occupiedBy(TetrominoType.O);
+        }
+        var game = game(board, new WeightBlock().toItemPiece(null, null), new Position(3, 10));
+        game.handle(GameCommand.HARD_DROP);
+        var first = game.snapshot();
+        assertEquals(clearsRow ? 100 : 0, first.score());
+        assertEquals(clearsRow ? 1 : 0, first.clearedLines());
+        if (clearsRow) {
+            assertEquals(1, first.lineClearAnimation().rows().size());
+            assertTrue(first.lineClearAnimation().removedCells().isEmpty());
+            Cell[][] restored = first.lineClearAnimation().boardBeforeClear(first.engine().board());
+            assertTrue(restored[12][3].isEmpty());
+            assertTrue(restored[16][6].isEmpty());
+            assertEquals(WeightBlock.SHAPE, restored[19][3].occupiedBy());
+            game.update(LineClearAnimation.DURATION_NANOS);
+        }
+        assertNull(game.snapshot().lineClearAnimation());
+        assertEquals(WeightBlock.SHAPE, game.snapshot().engine().board()[19][4].occupiedBy());
+        game.handle(GameCommand.SOFT_DROP);
+        assertEquals(first.score() + 1, game.snapshot().score());
+    }
+
     @Test void doubleScoreWithoutDeletionHasNoAnimation() {
         var game = game(new Board(10, 20).snapshot(),
                 Piece.of(TetrominoType.O).withItem(0, new DoubleScoreItem()), new Position(3, 18));

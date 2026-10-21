@@ -14,6 +14,7 @@ import team.tetris.core.item.WeightBlock;
 import team.tetris.core.port.TetrisEnginePort;
 import team.tetris.core.result.EngineStep;
 import team.tetris.core.result.ItemActivation;
+import team.tetris.core.result.RemovedCell;
 
 /** 코어 호출과 시간·점수·한 판의 수명 관리. 하나의 실행 흐름에서 호출 필요. */
 public final class SinglePlayerSession implements GameSession {
@@ -150,8 +151,9 @@ public final class SinglePlayerSession implements GameSession {
     private void accept(EngineStep step, int levelBeforeStep) {
         int distance = step.dropResult() == null ? 0 : step.dropResult().cellsDropped();
         // 고정 결과에는 다음 블록이 이미 스폰돼 있으므로 동작 전 블록으로 판정한다.
-        if (view.engine().activePiece() != null
-                && view.engine().activePiece().shape() == WeightBlock.SHAPE) {
+        boolean weight = view.engine().activePiece() != null
+                && view.engine().activePiece().shape() == WeightBlock.SHAPE;
+        if (weight) {
             distance = 0;
         }
         int lines = step.clearResult() == null ? 0 : step.clearResult().lineCount();
@@ -185,9 +187,11 @@ public final class SinglePlayerSession implements GameSession {
         if (step.lockResult() != null || status != GameStatus.RUNNING) {
             accumulatedNanos = 0;
         }
-        if (lines > 0 || !step.removedCells().isEmpty()) {
+        // 무게추가 부순 칸은 즉시 사라진다. 고정 후 완성된 줄은 일반 줄 삭제로 연출한다.
+        List<RemovedCell> animatedCells = weight ? List.of() : step.removedCells();
+        if (lines > 0 || !animatedCells.isEmpty()) {
             lineClearAnimation = new LineClearAnimation(
-                    lines > 0 ? step.clearResult().clearedRows() : List.of(), step.removedCells(),
+                    lines > 0 ? step.clearResult().clearedRows() : List.of(), animatedCells,
                     step.lockResult() == null ? view.engine().activePiece() : null, 0);
             accumulatedNanos = 0;
             // 다음 스폰이 실패했어도 삭제 연출을 마친 뒤 게임 종료를 알린다.
