@@ -89,7 +89,7 @@ GameScreen.update(경과 시간)
 | 줄 삭제 | `PlayerEngine.lockActivePieceAndSpawnNext` → `Board.clearRows`: 꽉 찬 줄 삭제 후 위 줄을 내림 |
 | 화면 구성 | `ui/render/TextRenderer.render`: `drawBoard`(보드), `drawActivePiece`(떨어지는 블록), `drawNext`(NEXT), `drawStats`(모드·난이도·SCORE·LEVEL·LINES), `drawHelp`(키 안내) |
 
-`GameSnapshot.mode()`·`difficulty()`는 게임 시작 시 확정한 분류를 전달하고, `drawStats`는 NEXT 아래·SCORE 위에 `일반 / EASY`처럼 표시합니다. 보드 빈 칸은 `BlockGlyphs.EMPTY`의 전각 가운뎃점(`・`)이며, `TextFramePanel`이 실제 글자 영역을 기준으로 칸 중앙에 그립니다.
+`GameSnapshot.mode()`·`difficulty()`는 게임 시작 시 확정한 분류를 전달하고, `drawStats`는 NEXT 위에 `일반 / EASY`처럼 표시합니다. 보드 빈 칸은 `BlockGlyphs.EMPTY`의 전각 가운뎃점(`・`)이며, `TextFramePanel`이 실제 글자 영역을 기준으로 칸 중앙에 그립니다.
 
 테스트: `BoardTest`, `PlayerEngineTest`, `TetrominoTypeTest`, `TextRendererTest`, `TextFramePanelTest`
 
@@ -359,6 +359,8 @@ PlayerEngine.lockActivePieceAndSpawnNext
 
 `Board.clearRows` → `ClearResult.clearedRows()` → `SinglePlayerSession.accept`에서 점수 반영·`LineClearAnimation` 시작 → `GameSnapshot.lineClearAnimation()` → `TextRenderer.render`.
 
-렌더러는 압축된 보드와 `ClearedRow.cells()`로 삭제 전 행 위치를 복원합니다. 삭제 행 전체를 150ms 흰색으로 강조하고 150ms 비운 뒤 압축된 보드·다음 활성 블록을 표시합니다. `SinglePlayerSession.update`가 연출 시간을 진행하며 그동안 이동·회전·드롭·중력은 차단합니다. 일시정지는 연출도 멈추고, 스폰 실패에 따른 종료 결과는 연출 뒤 확정합니다. `GameScreen`은 연출 중 키 입력을 버리고 반복을 소비합니다.
+렌더러는 압축된 보드와 `ClearedRow.cells()`로 삭제 전 행 위치를 복원합니다. 삭제 행 전체를 60ms 흰색으로 강조하고 240ms 동안 가운데부터 양쪽 끝으로 지운 뒤 압축된 보드·다음 활성 블록을 표시합니다. `SinglePlayerSession.update`가 연출 시간을 진행하며 그동안 이동·회전·드롭·중력은 차단합니다. 일시정지는 연출도 멈추고, 스폰 실패에 따른 종료 결과는 연출 뒤 확정합니다. `GameScreen`은 연출 중 키 입력을 버리고 반복을 소비합니다.
 
-테스트: `LineClearAnimationTest`, `LineClearRenderingTest`, `GameScreenTest`.
+아이템의 `LockContext.removeCell`과 낙하 전후 비교(`PlayerEngine.removedSince`) → `EngineStep.removedCells()`도 같은 연출에 합쳐집니다. 실제로 지운 칸만 강조하고 각 행의 삭제 범위 중앙부터 지웁니다. 개별 칸 삭제에는 점수·줄 수 증가나 위 칸 하강이 없습니다. 무게추의 낙하 중 삭제는 이전 활성 블록을 유지하고, 하드 드롭 경로의 삭제는 한 번에 연출합니다.
+
+테스트: `LineClearAnimationTest`, `ItemClearAnimationTest`, `LineClearRenderingTest`, `GameScreenTest`.

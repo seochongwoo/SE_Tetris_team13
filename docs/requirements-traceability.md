@@ -64,7 +64,7 @@
 | R2-03 | 줄 삭제에 따른 속도 증가가 easy 20% 덜, hard 20% 더 (p3) | `SpeedPolicy(Difficulty)` (레벨당 80/100/120ms) | `SpeedPolicyTest` | ✅ |
 | R2-04 | 난이도별 추가 규칙·점수 자유 (p3) | 추가 점수 배율 없음으로 결정 | - | ✅ |
 | R2-05 | 스코어보드에서 난이도 구분 (p3) | `ScoreboardService.list(mode, difficulty)`, `ScoreboardScreen` (←→) | `ScoreboardScreenTest`, `PersistenceServicesTest` | ✅ |
-| R2-06 | 줄 삭제 애니메이션 (p3) | `SinglePlayerSession`, `LineClearAnimation`, `TextRenderer`: 150ms 흰색 강조·150ms 사라짐 후 압축 표시 | `LineClearAnimationTest`, `LineClearRenderingTest`, `GameScreenTest` | ✅ 로컬 구현·검증, 카드 12 리뷰·머지 대기 |
+| R2-06 | 줄 삭제 애니메이션 (p3) | `SinglePlayerSession`, `LineClearAnimation`, `TextRenderer`: 60ms 흰색 강조·240ms 중앙부터 양쪽으로 삭제 후 압축 표시 | `LineClearAnimationTest`, `LineClearRenderingTest`, `GameScreenTest` | ✅ 로컬 구현·검증, 카드 12 리뷰·머지 대기 |
 
 ### 확률에 따른 블록 생성
 

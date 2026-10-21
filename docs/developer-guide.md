@@ -141,7 +141,7 @@ public record GameSnapshot(
 
 ### 게임 화면 표시
 
-`TextRenderer.drawStats`는 NEXT 아래, SCORE 위에 현재 판의 모드와 난이도를 `일반 / EASY`, `아이템 / HARD` 형식으로 표시합니다. `GameSnapshot.mode()`와 `difficulty()`를 사용하므로 일시정지·종료 상태에도 같은 분류를 유지합니다.
+`TextRenderer.drawStats`는 NEXT 위에 현재 판의 모드와 난이도를 `일반 / EASY`, `아이템 / HARD` 형식으로 표시합니다. `GameSnapshot.mode()`와 `difficulty()`를 사용하므로 일시정지·종료 상태에도 같은 분류를 유지합니다.
 
 보드의 빈 칸은 `BlockGlyphs.EMPTY`의 전각 가운뎃점(`・`)으로 표시합니다. `TextFramePanel`은 글자의 실제 그려지는 영역을 기준으로 두 글자 폭의 보드 칸 중앙에 배치하며, 화면 크기와 HiDPI 배율이 바뀌어도 중앙 정렬을 유지합니다.
 
@@ -398,17 +398,19 @@ lineBonus = 100 × clearedLinesInThisStep²
 3. `dropResult`가 없으면 하강 거리를 0, `clearResult`가 없으면 삭제 줄 수를 0으로 읽는다. 결과 객체가 있어도 값은 0일 수 있다.
 4. 직전 레벨로 이번 획득 점수를 계산하여 정확히 한 번 더한다.
 5. 누적 삭제 줄 수를 갱신하고 다음 동작에 적용할 레벨·주기를 계산한다.
-6. 코어 phase를 반영한다. 줄 삭제가 있으면 삭제 연출을 시작하고, 다음 스폰 실패로 인한 게임 종료 결과는 연출이 끝난 뒤 확정한다. 마지막 동작의 점수는 연출 시작 전에 반영한다.
+6. 코어 phase를 반영한다. 줄 삭제나 아이템에 의한 칸 삭제가 있으면 삭제 연출을 시작하고, 다음 스폰 실패로 인한 게임 종료 결과는 연출이 끝난 뒤 확정한다. 마지막 동작의 점수는 연출 시작 전에 반영한다.
 
 예: 누적 9줄·레벨 0에서 하드드롭으로 3칸 하강하고 1줄을 지우면 3+100점을 얻는다. 이후 누적 10줄·레벨 1·900ms 주기가 적용된다.
 
 정지·재개는 코어에도 PAUSE/RESUME을 전달하여 세션과 엔진 상태를 맞춘다. ABORTED는 세션 상태이며 이후 엔진 호출을 차단한다.
 
-### 줄 삭제 연출 (카드 12)
+### 줄·아이템 삭제 연출 (카드 12)
 
-`SinglePlayerSession`은 줄을 지운 결과를 받으면 `GameSnapshot.lineClearAnimation()`에 삭제 행과 경과 시간을 전달합니다. `TextRenderer`는 `LineClearAnimation.boardBeforeClear`로 압축 전 위치를 복원해 150ms 동안 줄 전체를 흰색으로 강조하고, 150ms 동안 해당 줄을 비운 뒤 압축된 보드와 다음 블록을 표시합니다. 일반 삭제와 `L` 아이템으로 지운 미완성 줄에 같은 연출을 적용합니다. 칸만 지우는 폭탄·연쇄·무게추 효과 자체에는 적용하지 않습니다.
+`SinglePlayerSession`은 줄 또는 칸을 지운 결과를 받으면 `GameSnapshot.lineClearAnimation()`에 삭제 행, 개별 삭제 칸과 경과 시간을 전달합니다. `TextRenderer`는 `LineClearAnimation.boardBeforeClear`로 삭제 전 위치와 내용을 복원해 60ms 동안 삭제 대상을 흰색으로 강조하고, 240ms 동안 각 행의 삭제 범위 중앙부터 양쪽 끝으로 지웁니다. 일반 줄 삭제, `L` 아이템, 폭탄·연쇄·무게추에 같은 연출을 적용합니다. 아이템은 실제로 지운 칸만 강조하며 주변 칸과 범위 안의 빈 칸은 그대로 둡니다. 줄 삭제와 개별 칸 삭제가 함께 발생하면 한 번의 300ms 연출로 합칩니다.
 
 실제 엔진은 고정 시점에 삭제·압축·다음 스폰을 끝냅니다. 점수·줄 수·아이템 공급은 그때 한 번만 처리하며, 연출 동안 세션이 이동·회전·드롭·중력 호출을 막습니다. 화면에서는 다음 활성 블록을 숨깁니다. 연출을 넘긴 경과 시간은 버리고 다음 블록에 온전한 중력 간격을 줍니다. 일시정지는 남은 연출 시간도 보존하며, 중도 종료는 연출을 취소합니다. 스폰에 실패한 경우에도 세션은 연출이 끝날 때까지 RUNNING(또는 PAUSED)을 유지하므로 화면 전환은 엔진 phase가 아닌 세션 status와 result를 따릅니다.
+
+무게추가 낙하 중 칸을 지우면 삭제 직전의 활성 블록을 표시한 채 연출하고, 끝난 뒤 이동한 위치를 보여줍니다. 하드 드롭 경로의 삭제는 한 번에 모아 연출합니다. 개별 칸 삭제는 줄 수·점수·아이템 공급에 추가로 반영하지 않고, 칸 위의 블록도 내리지 않습니다. 삭제가 없는 아이템 발동에는 연출이 없습니다.
 
 UI는 연출 중 키 반복을 소비해 종료 직후 밀린 입력이 몰리지 않게 합니다.
 
@@ -416,7 +418,7 @@ UI는 연출 중 키 반복을 소비해 종료 직후 밀린 입력이 몰리�
 
 - 점수·속도: `ScoreRule`과 `SpeedRule`을 구현하고 `AppComposition(Path, Supplier<? extends PieceGenerator>, ScoreRule, SpeedRule)`에 전달합니다. 순수 계산으로 구현하며 실행 중 외부에서 변경하지 않습니다. 이 생성자의 명시적 `SpeedRule`은 난이도와 무관하게 그대로 사용합니다. 난이도에 맞춰 만들려면 마지막 인자에 `Function<Difficulty, ? extends SpeedRule>` (예: `SpeedPolicy::new`)을 전달합니다.
 - 블록 생성: `PieceGenerator`를 구현하고 생성자에 팩터리를 전달합니다. 난이도별로 다르게 만들려면 `Function<Difficulty, PieceGenerator>`를 받는 생성자를, 난이도와 무관하면 `Supplier`를 받는 생성자를 씁니다. 새 게임마다 독립된 생성기를 반환해야 합니다.
-- 코어: `TetrisEnginePort`는 `snapshot()`, `apply(GameAction)`, `tick()`을 제공합니다. 세션은 이 포트에 의존하며 실제 엔진 생성은 bootstrap에서 수행합니다. `EngineStep`의 drop/lock/clear 결과는 없으면 null일 수 있고, `itemActivations()`는 아이템이 발동하지 않으면 빈 목록입니다. `ClearedRow.cells()`에 지워지기 직전 칸 내용이 있어 삭제 애니메이션에 쓸 수 있습니다.
+- 코어: `TetrisEnginePort`는 `snapshot()`, `apply(GameAction)`, `tick()`을 제공합니다. 세션은 이 포트에 의존하며 실제 엔진 생성은 bootstrap에서 수행합니다. `EngineStep`의 drop/lock/clear 결과는 없으면 null일 수 있고, `itemActivations()`는 아이템이 발동하지 않으면 빈 목록입니다. `ClearedRow.cells()`는 삭제 행 내용을, `EngineStep.removedCells()`는 아이템·낙하 규칙으로 지운 칸의 줄 압축 전 좌표와 내용을 전달합니다. `RemovedCell`은 빈 칸을 허용하지 않습니다.
 - 블록 모양: 테트로미노가 아닌 블록은 `core.Shape`를 구현합니다. 회전해도 같은 인덱스가 같은 칸을 가리키도록 좌표를 정렬하고, 회전하지 않는 블록은 `rotationStates()`를 1로 둡니다.
 - 블록 이동: `core.rule.PieceMovementRule`을 구현하고 `Shape.movementRule()`에서 반환합니다. 기본값은 일반 충돌 규칙입니다. 좌우 이동·회전 허용 여부와 한 칸 낙하를 재정의할 수 있으며, 허용된 좌우 이동·회전에는 기존 충돌 판정을 적용합니다. 최초 아래쪽 접촉 상태는 엔진이 초기 배치·스폰·이동·회전·낙하 시 갱신하고 다음 블록에서 초기화합니다. 규칙은 상태를 저장하지 않고 전달받은 접촉 여부를 사용해야 합니다. `descend`는 성공 시 한 칸 아래 위치, 실패 시 null을 반환하며 실패 시 보드를 변경하지 않습니다. 실제 낙하와 두 미리보기가 같은 규칙을 사용하므로 성공 시에도 전달받은 보드 외부의 상태를 바꾸면 안 됩니다. 무게추는 `WeightMovementRule`로 접촉 후 이동 제한·회전 금지·낙하 중 삭제를 구현합니다. 점수 계산은 기존처럼 application의 책임입니다.
 - 아이템: `core.item.Item`을 구현합니다. 블록이 고정되면 아이템이 실린 칸마다 `onLock(ItemContext, Position)`이 한 번 호출되고 아이템은 소모됩니다. 처리 순서는 보드 기록 → 아이템 효과 → 꽉 찬 줄과 `ItemContext.clearRow`로 지정한 줄 일괄 삭제이며, 지운 줄은 모두 `clearResult`로 보고되어 기존 방식대로 점수가 계산됩니다. 점수 배율처럼 보드 밖 효과는 `itemActivations()`를 보고 application에서 처리합니다.

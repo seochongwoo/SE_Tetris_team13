@@ -41,6 +41,9 @@ class RequiredItemScoringTest {
         session.handle(GameCommand.HARD_DROP);
         assertEquals(before, session.snapshot().score());
         assertEquals(0, session.snapshot().clearedLines());
+        assertNotNull(session.snapshot().lineClearAnimation());
+        session.update(LineClearAnimation.DURATION_NANOS);
+        assertEquals(before, session.snapshot().score());
         session.handle(GameCommand.SOFT_DROP);
         assertEquals(before + 1, session.snapshot().score());
     }

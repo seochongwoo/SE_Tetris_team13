@@ -1,6 +1,7 @@
 package team.tetris.application;
 
 import java.util.Objects;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import team.tetris.application.model.GameMode;
@@ -184,8 +185,10 @@ public final class SinglePlayerSession implements GameSession {
         if (step.lockResult() != null || status != GameStatus.RUNNING) {
             accumulatedNanos = 0;
         }
-        if (lines > 0) {
-            lineClearAnimation = new LineClearAnimation(step.clearResult().clearedRows(), 0);
+        if (lines > 0 || !step.removedCells().isEmpty()) {
+            lineClearAnimation = new LineClearAnimation(
+                    lines > 0 ? step.clearResult().clearedRows() : List.of(), step.removedCells(),
+                    step.lockResult() == null ? view.engine().activePiece() : null, 0);
             accumulatedNanos = 0;
             // 다음 스폰이 실패했어도 삭제 연출을 마친 뒤 게임 종료를 알린다.
             status = GameStatus.RUNNING;
@@ -203,6 +206,7 @@ public final class SinglePlayerSession implements GameSession {
             if (view.engine().phase() == EnginePhase.GAME_OVER) finish(GameStatus.GAME_OVER);
         } else {
             lineClearAnimation = new LineClearAnimation(lineClearAnimation.rows(),
+                    lineClearAnimation.removedCells(), lineClearAnimation.activePiece(),
                     lineClearAnimation.elapsedNanos() + elapsedNanos);
         }
         // 연출을 넘긴 시간도 버려 새 블록에 온전한 낙하 간격을 준다.

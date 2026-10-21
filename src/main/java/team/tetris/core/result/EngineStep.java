@@ -17,13 +17,21 @@ import team.tetris.core.EngineSnapshot;
  * @param lockResult      이번에 블록이 고정됐다면 그 정보 (아니면 null)
  * @param clearResult     이번에 라인이 지워졌다면 그 정보 (아니면 null)
  * @param itemActivations 이번 고정으로 발동한 아이템들 (고정 칸 순서)
+ * @param removedCells    아이템이나 낙하 규칙이 지운 칸들 (줄 압축 전 좌표)
  */
 public record EngineStep(
         EngineSnapshot snapshot, DropResult dropResult, LockResult lockResult, ClearResult clearResult,
-        List<ItemActivation> itemActivations) {
+        List<ItemActivation> itemActivations, List<RemovedCell> removedCells) {
 
     public EngineStep {
         itemActivations = itemActivations == null ? List.of() : List.copyOf(itemActivations);
+        removedCells = List.copyOf(removedCells);
+    }
+
+    /** 개별 칸 삭제가 없는 결과. */
+    public EngineStep(EngineSnapshot snapshot, DropResult dropResult, LockResult lockResult, ClearResult clearResult,
+                      List<ItemActivation> itemActivations) {
+        this(snapshot, dropResult, lockResult, clearResult, itemActivations, List.of());
     }
 
     /** 아이템 발동이 없는 결과. */

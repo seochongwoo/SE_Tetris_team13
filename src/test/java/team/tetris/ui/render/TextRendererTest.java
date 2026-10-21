@@ -43,15 +43,15 @@ class TextRendererTest {
     @ParameterizedTest
     @CsvSource({"NORMAL,EASY,일반", "NORMAL,NORMAL,일반", "NORMAL,HARD,일반",
             "ITEM,EASY,아이템", "ITEM,NORMAL,아이템", "ITEM,HARD,아이템"})
-    void showsTheSessionsModeAndDifficultyBetweenPreviewAndScore(GameMode mode, Difficulty difficulty, String label) {
+    void showsTheSessionsModeAndDifficultyAbovePreview(GameMode mode, Difficulty difficulty, String label) {
         var game = new SinglePlayerSession(
                 new PlayerEngine(10, 20, TestApplication.constant(TetrominoType.T)),
                 new ScorePolicy(), new SpeedPolicy(difficulty), mode, difficulty);
         for (GameCommand command : new GameCommand[]{GameCommand.MOVE_LEFT, GameCommand.PAUSE,
                 GameCommand.RESUME, GameCommand.HARD_DROP, GameCommand.QUIT_GAME}) {
             var frame = renderer.render(game.snapshot());
-            assertEquals(label + " / " + difficulty.name(), panelText(frame, 8).strip());
-            assertTrue(panelText(frame, 9).startsWith("SCORE"));
+            assertEquals(label + " / " + difficulty.name(), panelText(frame, 1).strip());
+            assertTrue(panelText(frame, 11).startsWith("SCORE"));
             game.handle(command);
         }
     }
@@ -113,11 +113,11 @@ class TextRendererTest {
         TextFrame frame = renderer.render(session.snapshot());
 
         boolean found = false;
-        for (int row = TextRenderer.BOARD_TOP + 2; row < TextRenderer.BOARD_TOP + 6; row++) {
+        for (int row = TextRenderer.NEXT_TITLE_ROW + 2; row < TextRenderer.NEXT_TITLE_ROW + 6; row++) {
             found |= panelText(frame, row).contains("<>");
         }
         assertTrue(found);
-        assertTrue(frame.rowText(TextRenderer.BOARD_TOP).contains("NEXT"));
+        assertTrue(frame.rowText(TextRenderer.NEXT_TITLE_ROW).contains("NEXT"));
     }
 
     @Test
@@ -175,7 +175,7 @@ class TextRendererTest {
         assertEquals(palette.itemStyle(TetrominoType.T), frame.styleAt(col, row));
         assertEquals('<', frame.codePointAt(TextRenderer.columnOf(3), TextRenderer.rowOf(1)));
         boolean previewHasItem = false;
-        for (int r = TextRenderer.BOARD_TOP + 2; r < TextRenderer.BOARD_TOP + 6; r++) {
+        for (int r = TextRenderer.NEXT_TITLE_ROW + 2; r < TextRenderer.NEXT_TITLE_ROW + 6; r++) {
             previewHasItem |= panelText(frame, r).contains("K");
         }
         assertTrue(previewHasItem);
@@ -242,7 +242,7 @@ class TextRendererTest {
                 assertEquals(colors.itemStyle(piece.shape()), frame.styleAt(
                         TextRenderer.columnOf(position.x()), TextRenderer.rowOf(position.y())));
                 boolean previewHasSymbol = false;
-                for (int row = TextRenderer.BOARD_TOP + 2; row < TextRenderer.BOARD_TOP + 6; row++) {
+                for (int row = TextRenderer.NEXT_TITLE_ROW + 2; row < TextRenderer.NEXT_TITLE_ROW + 6; row++) {
                     previewHasSymbol |= panelText(frame, row).contains("" + symbol);
                 }
                 assertTrue(previewHasSymbol);
