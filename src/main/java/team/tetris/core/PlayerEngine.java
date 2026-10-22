@@ -13,6 +13,7 @@ import team.tetris.core.result.DropResult;
 import team.tetris.core.result.EngineStep;
 import team.tetris.core.result.ItemActivation;
 import team.tetris.core.result.LockResult;
+import team.tetris.core.result.RemovedCell;
 import team.tetris.core.rule.PieceGenerator;
 import team.tetris.core.rule.DropRule;
 import team.tetris.core.rule.PieceSource;
@@ -66,7 +67,6 @@ public final class PlayerEngine implements TetrisEnginePort {
         for (Position cell : initialPiece.cells()) {
             if (cell.y() < 0) throw new IllegalArgumentException("Initial piece must be visible");
         }
-        updateContact();
         phase = EnginePhase.RUNNING;
     }
 
@@ -126,7 +126,6 @@ public final class PlayerEngine implements TetrisEnginePort {
         Position moved = activePiece.origin().translate(dx, dy);
         if (board.canPlace(activePiece.shape(), activePiece.rotation(), moved)) {
             activePiece = activePiece.movedTo(moved);
-            updateContact();
         }
         return noEvent();
     }
@@ -139,7 +138,6 @@ public final class PlayerEngine implements TetrisEnginePort {
                 board, activePiece.shape(), activePiece.rotation(), activePiece.origin(), clockwise);
         if (result.rotated()) {
             activePiece = activePiece.rotatedTo(result.rotation(), result.origin());
-            updateContact();
         }
         return noEvent();
     }
@@ -150,55 +148,73 @@ public final class PlayerEngine implements TetrisEnginePort {
      * tick()과 SOFT_DROP이 이 동작을 공유한다.
      */
     private EngineStep descendOrLock() {
+        Cell[][] before = board.snapshot();
         if (descendOneCell()) {
-            return new EngineStep(snapshot(), new DropResult(1), null, null);
+            return new EngineStep(snapshot(), new DropResult(1), null, null, List.of(), removedSince(before));
         }
-        return lockActivePieceAndSpawnNext(null);
+        return lockActivePieceAndSpawnNext(null, List.of());
     }
 
     private EngineStep hardDrop() {
+        Cell[][] before = board.snapshot();
         int cellsDropped = 0;
         while (descendOneCell()) {
             cellsDropped++;
         }
-        return lockActivePieceAndSpawnNext(new DropResult(cellsDropped));
+        return lockActivePieceAndSpawnNext(new DropResult(cellsDropped), removedSince(before));
+    }
+
+    /** 낙하 규칙이 지운 칸을 한 번의 조작 결과로 모은다. 하드 드롭도 한 번만 연출한다. */
+    private List<RemovedCell> removedSince(Cell[][] before) {
+        List<RemovedCell> removed = new ArrayList<>();
+        for (int y = 0; y < board.height(); y++) {
+            for (int x = 0; x < board.width(); x++) {
+                if (before[y][x].isEmpty()) continue;
+                Position position = new Position(x, y);
+                if (board.cellAt(position).isEmpty()) {
+                    removed.add(new RemovedCell(position, before[y][x]));
+                }
+            }
+        }
+        return removed;
     }
 
     /** 일반 블록은 충돌을 검사하고, 무게추는 다음 위치의 칸을 지우며 한 칸 내려간다. */
     private boolean descendOneCell() {
+        // 실제 하강 시도에서 막힌 경우만 기록한다. 무게추가 칸을 지우기 전에 검사해야 한다.
+        updateContact();
         ActivePiece next = DropRule.descend(board, activePiece);
         if (next == null) return false;
         activePiece = next;
-        updateContact();
         return true;
     }
 
-    /** 최초 아래쪽 접촉을 기억한다. 이동 제한 여부는 블록의 규칙이 결정한다. */
+    /** 하강을 시도하다 처음 막힌 상태를 기억한다. 이동 제한 여부는 블록의 규칙이 결정한다. */
     private void updateContact() {
         if (!DropRule.canDescend(board, activePiece)) {
             touchedDown = true;
         }
     }
 
-    private EngineStep lockActivePieceAndSpawnNext(DropResult dropResult) {
+    private EngineStep lockActivePieceAndSpawnNext(DropResult dropResult, List<RemovedCell> removedCells) {
         // 상단 밖에 걸친 블록은 일부만 보드에 저장하지 않고 최종 위치를 유지한 채 종료한다.
         // 스폰과 회전이 항상 화면 안에서만 일어나므로 정상 진행에서는 닿지 않는 방어 코드다.
         for (Position cell : activePiece.cells()) {
             if (cell.y() < 0) {
                 phase = EnginePhase.GAME_OVER;
-                return new EngineStep(snapshot(), dropResult, null, null);
+                return new EngineStep(snapshot(), dropResult, null, null, List.of(), removedCells);
             }
         }
         LockResult lockResult = new LockResult(activePiece.shape(), activePiece.origin(), activePiece.rotation());
         board.place(activePiece);
-        LockContext context = new LockContext();
+        LockContext context = new LockContext(removedCells);
         List<ItemActivation> activations = activateItems(context);
         ClearResult clearResult = board.clearRows(context.rowsToClear);
         if (!clearResult.isEmpty()) {
             source.onLinesCleared(clearResult.lineCount());
         }
         spawnNext();
-        return new EngineStep(snapshot(), dropResult, lockResult, clearResult, activations);
+        return new EngineStep(snapshot(), dropResult, lockResult, clearResult, activations, context.removedCells);
     }
 
     /**
@@ -230,7 +246,6 @@ public final class PlayerEngine implements TetrisEnginePort {
         Position origin = spawnOrigin(piece.shape());
         if (board.canPlace(piece.shape(), 0, origin)) {
             activePiece = new ActivePiece(piece, 0, origin);
-            updateContact();
             phase = EnginePhase.RUNNING;
         } else {
             activePiece = null;
@@ -275,6 +290,11 @@ public final class PlayerEngine implements TetrisEnginePort {
     /** 고정 한 번 동안 아이템 효과가 쓰는 보드 조작. 지울 줄은 모아 두었다가 한 번에 지운다. */
     private final class LockContext implements ItemContext {
         private final Set<Integer> rowsToClear = new TreeSet<>();
+        private final List<RemovedCell> removedCells;
+
+        private LockContext(List<RemovedCell> removedCells) {
+            this.removedCells = new ArrayList<>(removedCells);
+        }
 
         @Override
         public int width() {
@@ -301,6 +321,8 @@ public final class PlayerEngine implements TetrisEnginePort {
 
         @Override
         public void removeCell(Position position) {
+            Cell cell = board.cellAt(position);
+            if (!cell.isEmpty()) removedCells.add(new RemovedCell(position, cell));
             board.removeCell(position);
         }
     }

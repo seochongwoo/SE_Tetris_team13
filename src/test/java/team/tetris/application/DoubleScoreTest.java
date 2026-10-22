@@ -37,6 +37,7 @@ class DoubleScoreTest {
         long before = session.snapshot().score();
         engine.queue.add(engine.lockStep(lines, activated));
         session.handle(GameCommand.HARD_DROP);
+        if (lines > 0) session.update(LineClearAnimation.DURATION_NANOS);
         return session.snapshot().score() - before;
     }
 
@@ -94,6 +95,7 @@ class DoubleScoreTest {
         lock(1, new DoubleScoreItem());
         engine.queue.add(engine.lockStep(1, EnginePhase.GAME_OVER));
         session.handle(GameCommand.HARD_DROP);
+        session.update(LineClearAnimation.DURATION_NANOS);
 
         assertEquals(400, session.result().orElseThrow().score());
     }

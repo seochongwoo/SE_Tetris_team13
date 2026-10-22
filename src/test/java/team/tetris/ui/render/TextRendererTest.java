@@ -4,10 +4,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import team.tetris.application.GameCommand;
 import team.tetris.application.GameSnapshot;
 import team.tetris.application.GameStatus;
 import team.tetris.application.SinglePlayerSession;
+import team.tetris.application.ScorePolicy;
+import team.tetris.application.SpeedPolicy;
+import team.tetris.application.model.Difficulty;
+import team.tetris.application.model.GameMode;
 import team.tetris.application.model.Settings;
 import team.tetris.core.Cell;
 import team.tetris.core.EngineSnapshot;
@@ -34,6 +40,22 @@ class TextRendererTest {
     private final SinglePlayerSession session =
             new SinglePlayerSession(new PlayerEngine(10, 20, TestApplication.constant(TetrominoType.T)));
 
+    @ParameterizedTest
+    @CsvSource({"NORMAL,EASY,일반", "NORMAL,NORMAL,일반", "NORMAL,HARD,일반",
+            "ITEM,EASY,아이템", "ITEM,NORMAL,아이템", "ITEM,HARD,아이템"})
+    void showsTheSessionsModeAndDifficultyAbovePreview(GameMode mode, Difficulty difficulty, String label) {
+        var game = new SinglePlayerSession(
+                new PlayerEngine(10, 20, TestApplication.constant(TetrominoType.T)),
+                new ScorePolicy(), new SpeedPolicy(difficulty), mode, difficulty);
+        for (GameCommand command : new GameCommand[]{GameCommand.MOVE_LEFT, GameCommand.PAUSE,
+                GameCommand.RESUME, GameCommand.HARD_DROP, GameCommand.QUIT_GAME}) {
+            var frame = renderer.render(game.snapshot());
+            assertEquals(label + " / " + difficulty.name(), panelText(frame, 1).strip());
+            assertTrue(panelText(frame, 11).startsWith("SCORE"));
+            game.handle(command);
+        }
+    }
+
     @Test
     void drawsABorderAroundATenByTwentyBoard() {
         TextFrame frame = renderer.render(session.snapshot());
@@ -54,7 +76,8 @@ class TextRendererTest {
         assertEquals('<', frame.codePointAt(col, row));
         assertEquals('>', frame.codePointAt(col + 1, row));
         assertEquals(palette.block(TetrominoType.T), frame.styleAt(col, row).foreground());
-        assertEquals('.', frame.codePointAt(TextRenderer.columnOf(0) + 1, TextRenderer.rowOf(0)));
+        assertEquals('・', frame.codePointAt(TextRenderer.columnOf(0), TextRenderer.rowOf(0)));
+        assertTrue(frame.isContinuation(TextRenderer.columnOf(0) + 1, TextRenderer.rowOf(0)));
         assertEquals(palette.dim(), frame.styleAt(TextRenderer.columnOf(0), TextRenderer.rowOf(19)).foreground());
     }
 
@@ -90,11 +113,11 @@ class TextRendererTest {
         TextFrame frame = renderer.render(session.snapshot());
 
         boolean found = false;
-        for (int row = TextRenderer.BOARD_TOP + 2; row < TextRenderer.BOARD_TOP + 6; row++) {
-            found |= frame.rowText(row).substring(TextRenderer.PANEL_LEFT).contains("<>");
+        for (int row = TextRenderer.NEXT_TITLE_ROW + 2; row < TextRenderer.NEXT_TITLE_ROW + 6; row++) {
+            found |= panelText(frame, row).contains("<>");
         }
         assertTrue(found);
-        assertTrue(frame.rowText(TextRenderer.BOARD_TOP).contains("NEXT"));
+        assertTrue(frame.rowText(TextRenderer.NEXT_TITLE_ROW).contains("NEXT"));
     }
 
     @Test
@@ -152,8 +175,8 @@ class TextRendererTest {
         assertEquals(palette.itemStyle(TetrominoType.T), frame.styleAt(col, row));
         assertEquals('<', frame.codePointAt(TextRenderer.columnOf(3), TextRenderer.rowOf(1)));
         boolean previewHasItem = false;
-        for (int r = TextRenderer.BOARD_TOP + 2; r < TextRenderer.BOARD_TOP + 6; r++) {
-            previewHasItem |= frame.rowText(r).substring(TextRenderer.PANEL_LEFT).contains("K");
+        for (int r = TextRenderer.NEXT_TITLE_ROW + 2; r < TextRenderer.NEXT_TITLE_ROW + 6; r++) {
+            previewHasItem |= panelText(frame, r).contains("K");
         }
         assertTrue(previewHasItem);
     }
@@ -213,17 +236,41 @@ class TextRendererTest {
                 SinglePlayerSession game = new SinglePlayerSession(new PlayerEngine(10, 20, source));
                 TextFrame frame = itemRenderer.render(game.snapshot());
                 Position position = game.snapshot().engine().activePiece().cells()[0];
-                char symbol = piece.itemAt(0).symbol();
+                boolean weight = piece.shape() == WeightBlock.SHAPE;
+                char symbol = weight ? '@' : piece.itemAt(0).symbol();
                 assertEquals(symbol, frame.codePointAt(TextRenderer.columnOf(position.x()),
                         TextRenderer.rowOf(position.y())));
-                assertEquals(colors.itemStyle(piece.shape()), frame.styleAt(
+                assertEquals(weight ? colors.blockStyle(piece.shape()) : colors.itemStyle(piece.shape()), frame.styleAt(
                         TextRenderer.columnOf(position.x()), TextRenderer.rowOf(position.y())));
                 boolean previewHasSymbol = false;
-                for (int row = TextRenderer.BOARD_TOP + 2; row < TextRenderer.BOARD_TOP + 6; row++) {
-                    previewHasSymbol |= frame.rowText(row).substring(TextRenderer.PANEL_LEFT).contains("" + symbol);
+                for (int row = TextRenderer.NEXT_TITLE_ROW + 2; row < TextRenderer.NEXT_TITLE_ROW + 6; row++) {
+                    previewHasSymbol |= panelText(frame, row).contains("" + symbol);
                 }
                 assertTrue(previewHasSymbol);
+                if (weight) {
+                    assertTrue(!frame.text().contains("W"));
+                    for (Position cell : game.snapshot().engine().activePiece().cells()) {
+                        for (int offset = 0; offset < TextRenderer.CELL_WIDTH; offset++) {
+                            assertEquals('@', frame.codePointAt(TextRenderer.columnOf(cell.x()) + offset, TextRenderer.rowOf(cell.y())));
+                            assertEquals(colors.blockStyle(piece.shape()), frame.styleAt(
+                                    TextRenderer.columnOf(cell.x()) + offset, TextRenderer.rowOf(cell.y())));
+                        }
+                    }
+                    game.handle(GameCommand.HARD_DROP);
+                    TextFrame locked = itemRenderer.render(game.snapshot());
+                    assertTrue(!locked.text().contains("W"));
+                    assertEquals('@', locked.codePointAt(TextRenderer.columnOf(4), TextRenderer.rowOf(18)));
+                    assertEquals('@', locked.codePointAt(TextRenderer.columnOf(3), TextRenderer.rowOf(19)));
+                }
             }
         }
+    }
+    /** 전각 문자도 격자 열 좌표를 기준으로 정보 영역을 읽는다. */
+    private static String panelText(TextFrame frame, int row) {
+        StringBuilder text = new StringBuilder();
+        for (int col = TextRenderer.PANEL_LEFT; col < frame.columns(); col++) {
+            if (!frame.isContinuation(col, row)) text.appendCodePoint(frame.codePointAt(col, row));
+        }
+        return text.toString();
     }
 }

@@ -6,8 +6,11 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import team.tetris.core.Piece;
 import team.tetris.core.PlayerEngine;
+import team.tetris.core.Position;
 import team.tetris.core.TetrominoType;
 import team.tetris.core.item.DoubleScoreItem;
 import team.tetris.core.item.LineClearItem;
@@ -15,6 +18,31 @@ import team.tetris.core.item.WeightBlock;
 import team.tetris.core.rule.PieceSource;
 
 class RequiredItemScoringTest {
+    @ParameterizedTest @ValueSource(booleans = {false, true})
+    void weightCanMoveUntilTheNextGravityOrSoftDropHitsAnObstacle(boolean softDrop) {
+        SinglePlayerSession session = session(8, 10, Piece.of(TetrominoType.O),
+                new WeightBlock().toItemPiece(null, null));
+        session.handle(GameCommand.HARD_DROP);
+        long before = session.snapshot().score();
+        long interval = session.snapshot().gravityIntervalNanos();
+        for (int i = 0; i < 6; i++) session.update(interval);
+        assertEquals(new Position(2, 6), session.snapshot().engine().activePiece().origin());
+        session.update(interval - 1);
+        session.handle(GameCommand.MOVE_LEFT);
+        assertEquals(new Position(1, 6), session.snapshot().engine().activePiece().origin());
+        session.handle(GameCommand.MOVE_RIGHT);
+
+        if (softDrop) session.handle(GameCommand.SOFT_DROP);
+        else session.update(1);
+        assertEquals(new Position(2, 7), session.snapshot().engine().activePiece().origin());
+        assertTrue(session.snapshot().engine().board()[8][3].isEmpty());
+        session.handle(GameCommand.MOVE_LEFT);
+        assertEquals(new Position(2, 7), session.snapshot().engine().activePiece().origin());
+        session.handle(GameCommand.MOVE_RIGHT);
+        assertEquals(new Position(2, 7), session.snapshot().engine().activePiece().origin());
+        assertEquals(before, session.snapshot().score());
+    }
+
     @Test
     void lineClearScoresAndCountsLikeANormalLineIncludingTheDoubleScoreBonus() {
         Piece line = Piece.of(TetrominoType.O).withItem(2, new LineClearItem());
@@ -23,6 +51,7 @@ class RequiredItemScoringTest {
         assertEquals(216, session.snapshot().score()); // (8칸 하강 + 100) × 2
         assertEquals(1, session.snapshot().clearedLines());
         assertEquals(2, session.snapshot().doubleScoreClears());
+        session.update(LineClearAnimation.DURATION_NANOS);
         session.handle(GameCommand.HARD_DROP);
         assertEquals(430, session.snapshot().score()); // (7칸 하강 + 100) × 2
         assertEquals(2, session.snapshot().clearedLines());
@@ -40,6 +69,7 @@ class RequiredItemScoringTest {
         session.handle(GameCommand.HARD_DROP);
         assertEquals(before, session.snapshot().score());
         assertEquals(0, session.snapshot().clearedLines());
+        assertNull(session.snapshot().lineClearAnimation());
         session.handle(GameCommand.SOFT_DROP);
         assertEquals(before + 1, session.snapshot().score());
     }

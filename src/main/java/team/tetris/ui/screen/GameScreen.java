@@ -23,6 +23,7 @@ import team.tetris.ui.render.palette.ColorPalette;
 /**
  * 게임 화면. 키 입력을 명령 큐에 넣었다가 매 프레임 {@link #update}에서 세션 시간을 먼저 흘린 뒤
  * 큐에 쌓인 순서대로 세션에 전달한다 (개발 가이드의 시간·스레드 계약).
+ * 삭제 연출 중의 게임 조작은 보관했다가 연출이 끝나면 먼저 전달한다.
  *
  * <p>일시정지 중에는 "재개 / 메뉴로 / 프로그램 종료" 메뉴를 띄운다. 일시정지 키뿐 아니라 게임 메뉴
  * 키(기본 Esc)도 같은 메뉴를 연다. 게임이 끝나면 잠시 GAME OVER를 보여준 뒤 종료 흐름으로 넘어간다.
@@ -45,6 +46,7 @@ public final class GameScreen implements Screen {
     private final ColorPalette palette;
     private final String settingsWarning;
     private final Deque<GameCommand> pending = new ArrayDeque<>();
+    private final Deque<GameCommand> animationInput = new ArrayDeque<>();
     private long clockNanos;
     private long gameOverNanos;
     private int pauseCursor;
@@ -76,6 +78,7 @@ public final class GameScreen implements Screen {
 
     public void clearPendingInput() {
         pending.clear();
+        animationInput.clear();
         repeats.releaseAll();
     }
 
@@ -158,7 +161,7 @@ public final class GameScreen implements Screen {
 
     @Override
     public void onFocusLost() {
-        repeats.releaseAll();
+        clearPendingInput();
         if (!finished && session.snapshot().status() == GameStatus.RUNNING) {
             pending.add(GameCommand.PAUSE);
         }
@@ -175,9 +178,27 @@ public final class GameScreen implements Screen {
             for (String key : repeats.due(clockNanos)) {
                 keys.commandFor(key, GameStatus.RUNNING).filter(InputMapper::isRepeatable).ifPresent(pending::add);
             }
+            if (session.snapshot().lineClearAnimation() == null) {
+                // 이전 프레임에 보관한 조작을 이번 프레임의 새 입력보다 먼저 적용한다.
+                while (!animationInput.isEmpty()) pending.addFirst(animationInput.removeLast());
+            }
         }
         while (!pending.isEmpty()) {
-            session.handle(pending.poll());
+            GameStatus before = session.snapshot().status();
+            GameCommand command = pending.poll();
+            if (before == GameStatus.RUNNING && session.snapshot().lineClearAnimation() != null
+                    && command != GameCommand.PAUSE && command != GameCommand.RESUME
+                    && command != GameCommand.QUIT_GAME) {
+                animationInput.add(command);
+                continue;
+            }
+            session.handle(command);
+            GameStatus after = session.snapshot().status();
+            if (before != after && (before == GameStatus.PAUSED || after == GameStatus.PAUSED)) {
+                // 일시정지 메뉴와 게임 사이에 이전 입력이 넘어가지 않도록 새로 눌러야 한다.
+                clearPendingInput();
+                router.ignoreHeldKeys();
+            }
         }
         if (session.snapshot().status() != GameStatus.PAUSED) {
             pauseCursor = RESUME_ITEM;
@@ -187,6 +208,7 @@ public final class GameScreen implements Screen {
         if (result.isEmpty()) {
             return;
         }
+        clearPendingInput();
         // 재현 결과를 관찰하고 같은 프리셋을 다시 시작할 수 있도록 화면을 유지한다.
         if (session instanceof DebugSession && result.get().reason() == GameStatus.GAME_OVER) {
             return;
@@ -198,7 +220,6 @@ public final class GameScreen implements Screen {
             }
         }
         finished = true;
-        repeats.releaseAll();
         router.finishGame(result.get());
     }
 

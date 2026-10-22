@@ -2,6 +2,7 @@ package team.tetris.core.rule;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -32,7 +33,7 @@ class PieceMovementRuleTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"gravity", "soft", "hard"})
-    void customDescentIsSharedByEveryDropAndLandingPreview(String mode) {
+    void customDescentIsSharedByEveryDropAndBothPreviews(String mode) {
         // 무게추가 아닌 새 블록: 경로의 칸을 지우지만 3행에서 멈춘다.
         PieceMovementRule rule = new PieceMovementRule() {
             public ActivePiece descend(Board board, ActivePiece piece) {
@@ -49,8 +50,10 @@ class PieceMovementRuleTest {
         ActivePiece initial = new ActivePiece(shape, 0, new Position(2, 0));
         PlayerEngine engine = engine(cells, initial);
 
-        var landing = DropRule.landingPiece(cells, initial);
-        assertEquals(new Position(2, 3), landing.origin());
+        var preview = HardDropPreview.project(cells, initial);
+        assertEquals(new Position(2, 3), preview.landing().origin());
+        assertEquals(Set.of(new Position(2, 2)), preview.removedCells());
+        assertEquals(preview.landing(), DropRule.landingPiece(cells, initial));
         assertArrayEquals(cells, engine.snapshot().board());
         assertEquals(TetrominoType.J, cells[2][2].occupiedBy());
 
@@ -67,7 +70,7 @@ class PieceMovementRuleTest {
         }
         assertNotNull(step.lockResult());
         assertEquals(3, distance);
-        assertEquals(landing.origin(), step.lockResult().origin());
+        assertEquals(preview.landing().origin(), step.lockResult().origin());
         assertTrue(step.snapshot().board()[2][2].isEmpty());
         assertSame(shape, step.snapshot().board()[3][2].occupiedBy());
         assertEquals(TetrominoType.Z, step.snapshot().board()[6][2].occupiedBy());
@@ -85,8 +88,10 @@ class PieceMovementRuleTest {
         engine.apply(GameAction.MOVE_LEFT);
         assertEquals(new Position(1, 0), engine.snapshot().activePiece().origin());
         engine.apply(GameAction.MOVE_RIGHT);
-        engine.tick(); // (2,2)에 처음 접촉
+        engine.tick(); // (2,2) 바로 위에서는 다음 하강 시도 전까지 이동 가능
         engine.apply(GameAction.MOVE_LEFT);
+        assertEquals(new Position(1, 1), engine.snapshot().activePiece().origin());
+        engine.apply(GameAction.MOVE_RIGHT);
         assertEquals(new Position(2, 1), engine.snapshot().activePiece().origin());
         engine.tick(); // 접촉한 칸을 지운 뒤에도 잠금 유지
         assertTrue(engine.snapshot().board()[2][2].isEmpty());
@@ -103,15 +108,18 @@ class PieceMovementRuleTest {
 
     @ParameterizedTest
     @ValueSource(ints = {2, 6})
-    void initiallyTouchingWeightCannotMoveBeforeItsFirstTick(int row) {
+    void previewsAndInitialContactDoNotLockWeightBeforeItsFirstTick(int row) {
         Cell[][] cells = new Board(8, 8).snapshot();
         if (row == 2) cells[4][3] = Cell.occupiedBy(TetrominoType.J);
         ActivePiece initial = new ActivePiece(new WeightBlock().toItemPiece(null, null),
                 0, new Position(2, row));
         PlayerEngine engine = engine(cells, initial);
 
+        var preview = HardDropPreview.project(cells, initial);
+        assertEquals(DropRule.landingPiece(cells, initial), preview.landing());
+        assertArrayEquals(cells, engine.snapshot().board());
         engine.apply(GameAction.MOVE_LEFT);
-        assertEquals(initial, engine.snapshot().activePiece());
+        assertEquals(initial.movedTo(initial.origin().translate(-1, 0)), engine.snapshot().activePiece());
         engine.apply(GameAction.MOVE_RIGHT);
         assertEquals(initial, engine.snapshot().activePiece());
     }

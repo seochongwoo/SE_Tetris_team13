@@ -2,6 +2,8 @@ package team.tetris.ui.screen;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static team.tetris.ui.TestApplication.FRAME;
 
@@ -14,11 +16,21 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import team.tetris.application.GameCommand;
 import team.tetris.application.GameStatus;
+import team.tetris.application.SinglePlayerSession;
+import team.tetris.application.StartedGame;
+import team.tetris.application.model.LoadResult;
 import team.tetris.application.model.Settings;
 import team.tetris.application.port.SettingsRepository;
 import team.tetris.application.port.StorageException;
+import team.tetris.core.ActivePiece;
+import team.tetris.core.Board;
+import team.tetris.core.Cell;
+import team.tetris.core.EnginePhase;
 import team.tetris.core.Position;
+import team.tetris.core.Piece;
+import team.tetris.core.PlayerEngine;
 import team.tetris.core.TetrominoType;
+import team.tetris.core.rule.PieceSource;
 import team.tetris.storage.memory.InMemoryScoreRepository;
 import team.tetris.ui.ScreenRouter;
 import team.tetris.ui.TestApplication;
@@ -139,6 +151,119 @@ class GameScreenTest {
         router.keyPressed(key);
         router.update(FRAME);
         assertEquals(GameStatus.PAUSED, status(game));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "MOVE_LEFT, A, -1, 0",
+            "MOVE_LEFT, LEFT, -1, 0",
+            "MOVE_RIGHT, D, 1, 0",
+            "MOVE_RIGHT, RIGHT, 1, 0",
+            "SOFT_DROP, S, 0, 1",
+            "SOFT_DROP, DOWN, 0, 1"
+    })
+    void movementHeldBeforePauseRequiresReleaseAfterResume(GameCommand command, String key,
+            int dx, int dy) throws StorageException {
+        Settings defaults = Settings.defaults();
+        var bindings = new EnumMap<>(defaults.keyBindings());
+        bindings.put(command, key);
+        app.settings().update(new Settings(defaults.screenSize(), bindings, defaults.colorBlindMode()));
+        GameScreen game = start();
+        router.keyPressed(key);
+        router.update(FRAME);
+        Position pausedAt = origin(game);
+        TestApplication.tap(router, "P");
+        router.update(FRAME);
+
+        router.update(5_000_000_000L);
+        router.keyPressed(key); // 일시정지 전부터 누른 키의 OS 자동 반복
+        assertEquals(0, game.pauseCursor());
+        TestApplication.tap(router, "P");
+        router.update(FRAME);
+        assertEquals(GameStatus.RUNNING, status(game));
+        router.keyPressed(key);
+        router.update(200_000_000L);
+        assertEquals(pausedAt, origin(game));
+
+        router.keyReleased(key);
+        router.keyPressed(key);
+        router.update(FRAME);
+        assertEquals(pausedAt.translate(dx, dy), origin(game));
+        router.update(170_000_000L);
+        assertEquals(pausedAt.translate(dx * 2, dy * 2), origin(game));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "MOVE_LEFT, A",
+            "MOVE_LEFT, LEFT",
+            "SOFT_DROP, DOWN",
+            "ROTATE_CW, UP",
+            "HARD_DROP, SPACE"
+    })
+    void customResumeKeyCannotRepeatAsAGameCommand(GameCommand command, String key)
+            throws StorageException {
+        Settings defaults = Settings.defaults();
+        var bindings = new EnumMap<>(defaults.keyBindings());
+        bindings.put(command, key);
+        bindings.put(GameCommand.RESUME, key);
+        app.settings().update(new Settings(defaults.screenSize(), bindings, defaults.colorBlindMode()));
+        GameScreen game = start();
+        TestApplication.tap(router, "P");
+        router.update(FRAME);
+        var active = game.session().snapshot().engine().activePiece();
+        long score = game.session().snapshot().score();
+
+        router.keyPressed(key);
+        router.update(FRAME);
+        assertEquals(GameStatus.RUNNING, status(game));
+        router.keyPressed(key);
+        router.update(200_000_000L);
+
+        assertEquals(active, game.session().snapshot().engine().activePiece());
+        assertEquals(score, game.session().snapshot().score());
+    }
+
+    @Test
+    void pauseMenuKeysCannotBecomeGameInputWhenHeldThroughResume() {
+        GameScreen game = start();
+        TestApplication.tap(router, "P");
+        router.update(FRAME);
+        var active = game.session().snapshot().engine().activePiece();
+        long score = game.session().snapshot().score();
+
+        router.keyPressed("DOWN");
+        router.keyPressed("UP");
+        router.keyPressed("SPACE");
+        assertEquals(0, game.pauseCursor());
+        router.keyPressed("ENTER");
+        router.update(FRAME);
+        assertEquals(GameStatus.RUNNING, status(game));
+        router.keyPressed("DOWN");
+        router.keyPressed("UP");
+        router.keyPressed("SPACE");
+        router.update(200_000_000L);
+
+        assertEquals(active, game.session().snapshot().engine().activePiece());
+        assertEquals(score, game.session().snapshot().score());
+    }
+
+    @Test
+    void movementQueuedAfterPauseCannotStartRepeatingAfterResume() {
+        GameScreen game = start();
+        Position initial = origin(game);
+        TestApplication.tap(router, "P");
+        router.keyPressed("LEFT");
+        router.update(FRAME);
+        assertEquals(GameStatus.PAUSED, status(game));
+        assertEquals(initial, origin(game));
+
+        TestApplication.tap(router, "P");
+        router.update(FRAME);
+        router.update(200_000_000L);
+
+        assertEquals(GameStatus.RUNNING, status(game));
+        assertEquals(initial, origin(game));
     }
 
     @ParameterizedTest
@@ -297,6 +422,55 @@ class GameScreenTest {
         assertEquals(0, app.exits());
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"P", "ESCAPE", "FOCUS_LOST"})
+    void quittingPausedGameOverAnimationStillRegistersTheScore(String pauseTrigger) {
+        Cell[][] board = new Board(10, 20).snapshot();
+        for (int x = 0; x < 10; x++) {
+            if (x < 3 || x > 6) board[19][x] = Cell.occupiedBy(TetrominoType.O);
+        }
+        board[0][4] = Cell.occupiedBy(TetrominoType.Z);
+        PieceSource source = new PieceSource() {
+            public Piece next() { return peek(); }
+            public Piece peek() { return Piece.of(TetrominoType.T); }
+        };
+        var session = new SinglePlayerSession(new PlayerEngine(board,
+                new ActivePiece(TetrominoType.I, 0, new Position(3, 18)), source));
+        var game = new GameScreen(router, new StartedGame(session,
+                new LoadResult<>(Settings.defaults(), Optional.empty())));
+        game.onKeyPressed("SPACE");
+        game.onKeyReleased("SPACE");
+        game.update(FRAME);
+        assertEquals(EnginePhase.GAME_OVER, session.snapshot().engine().phase());
+        assertEquals(GameStatus.RUNNING, status(game));
+        assertNotNull(session.snapshot().lineClearAnimation());
+
+        if (pauseTrigger.equals("FOCUS_LOST")) {
+            game.onFocusLost();
+        } else {
+            game.onKeyPressed(pauseTrigger);
+            game.onKeyReleased(pauseTrigger);
+        }
+        game.update(FRAME);
+        assertEquals(GameStatus.PAUSED, status(game));
+        game.onKeyPressed("DOWN");
+        game.onKeyReleased("DOWN");
+        game.onKeyPressed("ENTER");
+        game.onKeyReleased("ENTER");
+        game.update(FRAME);
+        assertEquals(GameStatus.GAME_OVER, session.result().orElseThrow().reason());
+        assertNull(session.snapshot().lineClearAnimation());
+
+        game.update(GameScreen.GAME_OVER_DELAY_NANOS);
+        assertInstanceOf(NameEntryScreen.class, router.current());
+        router.charTyped('A');
+        TestApplication.tap(router, "ENTER");
+        var scoreboard = assertInstanceOf(ScoreboardScreen.class, router.current());
+        assertEquals(1, scoreboard.entries().size());
+        assertEquals(100, scoreboard.entries().getFirst().score());
+        assertTrue(scoreboard.highlightedRecordId().isPresent());
+    }
+
     @Test
     void exitItemClosesTheProgram() {
         start();
@@ -312,6 +486,42 @@ class GameScreenTest {
     @Test
     void losingFocusPausesTheGame() {
         GameScreen game = start();
+
+        router.focusLost();
+        router.update(FRAME);
+
+        assertEquals(GameStatus.PAUSED, status(game));
+    }
+
+    @Test
+    void losingFocusDiscardsGameCommandsWaitingForTheNextFrame() {
+        GameScreen game = start();
+        Position initial = origin(game);
+        router.keyPressed("LEFT");
+        router.keyPressed("SPACE");
+
+        router.focusLost();
+        router.update(FRAME);
+
+        assertEquals(GameStatus.PAUSED, status(game));
+        assertEquals(initial, origin(game));
+        assertEquals(0, game.session().snapshot().score());
+        TestApplication.tap(router, "P");
+        router.update(FRAME);
+        router.update(200_000_000L);
+        assertEquals(initial, origin(game));
+
+        TestApplication.tap(router, "LEFT");
+        router.update(FRAME);
+        assertEquals(initial.translate(-1, 0), origin(game));
+    }
+
+    @Test
+    void losingFocusDiscardsQueuedResume() {
+        GameScreen game = start();
+        TestApplication.tap(router, "P");
+        router.update(FRAME);
+        TestApplication.tap(router, "P");
 
         router.focusLost();
         router.update(FRAME);

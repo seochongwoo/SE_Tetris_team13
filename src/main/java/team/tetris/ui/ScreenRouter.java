@@ -48,6 +48,8 @@ public final class ScreenRouter {
     private final Set<String> heldKeys = new HashSet<>();
     /** 뗄 때까지 무시할 키 (화면 전환 전부터 누르고 있던 키). */
     private final Set<String> ignoredUntilRelease = new HashSet<>();
+    /** 키 코드가 없는 문자 이벤트를 직전 키 눌림과 연결한다. */
+    private String lastPressedKey;
     private final Deque<DebugSetup> debugSetupHistory = new ArrayDeque<>();
     private Settings settings;
     private String notice;
@@ -170,6 +172,7 @@ public final class ScreenRouter {
         debugSession().ifPresent(debug -> debug.setFrozen(true));
         heldKeys.clear();
         ignoredUntilRelease.clear();
+        lastPressedKey = null;
         if (current instanceof GameScreen game) game.clearPendingInput();
     }
 
@@ -240,6 +243,8 @@ public final class ScreenRouter {
     }
 
     public void keyPressed(String key) {
+        // 무시한 KEY_PRESSED에도 KEY_TYPED가 이어지므로 차단 여부를 확인하기 전에 기억한다.
+        lastPressedKey = key;
         if (ignoredUntilRelease.contains(key)) {
             return; // 전환 전부터 누르고 있던 키의 OS 자동 반복
         }
@@ -250,17 +255,21 @@ public final class ScreenRouter {
     public void keyReleased(String key) {
         heldKeys.remove(key);
         ignoredUntilRelease.remove(key);
+        if (Objects.equals(lastPressedKey, key)) lastPressedKey = null;
         current.onKeyReleased(key);
     }
 
     public void charTyped(char character) {
-        current.onCharTyped(character);
+        if (!ignoredUntilRelease.contains(lastPressedKey)) {
+            current.onCharTyped(character);
+        }
     }
 
     public void focusLost() {
         // 포커스가 없는 동안의 키 떼기는 전달되지 않으므로 눌림 상태를 모두 비운다.
         heldKeys.clear();
         ignoredUntilRelease.clear();
+        lastPressedKey = null;
         current.onFocusLost();
     }
 

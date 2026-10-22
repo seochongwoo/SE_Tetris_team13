@@ -22,4 +22,11 @@ public interface Item {
      * 표시는 이미 지워져 있다(아이템은 한 번 발동하고 소모된다).
      */
     void onLock(ItemContext context, Position position);
+
+    /**
+     * 복사한 보드에만 적용하는 디버그 미리보기. 아이템 자체나 외부 상태를 바꾸면 안 된다.
+     * 보드 효과가 있는 아이템은 순수한 효과 계산을 onLock과 공유해 재정의한다.
+     * 기본값은 효과 없음이며 실제 발동 콜백을 미리 호출하지 않는다.
+     */
+    default void previewOnLock(ItemContext context, Position position) { }
 }

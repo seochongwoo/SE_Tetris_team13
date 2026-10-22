@@ -81,9 +81,16 @@ class DebugPlacementUndoTest {
         restored.handle(GameCommand.HARD_DROP);
         assertSnapshotEquals(after, restored.snapshot());
         // 다음 아이템 이후의 추첨도 같은 난수 위치에서 이어진다.
+        original.update(LineClearAnimation.DURATION_NANOS);
+        restored.update(LineClearAnimation.DURATION_NANOS);
+        original.handle(GameCommand.MOVE_RIGHT);
+        restored.handle(GameCommand.MOVE_RIGHT);
+        var beforeNext = original.snapshot();
         original.handle(GameCommand.HARD_DROP);
         restored.handle(GameCommand.HARD_DROP);
         assertSnapshotEquals(original.snapshot(), restored.snapshot());
+        // 삭제 연출을 흘린 이력도 재생해야 그 다음 배치 직전으로 되돌아갈 수 있다.
+        assertSnapshotEquals(beforeNext, undo(original).snapshot());
     }
 
     @Test void consecutiveUndosPreserveStatsEditsAndNextPieceOverrides() {
@@ -147,6 +154,7 @@ class DebugPlacementUndoTest {
         assertEquals(expected.gravityIntervalNanos(), actual.gravityIntervalNanos());
         assertEquals(expected.doubleScoreClears(), actual.doubleScoreClears());
         assertEquals(expected.status(), actual.status());
+        assertEquals(expected.lineClearAnimation(), actual.lineClearAnimation());
     }
 
     private static void assertPieceEquals(Piece expected, Piece actual) {

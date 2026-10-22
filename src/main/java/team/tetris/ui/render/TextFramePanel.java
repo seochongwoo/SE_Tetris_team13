@@ -8,6 +8,7 @@ import java.awt.Graphics2D;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.font.TextLayout;
+import java.awt.geom.Rectangle2D;
 import java.util.Objects;
 import javax.swing.JComponent;
 import team.tetris.application.model.Settings.ScreenSize;
@@ -141,6 +142,7 @@ public final class TextFramePanel extends JComponent {
             TextFrame current = frame;
             g.setColor(current.styleAt(0, 0).background());
             g.fillRect(0, 0, getWidth(), getHeight());
+            Rectangle2D[] markerBounds = new Rectangle2D[2]; // 같은 프레임에서는 글꼴별로 한 번만 측정한다.
             for (int row = 0; row < current.rows(); row++) {
                 for (int col = 0; col < current.columns(); col++) {
                     g.setColor(current.styleAt(col, row).background());
@@ -161,6 +163,21 @@ public final class TextFramePanel extends JComponent {
                     g.setColor(style.foreground());
                     String glyph = new String(Character.toChars(codePoint));
                     int x = col * cellWidth;
+                    if (codePoint == '・') {
+                        // 빈 칸 표시는 전각 두 칸의 중심에 잉크를 맞춘다. 글꼴별 기준선 차이도 보정한다.
+                        int fontIndex = style.bold() ? 1 : 0;
+                        Rectangle2D ink = markerBounds[fontIndex];
+                        if (ink == null) {
+                            ink = new TextLayout(glyph, g.getFont(), g.getFontRenderContext())
+                                    .getBounds();
+                            markerBounds[fontIndex] = ink;
+                        }
+                        // 논리 좌표로 배치해 HiDPI 변환이 적용돼도 칸 중심을 유지한다.
+                        float markerX = (float) (x + (2 * cellWidth - ink.getWidth()) / 2 - ink.getX());
+                        float markerY = (float) (row * cellHeight + (cellHeight - ink.getHeight()) / 2 - ink.getY());
+                        g.drawString(glyph, markerX, markerY);
+                        continue;
+                    }
                     if (TextFrame.isWide(codePoint)) {
                         // 넓은 글자는 두 칸 가운데에 그려서 글자 사이가 고르게 보이게 한다.
                         x += Math.max(0, (2 * cellWidth - g.getFontMetrics().stringWidth(glyph)) / 2);

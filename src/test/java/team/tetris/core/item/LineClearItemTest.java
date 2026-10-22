@@ -35,4 +35,15 @@ class LineClearItemTest {
         assertArrayEquals(before, context.board.snapshot());
     }
 
+    @Test
+    void previewRequestsTheSameRowAsLocking() {
+        Position position = new Position(2, 7);
+        context.place(SoloBlock.SHAPE, position);
+        Cell[][] before = context.board.snapshot();
+
+        item.previewOnLock(context, position);
+
+        assertEquals(List.of(7), context.requestedRows);
+        assertArrayEquals(before, context.board.snapshot());
+    }
 }

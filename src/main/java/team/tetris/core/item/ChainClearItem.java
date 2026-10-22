@@ -34,6 +34,11 @@ public final class ChainClearItem implements Item {
 
     @Override
     public void onLock(ItemContext context, Position position) {
+        previewOnLock(context, position);
+    }
+
+    @Override
+    public void previewOnLock(ItemContext context, Position position) {
         Cell start = context.cellAt(position);
         if (!(start.occupiedBy() instanceof TetrominoType type)) {
             return;

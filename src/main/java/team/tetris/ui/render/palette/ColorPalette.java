@@ -92,6 +92,19 @@ public record ColorPalette(
         return new TextStyle(border, background, false);
     }
 
+    /** 두 팔레트 모두 삭제할 줄 전체를 흰색으로 강조한다. */
+    public TextStyle lineClearStyle() {
+        return new TextStyle(Color.BLACK, Color.WHITE, true);
+    }
+
+    /** 디버그 삭제 예고: 블록 글자색은 유지하고 배경에 흰색을 25% 섞어 강조한다. */
+    public TextStyle removalPreviewStyle(Shape shape) {
+        return blockStyle(shape).withBackground(new Color(
+                (background.getRed() * 3 + 255) / 4,
+                (background.getGreen() * 3 + 255) / 4,
+                (background.getBlue() * 3 + 255) / 4));
+    }
+
     /** 블록 칸의 스타일. 테트로미노가 아닌 블록(무게추 등)은 글자색으로 그린다. */
     public TextStyle blockStyle(Shape shape) {
         return new TextStyle(colorOf(shape), background, true);

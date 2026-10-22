@@ -124,13 +124,14 @@ class RequiredItemsTest {
     }
 
     @Test
-    void contactLocksLateralMovementImmediatelyAndSoftDropCrushesOneRowAtATime() {
+    void weightCanMoveAboveBlocksUntilDescentCrushesTheFirstRow() {
         PlayerEngine engine = stackedWeight();
-        // O는 x=3~4, y=8~9. 무게추의 바닥이 y=7이면 처음 접촉한다.
+        // O는 x=3~4, y=8~9. 바로 위 y=7에 도착해도 다음 하강 시도 전에는 이동 가능하다.
         for (int i = 0; i < 6; i++) engine.tick();
         Position contact = engine.snapshot().activePiece().origin();
         assertEquals(new Position(2, 6), contact);
         engine.apply(GameAction.MOVE_LEFT);
+        assertEquals(contact.translate(-1, 0), engine.snapshot().activePiece().origin());
         engine.apply(GameAction.MOVE_RIGHT);
         assertEquals(contact, engine.snapshot().activePiece().origin());
         assertEquals(4, filled(engine.snapshot().board()));
@@ -140,6 +141,10 @@ class RequiredItemsTest {
         assertEquals(1, step.dropResult().cellsDropped());
         assertEquals(2, filled(step.snapshot().board()));
         assertEquals(TetrominoType.O, step.snapshot().board()[9][3].occupiedBy());
+        engine.apply(GameAction.MOVE_LEFT);
+        assertEquals(contact.translate(0, 1), engine.snapshot().activePiece().origin());
+        engine.apply(GameAction.MOVE_RIGHT);
+        assertEquals(contact.translate(0, 1), engine.snapshot().activePiece().origin());
         engine.tick();
         assertEquals(0, filled(engine.snapshot().board()));
         Position floor = engine.snapshot().activePiece().origin();
@@ -176,12 +181,14 @@ class RequiredItemsTest {
     }
 
     @Test
-    void contactAtSpawnLocksMovementAndPauseDoesNotCrushCells() {
+    void weightCanMoveAtSpawnUntilDescentAndPauseDoesNotCrushCells() {
         PlayerEngine engine = new PlayerEngine(8, 4,
                 new Sequence(Piece.of(TetrominoType.O), WEIGHT));
         engine.apply(GameAction.HARD_DROP);
         Position origin = engine.snapshot().activePiece().origin();
         engine.apply(GameAction.MOVE_RIGHT);
+        assertEquals(origin.translate(1, 0), engine.snapshot().activePiece().origin());
+        engine.apply(GameAction.MOVE_LEFT);
         assertEquals(origin, engine.snapshot().activePiece().origin());
         engine.apply(GameAction.PAUSE);
         engine.tick();
@@ -189,6 +196,9 @@ class RequiredItemsTest {
         assertEquals(4, filled(engine.snapshot().board()));
         assertEquals(origin, engine.snapshot().activePiece().origin());
         engine.apply(GameAction.RESUME);
+        engine.tick(); // 첫 실제 하강에서 장애물을 지우며 잠긴다.
+        engine.apply(GameAction.MOVE_RIGHT);
+        assertEquals(origin.translate(0, 1), engine.snapshot().activePiece().origin());
         engine.apply(GameAction.HARD_DROP);
         assertEquals(6, filled(engine.snapshot().board()));
     }
@@ -218,7 +228,7 @@ class RequiredItemsTest {
     }
 
     @Test
-    void movingOverASuspendedCellLocksTheWeightEvenAfterItCrushesThatCell() {
+    void movingOverASuspendedCellAllowsEscapeUntilDescentAndThenKeepsTheLock() {
         Shape suspended = new Shape() {
             public Position[] cellsAt(int rotation) {
                 return new Position[] {new Position(0, 0), new Position(6, 6)};
@@ -229,9 +239,11 @@ class RequiredItemsTest {
         engine.apply(GameAction.HARD_DROP); // (0,3)과 무게추 경로 밖 (6,9)
         engine.tick();
         engine.apply(GameAction.MOVE_LEFT);
-        engine.apply(GameAction.MOVE_LEFT); // x=0으로 이동하는 순간 (0,3)에 접촉
+        engine.apply(GameAction.MOVE_LEFT); // x=0에서 (0,3) 바로 위로 이동해도 잠기지 않는다.
         assertEquals(new Position(0, 1), engine.snapshot().activePiece().origin());
         engine.apply(GameAction.MOVE_RIGHT);
+        assertEquals(new Position(1, 1), engine.snapshot().activePiece().origin());
+        engine.apply(GameAction.MOVE_LEFT);
         assertEquals(new Position(0, 1), engine.snapshot().activePiece().origin());
         engine.tick(); // (0,3)을 지워 아래가 다시 비었지만 이동 잠금은 유지
         engine.apply(GameAction.MOVE_RIGHT);
@@ -240,11 +252,12 @@ class RequiredItemsTest {
     }
 
     @Test
-    void touchingAnEmptyFloorLocksTheWeightBeforeTheNextTick() {
+    void touchingAnEmptyFloorAllowsMovementUntilTheLockingTick() {
         PlayerEngine engine = new PlayerEngine(8, 3, new Sequence(WEIGHT));
         engine.tick();
         Position floor = engine.snapshot().activePiece().origin();
         engine.apply(GameAction.MOVE_LEFT);
+        assertEquals(floor.translate(-1, 0), engine.snapshot().activePiece().origin());
         engine.apply(GameAction.MOVE_RIGHT);
         assertEquals(floor, engine.snapshot().activePiece().origin());
         assertNotNull(engine.tick().lockResult());
@@ -252,14 +265,14 @@ class RequiredItemsTest {
 
     @ParameterizedTest
     @ValueSource(ints = {2, 18})
-    void initialWeightContactLocksMovementBeforeTheFirstTick(int row) {
+    void initialWeightContactAllowsMovementBeforeTheFirstTick(int row) {
         Cell[][] board = new Board(10, 20).snapshot();
         if (row == 2) board[4][3] = Cell.occupiedBy(TetrominoType.J);
         ActivePiece initial = new ActivePiece(WEIGHT, 0, new Position(3, row));
         PlayerEngine engine = new PlayerEngine(board, initial, new Sequence());
 
         engine.apply(GameAction.MOVE_LEFT);
-        assertEquals(initial, engine.snapshot().activePiece());
+        assertEquals(initial.movedTo(initial.origin().translate(-1, 0)), engine.snapshot().activePiece());
         engine.apply(GameAction.MOVE_RIGHT);
         assertEquals(initial, engine.snapshot().activePiece());
         assertArrayEquals(board, engine.snapshot().board());
@@ -270,6 +283,8 @@ class RequiredItemsTest {
             ActivePiece descended = engine.snapshot().activePiece();
             engine.apply(GameAction.MOVE_RIGHT);
             assertEquals(descended, engine.snapshot().activePiece());
+        } else {
+            assertEquals(initial.origin(), engine.tick().lockResult().origin());
         }
     }
 

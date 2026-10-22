@@ -106,6 +106,8 @@ class AppCompositionTest {
         app.settings().update(new Settings(Settings.ScreenSize.MEDIUM, Settings.defaults().keyBindings(), false,
                 Difficulty.HARD));
         GameSession hard = app.newGame().session();
+        assertEquals(Difficulty.EASY, easy.snapshot().difficulty());
+        assertEquals(Difficulty.HARD, hard.snapshot().difficulty());
         for (GameSession session : new GameSession[]{easy, hard}) {
             // 25개의 O 블록으로 10줄을 삭제해 첫 가속을 실제 엔진에서 확인한다.
             for (int pair = 0; pair < 5; pair++) {
@@ -113,12 +115,17 @@ class AppCompositionTest {
                     for (int i = 0; i < 10; i++) session.handle(GameCommand.MOVE_LEFT);
                     for (int i = 0; i < target; i++) session.handle(GameCommand.MOVE_RIGHT);
                     session.handle(GameCommand.HARD_DROP);
+                    if (session.snapshot().lineClearAnimation() != null) {
+                        session.update(team.tetris.application.LineClearAnimation.DURATION_NANOS);
+                    }
                 }
             }
             assertEquals(10, session.snapshot().clearedLines());
             assertEquals(1, session.snapshot().level());
         }
         assertEquals(920_000_000L, easy.snapshot().gravityIntervalNanos());
+        assertEquals(Difficulty.EASY, easy.snapshot().difficulty());
+        assertEquals(Difficulty.HARD, hard.snapshot().difficulty());
         assertEquals(880_000_000L, hard.snapshot().gravityIntervalNanos());
         var before = hard.snapshot().engine().activePiece().origin();
         hard.update(879_999_999L);
@@ -211,6 +218,9 @@ class AppCompositionTest {
                 for (int i = 0; i < 10; i++) session.handle(GameCommand.MOVE_LEFT);
                 for (int i = 0; i < target; i++) session.handle(GameCommand.MOVE_RIGHT);
                 session.handle(GameCommand.HARD_DROP);
+                if (session.snapshot().lineClearAnimation() != null) {
+                    session.update(team.tetris.application.LineClearAnimation.DURATION_NANOS);
+                }
             }
         }
     }
@@ -221,11 +231,14 @@ class AppCompositionTest {
                 List.of(new AttachedItem(MARK)));
         GameSession item = app.newGame(GameMode.ITEM).session();
         GameSession normal = app.newGame(GameMode.NORMAL).session();
+        assertEquals(GameMode.ITEM, item.snapshot().mode());
+        assertEquals(GameMode.NORMAL, normal.snapshot().mode());
 
         clearTenLines(item);
         clearTenLines(normal);
 
         assertEquals(10, item.snapshot().clearedLines());
+        assertEquals(GameMode.ITEM, item.snapshot().mode());
         assertTrue(item.snapshot().engine().nextPiece().items().containsValue(MARK));
         assertFalse(normal.snapshot().engine().nextPiece().hasItems());
         item.handle(GameCommand.QUIT_GAME);

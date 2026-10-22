@@ -1,17 +1,20 @@
 package team.tetris.application;
 
 import java.util.Objects;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import team.tetris.application.model.GameMode;
 import team.tetris.application.model.Difficulty;
 import team.tetris.core.EnginePhase;
+import team.tetris.core.EngineSnapshot;
 import team.tetris.core.GameAction;
 import team.tetris.core.item.DoubleScoreItem;
 import team.tetris.core.item.WeightBlock;
 import team.tetris.core.port.TetrisEnginePort;
 import team.tetris.core.result.EngineStep;
 import team.tetris.core.result.ItemActivation;
+import team.tetris.core.result.RemovedCell;
 
 /** 코어 호출과 시간·점수·한 판의 수명 관리. 하나의 실행 흐름에서 호출 필요. */
 public final class SinglePlayerSession implements GameSession {
@@ -35,6 +38,7 @@ public final class SinglePlayerSession implements GameSession {
     private GameStatus status = GameStatus.RUNNING;
     private GameSnapshot view;
     private GameResult result;
+    private LineClearAnimation lineClearAnimation;
 
     /** 기본 정책으로 새 RUNNING 엔진의 소유권을 세션에 전달. */
     public SinglePlayerSession(TetrisEnginePort engine) {
@@ -68,7 +72,7 @@ public final class SinglePlayerSession implements GameSession {
         if (initial.phase() != EnginePhase.RUNNING) {
             throw new IllegalArgumentException("A new session requires a running engine");
         }
-        view = new GameSnapshot(initial, score, level, clearedLines, gravityIntervalNanos, status, doubleScoreClears);
+        refreshView(initial);
     }
 
     @Override
@@ -78,8 +82,10 @@ public final class SinglePlayerSession implements GameSession {
             return;
         }
         if (command == GameCommand.QUIT_GAME) {
-            finish(GameStatus.ABORTED);
-            view = new GameSnapshot(view.engine(), score, level, clearedLines, gravityIntervalNanos, status, doubleScoreClears);
+            var snapshot = engine.snapshot();
+            // 삭제 연출이 종료 표시를 미루고 있어도 이미 확정된 게임 오버는 보존한다.
+            finish(snapshot.phase() == EnginePhase.GAME_OVER ? GameStatus.GAME_OVER : GameStatus.ABORTED);
+            refreshView(snapshot);
             return;
         }
         if (status == GameStatus.PAUSED && command != GameCommand.RESUME) {
@@ -101,6 +107,15 @@ public final class SinglePlayerSession implements GameSession {
         if (command == GameCommand.PAUSE || command == GameCommand.RESUME) {
             accumulatedNanos = 0;
         }
+        if (lineClearAnimation != null) {
+            if (command == GameCommand.PAUSE || command == GameCommand.RESUME) {
+                EngineStep step = engine.apply(action);
+                status = command == GameCommand.PAUSE ? GameStatus.PAUSED : GameStatus.RUNNING;
+                refreshView(step.snapshot());
+                stepObserver.accept(step);
+            }
+            return;
+        }
         int levelBeforeStep = level;
         accept(engine.apply(action), levelBeforeStep);
     }
@@ -111,6 +126,10 @@ public final class SinglePlayerSession implements GameSession {
             throw new IllegalArgumentException("Elapsed time must be non-negative");
         }
         if (status != GameStatus.RUNNING || elapsedNanos == 0) {
+            return;
+        }
+        if (lineClearAnimation != null) {
+            advanceLineClear(elapsedNanos);
             return;
         }
         long cap = gravityIntervalNanos > Long.MAX_VALUE / MAX_TICKS_PER_UPDATE
@@ -124,7 +143,7 @@ public final class SinglePlayerSession implements GameSession {
             int levelBeforeStep = level;
             EngineStep step = engine.tick();
             accept(step, levelBeforeStep);
-            if (status != GameStatus.RUNNING || step.lockResult() != null) {
+            if (status != GameStatus.RUNNING || step.lockResult() != null || lineClearAnimation != null) {
                 return;
             }
         }
@@ -134,8 +153,9 @@ public final class SinglePlayerSession implements GameSession {
     private void accept(EngineStep step, int levelBeforeStep) {
         int distance = step.dropResult() == null ? 0 : step.dropResult().cellsDropped();
         // 고정 결과에는 다음 블록이 이미 스폰돼 있으므로 동작 전 블록으로 판정한다.
-        if (view.engine().activePiece() != null
-                && view.engine().activePiece().shape() == WeightBlock.SHAPE) {
+        boolean weight = view.engine().activePiece() != null
+                && view.engine().activePiece().shape() == WeightBlock.SHAPE;
+        if (weight) {
             distance = 0;
         }
         int lines = step.clearResult() == null ? 0 : step.clearResult().lineCount();
@@ -169,11 +189,39 @@ public final class SinglePlayerSession implements GameSession {
         if (step.lockResult() != null || status != GameStatus.RUNNING) {
             accumulatedNanos = 0;
         }
-        if (status == GameStatus.GAME_OVER) {
+        // 무게추가 부순 칸은 즉시 사라진다. 고정 후 완성된 줄은 일반 줄 삭제로 연출한다.
+        List<RemovedCell> animatedCells = weight ? List.of() : step.removedCells();
+        if (lines > 0 || !animatedCells.isEmpty()) {
+            lineClearAnimation = new LineClearAnimation(
+                    lines > 0 ? step.clearResult().clearedRows() : List.of(), animatedCells,
+                    step.lockResult() == null ? view.engine().activePiece() : null, 0);
+            accumulatedNanos = 0;
+            // 다음 스폰이 실패했어도 삭제 연출을 마친 뒤 게임 종료를 알린다.
+            status = GameStatus.RUNNING;
+        } else if (status == GameStatus.GAME_OVER) {
             finish(status);
         }
-        view = new GameSnapshot(step.snapshot(), score, level, clearedLines, gravityIntervalNanos, status, doubleScoreClears);
+        refreshView(step.snapshot());
         stepObserver.accept(step);
+    }
+
+    private void advanceLineClear(long elapsedNanos) {
+        long remaining = LineClearAnimation.DURATION_NANOS - lineClearAnimation.elapsedNanos();
+        if (elapsedNanos >= remaining) {
+            lineClearAnimation = null;
+            if (view.engine().phase() == EnginePhase.GAME_OVER) finish(GameStatus.GAME_OVER);
+        } else {
+            lineClearAnimation = new LineClearAnimation(lineClearAnimation.rows(),
+                    lineClearAnimation.removedCells(), lineClearAnimation.activePiece(),
+                    lineClearAnimation.elapsedNanos() + elapsedNanos);
+        }
+        // 연출을 넘긴 시간도 버려 새 블록에 온전한 낙하 간격을 준다.
+        refreshView(view.engine());
+    }
+
+    private void refreshView(EngineSnapshot snapshot) {
+        view = new GameSnapshot(snapshot, score, level, clearedLines, gravityIntervalNanos,
+                status, doubleScoreClears, lineClearAnimation, mode, difficulty);
     }
 
     /** 디버그 관찰자: 한 update 안에 여러 중력이 실행되어도 각 결과의 점수 반영 뒤 호출한다. */
@@ -196,14 +244,14 @@ public final class SinglePlayerSession implements GameSession {
         level = nextLevel;
         gravityIntervalNanos = nextInterval;
         resetGravityClock();
-        view = new GameSnapshot(view.engine(), score, level, clearedLines, gravityIntervalNanos, status, doubleScoreClears);
+        refreshView(view.engine());
     }
 
     public long accumulatedGravityNanos() { return accumulatedNanos; }
 
     /** 자동 진행과 같은 점수·종료 경로로 중력을 정확히 한 번 적용한다. */
     public void stepGravity() {
-        if (status != GameStatus.RUNNING) return;
+        if (status != GameStatus.RUNNING || lineClearAnimation != null) return;
         resetGravityClock();
         accept(engine.tick(), level);
     }
@@ -241,6 +289,7 @@ public final class SinglePlayerSession implements GameSession {
     private void finish(GameStatus reason) {
         status = reason;
         accumulatedNanos = 0;
+        lineClearAnimation = null;
         result = new GameResult(gameId, score, level, clearedLines, reason, mode, difficulty);
     }
 

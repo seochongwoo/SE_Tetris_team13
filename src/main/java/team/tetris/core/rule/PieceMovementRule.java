@@ -5,12 +5,13 @@ import team.tetris.core.Board;
 
 /**
  * 블록별 이동 규칙. {@link team.tetris.core.Shape#movementRule()}에서 선택한다.
- * 구현체는 상태를 저장하지 않는다. 최초 아래쪽 접촉 여부는 엔진이 블록마다 관리한다.
+ * 구현체는 상태를 저장하지 않는다. 실제 하강 시도에서 아래쪽 장애물·바닥에 막힌 이력은
+ * 엔진이 블록마다 관리한다. 초기 배치·스폰·좌우 이동·회전만으로는 접촉 이력을 기록하지 않는다.
  */
 public interface PieceMovementRule {
     PieceMovementRule NORMAL = new PieceMovementRule() { };
 
-    /** 최초 접촉 이후에는 아래가 다시 비어도 touchedDown이 true로 유지된다. */
+    /** 하강 시 처음 막힌 뒤에는 아래 칸을 지워 다시 비어도 touchedDown이 true로 유지된다. */
     default boolean allowsHorizontalMovement(boolean touchedDown) {
         return true;
     }

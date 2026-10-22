@@ -63,6 +63,17 @@ class DebugSessionTest {
         session.stepGravity();
         assertEquals(4, session.snapshot().clearedLines());
         assertEquals(1600, session.snapshot().score() - before);
+        assertNotNull(session.snapshot().lineClearAnimation());
+        assertTrue(session.frozen());
+        var active = session.snapshot().engine().activePiece();
+        session.stepGravity();
+        assertEquals(active, session.snapshot().engine().activePiece());
+        session.update(LineClearAnimation.DURATION_NANOS - 1);
+        assertNotNull(session.snapshot().lineClearAnimation());
+        session.update(1);
+        assertNull(session.snapshot().lineClearAnimation());
+        session.update(Long.MAX_VALUE);
+        assertEquals(active, session.snapshot().engine().activePiece());
     }
 
     @Test void ninthLinePresetSynchronizesSpeedAndItemThreshold() {
@@ -171,6 +182,9 @@ class DebugSessionTest {
         prepareIInGap(session);
         GameSnapshot before = session.snapshot();
         session.applyStats(29, Difficulty.HARD);
+        assertEquals(Difficulty.NORMAL, before.difficulty());
+        assertEquals(Difficulty.HARD, session.snapshot().difficulty());
+        assertEquals(GameMode.ITEM, session.snapshot().mode());
         assertArrayEquals(before.engine().board(), session.snapshot().engine().board());
         assertEquals(before.engine().activePiece(), session.snapshot().engine().activePiece());
         assertEquals(before.engine().nextPiece(), session.snapshot().engine().nextPiece());

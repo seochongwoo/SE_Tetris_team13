@@ -7,7 +7,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import team.tetris.application.GameCommand;
+import team.tetris.application.GameStatus;
 import team.tetris.application.model.GameMode;
 import team.tetris.application.model.Settings;
 import team.tetris.core.TetrominoType;
@@ -89,6 +92,78 @@ class ScreenRouterTest {
         router.keyReleased("ENTER");
         router.keyPressed("ENTER");
         assertInstanceOf(GameScreen.class, router.current());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"D, d", "D, D", "DIGIT1, !", "SEMICOLON, :"})
+    void heldDropKeyCannotTypeIntoTheNameAfterGameOver(String key, char character) throws Exception {
+        NameEntryScreen entry = finishGameHolding(key);
+
+        router.charTyped(character); // 전환 직전 눌림에 뒤따르는 문자 이벤트
+        for (int i = 0; i < 3; i++) {
+            router.keyPressed(key); // OS 자동 반복은 KEY_PRESSED와 KEY_TYPED 모두 발생시킨다.
+            router.charTyped(character);
+        }
+        assertEquals("", entry.name());
+
+        router.keyReleased(key);
+        router.keyPressed(key);
+        router.charTyped(character);
+        router.keyReleased(key);
+        TestApplication.tap(router, "ENTER");
+        assertEquals(String.valueOf(character), app.scores().list().getFirst().name());
+    }
+
+    @Test
+    void newTextKeysStillWorkWhileAnOldGameKeyIsHeld() throws Exception {
+        NameEntryScreen entry = finishGameHolding("D");
+
+        router.keyPressed("A");
+        router.charTyped('A');
+        router.keyReleased("A");
+        router.keyPressed("D");
+        router.charTyped('d');
+        assertEquals("A", entry.name());
+
+        router.keyReleased("D");
+        router.keyPressed("D");
+        router.charTyped('d');
+        router.keyPressed("D");
+        router.charTyped('d'); // 이름 화면에서 새로 누른 키의 정상 반복은 유지한다.
+        router.keyReleased("D");
+        router.charTyped('홍'); // 물리 키 식별자가 없는 입력기 확정 문자도 허용한다.
+        assertEquals("Add홍", entry.name());
+    }
+
+    @Test
+    void focusLossClearsTheOldKeysTextSuppression() throws Exception {
+        NameEntryScreen entry = finishGameHolding("D");
+        router.keyPressed("D");
+        router.charTyped('d');
+        assertEquals("", entry.name());
+
+        router.focusLost(); // 포커스를 잃은 동안의 KEY_RELEASED는 전달되지 않을 수 있다.
+        router.charTyped('홍');
+        router.keyPressed("D");
+        router.charTyped('d');
+        assertEquals("홍d", entry.name());
+    }
+
+    private NameEntryScreen finishGameHolding(String dropKey) throws Exception {
+        var defaults = Settings.defaults();
+        var bindings = new java.util.EnumMap<>(defaults.keyBindings());
+        bindings.put(GameCommand.HARD_DROP, dropKey);
+        router.updateSettings(new Settings(defaults.screenSize(), bindings, defaults.colorBlindMode()));
+        router.startGame();
+        GameScreen game = assertInstanceOf(GameScreen.class, router.current());
+        for (int i = 0; i < 200 && game.session().result().isEmpty(); i++) {
+            router.keyReleased(dropKey);
+            router.keyPressed(dropKey);
+            router.update(TestApplication.FRAME);
+        }
+        assertEquals(GameStatus.GAME_OVER, game.session().snapshot().status());
+        router.update(1_200_000_000L);
+        return assertInstanceOf(NameEntryScreen.class, router.current());
     }
 
     @Test
