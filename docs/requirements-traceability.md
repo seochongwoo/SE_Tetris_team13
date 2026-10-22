@@ -86,10 +86,10 @@
 | R2-14 | 아이템은 특징적인 모양·다른 문자, 아이템마다 다른 문자 (p7) | `BlockGlyphs.of(Item)`, `ColorPalette.itemStyle` | `ItemCatalogTest`, `TextRendererTest` | ✅ |
 | R2-15 | 줄 삭제 아이템 `L` (p8) | `LineClearItem` + `AttachedItem`, 줄 일괄 삭제·점수·누적 줄 수 반영 | `RequiredItemsTest`, `RequiredItemScoringTest` | 🔄 카드 7 (로컬 검증 완료, PR 전) |
 | R2-16 | 무게추 아이템 (p9) | `WeightBlock`, `PlayerEngine` 접촉 잠금·낙하 삭제, 화면 `@`, 세션 하강 점수 제외 | `RequiredItemsTest`, `RequiredItemScoringTest`, `TextRendererTest` | 🔄 카드 8 (로컬 검증 완료, PR 전) |
-| R2-17 | 팀 구상 아이템 3개 이상 (p7) | `ChainClearItem`(`C`), `BombItem`(`B`), `DoubleScoreItem`(`$`) | `ChainClearItemTest`, `BombItemTest`, `DoubleScoreTest`, `TeamItemsInEngineTest` | ✅ 카드 9~11 (백로그 완료 기록 기준, 팀 명세 확정은 별도) |
+| R2-17 | 팀 구상 아이템 3개 이상 (p7) | `ChainClearItem`(`C`), `BombItem`(`B`), `DoubleScoreItem`(`$`) | `ChainClearItemTest`, `BombItemTest`, `DoubleScoreTest`, `TeamItemsInEngineTest` | ✅ 카드 9~11, 2026-10-22 팀 명세 확정 |
 | R2-18 | 아이템을 추가하기 쉬운 구조 (p10) | `Item` 구현 + `ItemCatalog.entries()`에 이름과 생성 방식 | `ItemCatalogTest` | ✅ |
 | R2-19 | 1차 요구사항과 어긋나지 않는 규칙: 아이템 표시 + 색맹 모드, 난이도 설정 저장, 실행 환경 (p10) | 아이템은 문자로 구분, 설정 파일 v2에 난이도 저장 | `ColorPaletteTest`, `PropertiesSettingsRepositoryTest` | ✅ |
-| R2-20 | 팀 아이템 형태·기능 명세서를 평가팀에 제공 (p10) | [아이템 명세서](item-specification.md) | - | 🔄 5종 구현 반영, 팀 확정·평가팀 제공 대기 |
+| R2-20 | 팀 아이템 형태·기능 명세서를 평가팀에 제공 (p10) | [아이템 명세서](item-specification.md) | - | 🔄 5종 구현·팀 확정 반영, 평가팀 제공 대기 |
 
 ### 프로젝트 관리와 검증
 
@@ -108,7 +108,7 @@
 | 무게추 아이템 PR 리뷰·머지 | R2-16 | 8 |
 | 줄 삭제 애니메이션 PR 리뷰·머지 | R2-06 | 12 |
 | 2차 반영 배포 패키지 v2.0.0 | N1-08 | 13 |
-| 아이템 명세서 확정 | R2-20 | 11 |
+| 확정한 아이템 명세서 평가팀 제공 | R2-20 | 11 |
 | GitHub Issue 등록, PR에 `Closes #번호`와 상대방 리뷰 | N1-03, N2-02, N2-03 | 운영 |
 
 ## 4. 해석이 필요한 항목
