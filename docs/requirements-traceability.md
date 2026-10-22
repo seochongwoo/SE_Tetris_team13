@@ -6,7 +6,7 @@
 - 경로는 `src/main/java/team/tetris/` 기준, 테스트는 `src/test/java/team/tetris/` 아래 클래스 이름입니다.
 - 구현 확인: 2026-10-16, 카드 12와 게임 화면 모드·난이도 표시 포함
 - 리뷰 기준 전체 검증: 테스트 561개 통과, 라인 커버리지 94.8%
-- 2026-10-22 게임 오버 연출 중 종료 회귀 수정 후 전체 검증: 테스트 565개 통과, 라인 커버리지 94.8% (2,722 / 2,871줄). `./gradlew --offline --no-daemon test jacocoTestReport`로 확인.
+- 2026-10-22 연출 중 입력 버퍼링·게임 오버 종료 회귀 수정 후 전체 검증: 테스트 573개 통과, 라인 커버리지 94.8% (2,726 / 2,875줄). `./gradlew --offline --no-daemon test jacocoTestReport`로 확인.
 
 ## 1. 1차 요구사항
 
@@ -24,7 +24,7 @@
 | R1-08 | 화면: 보드, 다음 블록, 실시간 점수 (p7) | `ui/render/TextRenderer` | `TextRendererTest` | ✅ |
 | R1-09 | 조작 없이 1초에 1칸 낙하, 줄 삭제에 따라 가속 (p8) | `application/SinglePlayerSession.update`, `application/SpeedPolicy` | `SinglePlayerSessionTest`, `SpeedPolicyTest` | ✅ |
 | R1-10 | 좌·우·아래 이동, 시계 방향 90도 회전, 한 번에 떨어뜨리기 (p8) | `core/PlayerEngine`, `core/rule/RotationSystem` | `PlayerEngineTest`, `RotationSystemTest` | ✅ |
-| R1-11 | 반복 키 입력이 무시되지 않고 즉시 반응 (p8) | `ui/input/RepeatController`, `ui/screen/GameScreen` (삭제 연출 300ms 동안 이동·회전·드롭 입력을 버리고 버퍼링하지 않음) | `RepeatControllerTest`, `ResponsivenessTest`, `GameScreenTest` | ✅ |
+| R1-11 | 반복 키 입력이 무시되지 않고 즉시 반응 (p8) | `ui/input/RepeatController`, `ui/screen/GameScreen` (삭제 연출 중 이동·회전·드롭·키 반복을 보관하고 종료 후 순서대로 적용) | `RepeatControllerTest`, `ResponsivenessTest`, `GameScreenTest`, `AnimationInputTest` | ✅ |
 | R1-12 | 일시정지·재개 키 (p8) | `GameScreen` (P 키, Esc 게임 메뉴) | `GameScreenTest` | ✅ |
 | R1-13 | 진행·일시정지 중 게임 종료 방법 (OS 기능 제외) (p8) | `GameScreen` 게임 메뉴 "메뉴로 / 프로그램 종료" | `GameScreenTest` | ✅ |
 | R1-14 | 블록마다 다른 색, 비슷한·좌우 반전 블록은 대비되는 색·무늬 (p9) | `ui/render/palette/ColorPalette`, `BlockGlyphs` | `ColorPaletteTest` | ✅ |
@@ -49,7 +49,7 @@
 | N1-02 | 산출물(코드, 문서, 논의) 추적 관리 (p4, p16) | GitHub 저장소, `docs/`, PR, [프로젝트 진행 기록](project-history.md) | - | ✅ |
 | N1-03 | 이슈와 해결 상황 기록 (p16) | GitHub Issues | - | ⚠️ 이슈 미등록 ([프로젝트 관리 규칙](project-management.md) 참고) |
 | N1-04 | 팀원별 업무 분담 기록 (p16) | Trello, [백로그 진행 현황](requirements2-backlog.md), [ADR 역할 분담](architecture-decision.md) | - | ✅ |
-| N1-05 | 단위 테스트, 라인 커버리지 50~70% 이상 (p17) | JUnit 5, JaCoCo | 전체 490개 (카드 12 검증 시점) | ✅ 93.6% |
+| N1-05 | 단위 테스트, 라인 커버리지 50~70% 이상 (p17) | JUnit 5, JaCoCo | 전체 573개 (2026-10-22 검증) | ✅ 94.8% |
 | N1-06 | 비기능 요구사항 검증 테스트 1개 이상 (p17) | `test/performance` | `ResponsivenessTest` | ✅ |
 | N1-07 | 변경 시마다 테스트를 쉽게 실행하는 체계 (p17) | `gradlew build`, GitHub Actions(`.github/workflows/ci.yml`) | - | ✅ |
 | N1-08 | 배포 패키지를 쉽게 만드는 체계, 아이콘 포함 실행 파일, 명령어 없이 실행 (p18) | `gradlew packageZip` (jpackage, JRE 포함 `SETetris.exe`) | - | ✅ v1.0.0 / 🔄 2차 반영 배포는 카드 13 |
@@ -98,7 +98,7 @@
 | N2-01 | Trello 등으로 진척 상황·할 일 배정 관리, 팀원 생산성 확인 (p11) | Trello 보드, [백로그 진행 현황](requirements2-backlog.md) | ✅ |
 | N2-02 | Git·GitHub 버전 관리, 브랜치·PR 정책 (p11) | [프로젝트 관리 규칙](project-management.md), PR #1~#7 | ⚠️ PR 리뷰 기록 없음 |
 | N2-03 | 이슈를 GitHub Issue로 등록하고 해결 내역 추적 (p11) | GitHub Issues | ⚠️ 이슈 미등록 |
-| N2-04 | 중간평가 라인 커버리지 50%, 기말 70% (p12) | JaCoCo | ✅ 93.6% |
+| N2-04 | 중간평가 라인 커버리지 50%, 기말 70% (p12) | JaCoCo | ✅ 94.8% |
 
 ## 3. 남은 작업
 

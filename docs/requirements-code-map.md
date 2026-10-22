@@ -359,8 +359,8 @@ PlayerEngine.lockActivePieceAndSpawnNext
 
 `Board.clearRows` → `ClearResult.clearedRows()` → `SinglePlayerSession.accept`에서 점수 반영·`LineClearAnimation` 시작 → `GameSnapshot.lineClearAnimation()` → `TextRenderer.render`.
 
-렌더러는 압축된 보드와 `ClearedRow.cells()`로 삭제 전 행 위치를 복원합니다. 삭제 행 전체를 60ms 흰색으로 강조하고 240ms 동안 가운데부터 양쪽 끝으로 지운 뒤 압축된 보드·다음 활성 블록을 표시합니다. `SinglePlayerSession.update`가 연출 시간을 진행하며 그동안 이동·회전·드롭·중력은 차단합니다. 일시정지는 연출도 멈추고, 스폰 실패에 따른 종료 결과는 연출 뒤 확정합니다. `GameScreen`은 연출 중 키 입력을 버리고 반복을 소비합니다.
+렌더러는 압축된 보드와 `ClearedRow.cells()`로 삭제 전 행 위치를 복원합니다. 삭제 행 전체를 60ms 흰색으로 강조하고 240ms 동안 가운데부터 양쪽 끝으로 지운 뒤 압축된 보드·다음 활성 블록을 표시합니다. `SinglePlayerSession.update`가 연출 시간을 진행하며 그동안 이동·회전·드롭·중력은 차단합니다. 일시정지는 연출도 멈추고, 스폰 실패에 따른 종료 결과는 연출 뒤 확정합니다. `GameScreen`은 연출 중 이동·회전·드롭 입력과 키 반복을 보관하고, 연출 종료 후 받은 순서대로 적용합니다. 저장된 드롭이 새 연출을 시작하면 나머지 입력은 다음 연출 종료까지 보관하며, 일시정지·포커스 상실·게임 종료 시 대기 입력을 비웁니다.
 
 아이템의 `LockContext.removeCell`과 낙하 전후 비교(`PlayerEngine.removedSince`) → `EngineStep.removedCells()`가 삭제 칸을 기록합니다. 세션은 무게추의 칸 삭제를 제외하고 같은 연출에 합칩니다. 실제로 지운 칸만 강조하고 각 행의 삭제 범위 중앙부터 지웁니다. 개별 칸 삭제에는 점수·줄 수 증가나 위 칸 하강이 없습니다. 무게추가 부순 칸은 즉시 사라지며, 고정 후 완성된 줄만 일반 줄 삭제로 연출합니다.
 
-테스트: `LineClearAnimationTest`, `ItemClearAnimationTest`, `LineClearRenderingTest`, `GameScreenTest`.
+테스트: `LineClearAnimationTest`, `ItemClearAnimationTest`, `LineClearRenderingTest`, `GameScreenTest`, `AnimationInputTest`.

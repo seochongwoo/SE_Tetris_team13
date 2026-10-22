@@ -16,7 +16,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import team.tetris.application.GameCommand;
 import team.tetris.application.GameStatus;
-import team.tetris.application.LineClearAnimation;
 import team.tetris.application.SinglePlayerSession;
 import team.tetris.application.StartedGame;
 import team.tetris.application.model.LoadResult;
@@ -31,7 +30,6 @@ import team.tetris.core.Position;
 import team.tetris.core.Piece;
 import team.tetris.core.PlayerEngine;
 import team.tetris.core.TetrominoType;
-import team.tetris.core.item.LineClearItem;
 import team.tetris.core.rule.PieceSource;
 import team.tetris.storage.memory.InMemoryScoreRepository;
 import team.tetris.ui.ScreenRouter;
@@ -53,40 +51,6 @@ class GameScreenTest {
 
     private static GameStatus status(GameScreen game) {
         return game.session().snapshot().status();
-    }
-
-    @Test
-    void animationDiscardsQueuedDropsAndHeldRepeatsEvenOnItsFinalFrame() {
-        PieceSource source = new PieceSource() {
-            public Piece next() { return peek(); }
-            public Piece peek() { return Piece.of(TetrominoType.I).withItem(0, new LineClearItem()); }
-        };
-        var session = new SinglePlayerSession(new PlayerEngine(10, 20, source));
-        var game = new GameScreen(router, new StartedGame(session,
-                new LoadResult<>(Settings.defaults(), Optional.empty())));
-        game.onKeyPressed("SPACE");
-        game.onKeyReleased("SPACE");
-        game.update(FRAME);
-        assertNotNull(session.snapshot().lineClearAnimation());
-        var active = session.snapshot().engine().activePiece();
-        long score = session.snapshot().score();
-
-        game.onKeyPressed("LEFT");
-        game.update(LineClearAnimation.DURATION_NANOS - 1);
-        assertNotNull(session.snapshot().lineClearAnimation());
-        game.onKeyPressed("SPACE");
-        game.update(1);
-        assertNull(session.snapshot().lineClearAnimation());
-        assertEquals(active, session.snapshot().engine().activePiece());
-        game.update(FRAME);
-        assertEquals(active, session.snapshot().engine().activePiece());
-        assertEquals(score, session.snapshot().score());
-        assertEquals(1, session.snapshot().clearedLines());
-
-        game.onKeyReleased("LEFT");
-        game.onKeyPressed("RIGHT");
-        game.update(FRAME);
-        assertEquals(active.origin().translate(1, 0), origin(game));
     }
 
     @Test
