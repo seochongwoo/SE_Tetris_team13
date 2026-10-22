@@ -5,7 +5,8 @@
 - 상태: ✅ 충족 / 🔄 진행 중 / ❌ 미구현 / ⚠️ 보완 필요
 - 경로는 `src/main/java/team/tetris/` 기준, 테스트는 `src/test/java/team/tetris/` 아래 클래스 이름입니다.
 - 구현 확인: 2026-10-16, 카드 12와 게임 화면 모드·난이도 표시 포함
-- 전체 검증 수치는 카드 12 구현 당시 기록 기준: 테스트 490개 통과, 라인 커버리지 93.6% (이후 화면 변경의 전체 검증 수치는 별도 갱신 필요)
+- 리뷰 기준 전체 검증: 테스트 561개 통과, 라인 커버리지 94.8%
+- 2026-10-22 게임 오버 연출 중 종료 회귀 수정 후 전체 검증: 테스트 565개 통과, 라인 커버리지 94.8% (2,722 / 2,871줄). `./gradlew --offline --no-daemon test jacocoTestReport`로 확인.
 
 ## 1. 1차 요구사항
 
@@ -23,7 +24,7 @@
 | R1-08 | 화면: 보드, 다음 블록, 실시간 점수 (p7) | `ui/render/TextRenderer` | `TextRendererTest` | ✅ |
 | R1-09 | 조작 없이 1초에 1칸 낙하, 줄 삭제에 따라 가속 (p8) | `application/SinglePlayerSession.update`, `application/SpeedPolicy` | `SinglePlayerSessionTest`, `SpeedPolicyTest` | ✅ |
 | R1-10 | 좌·우·아래 이동, 시계 방향 90도 회전, 한 번에 떨어뜨리기 (p8) | `core/PlayerEngine`, `core/rule/RotationSystem` | `PlayerEngineTest`, `RotationSystemTest` | ✅ |
-| R1-11 | 반복 키 입력이 무시되지 않고 즉시 반응 (p8) | `ui/input/RepeatController`, `ui/screen/GameScreen` | `RepeatControllerTest`, `ResponsivenessTest` | ✅ |
+| R1-11 | 반복 키 입력이 무시되지 않고 즉시 반응 (p8) | `ui/input/RepeatController`, `ui/screen/GameScreen` (삭제 연출 300ms 동안 이동·회전·드롭 입력을 버리고 버퍼링하지 않음) | `RepeatControllerTest`, `ResponsivenessTest`, `GameScreenTest` | ✅ |
 | R1-12 | 일시정지·재개 키 (p8) | `GameScreen` (P 키, Esc 게임 메뉴) | `GameScreenTest` | ✅ |
 | R1-13 | 진행·일시정지 중 게임 종료 방법 (OS 기능 제외) (p8) | `GameScreen` 게임 메뉴 "메뉴로 / 프로그램 종료" | `GameScreenTest` | ✅ |
 | R1-14 | 블록마다 다른 색, 비슷한·좌우 반전 블록은 대비되는 색·무늬 (p9) | `ui/render/palette/ColorPalette`, `BlockGlyphs` | `ColorPaletteTest` | ✅ |

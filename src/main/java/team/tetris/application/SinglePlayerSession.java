@@ -82,8 +82,10 @@ public final class SinglePlayerSession implements GameSession {
             return;
         }
         if (command == GameCommand.QUIT_GAME) {
-            finish(GameStatus.ABORTED);
-            refreshView(view.engine());
+            var snapshot = engine.snapshot();
+            // 삭제 연출이 종료 표시를 미루고 있어도 이미 확정된 게임 오버는 보존한다.
+            finish(snapshot.phase() == EnginePhase.GAME_OVER ? GameStatus.GAME_OVER : GameStatus.ABORTED);
+            refreshView(snapshot);
             return;
         }
         if (status == GameStatus.PAUSED && command != GameCommand.RESUME) {

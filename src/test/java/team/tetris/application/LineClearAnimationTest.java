@@ -115,14 +115,22 @@ class LineClearAnimationTest {
         }
     }
 
-    @Test void quittingDuringPausedAnimationCancelsItAndKeepsTheAwardedScore() {
-        var session = game(false, false);
+    @ParameterizedTest @ValueSource(booleans = {false, true})
+    void quittingDuringPausedAnimationCancelsItAndKeepsTheAwardedScore(boolean gameOver) {
+        var session = game(false, gameOver);
         session.handle(GameCommand.HARD_DROP);
         session.handle(GameCommand.PAUSE);
+        assertEquals(GameStatus.PAUSED, session.snapshot().status());
         session.handle(GameCommand.QUIT_GAME);
         assertNull(session.snapshot().lineClearAnimation());
-        assertEquals(GameStatus.ABORTED, session.result().orElseThrow().reason());
-        assertEquals(100, session.result().orElseThrow().score());
+        var result = session.result().orElseThrow();
+        assertEquals(gameOver ? GameStatus.GAME_OVER : GameStatus.ABORTED, result.reason());
+        assertEquals(result.reason(), session.snapshot().status());
+        assertEquals(100, result.score());
+        assertEquals(1, result.clearedLines());
+        session.handle(GameCommand.QUIT_GAME);
+        session.update(Long.MAX_VALUE);
+        assertSame(result, session.result().orElseThrow());
     }
 
     @Test void restoresSeparatedRowsAndTopRowWithoutSharingMutableArrays() {

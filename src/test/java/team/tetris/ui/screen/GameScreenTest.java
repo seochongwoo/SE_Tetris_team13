@@ -23,6 +23,10 @@ import team.tetris.application.model.LoadResult;
 import team.tetris.application.model.Settings;
 import team.tetris.application.port.SettingsRepository;
 import team.tetris.application.port.StorageException;
+import team.tetris.core.ActivePiece;
+import team.tetris.core.Board;
+import team.tetris.core.Cell;
+import team.tetris.core.EnginePhase;
 import team.tetris.core.Position;
 import team.tetris.core.Piece;
 import team.tetris.core.PlayerEngine;
@@ -452,6 +456,55 @@ class GameScreenTest {
 
         assertInstanceOf(MenuScreen.class, router.current());
         assertEquals(0, app.exits());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"P", "ESCAPE", "FOCUS_LOST"})
+    void quittingPausedGameOverAnimationStillRegistersTheScore(String pauseTrigger) {
+        Cell[][] board = new Board(10, 20).snapshot();
+        for (int x = 0; x < 10; x++) {
+            if (x < 3 || x > 6) board[19][x] = Cell.occupiedBy(TetrominoType.O);
+        }
+        board[0][4] = Cell.occupiedBy(TetrominoType.Z);
+        PieceSource source = new PieceSource() {
+            public Piece next() { return peek(); }
+            public Piece peek() { return Piece.of(TetrominoType.T); }
+        };
+        var session = new SinglePlayerSession(new PlayerEngine(board,
+                new ActivePiece(TetrominoType.I, 0, new Position(3, 18)), source));
+        var game = new GameScreen(router, new StartedGame(session,
+                new LoadResult<>(Settings.defaults(), Optional.empty())));
+        game.onKeyPressed("SPACE");
+        game.onKeyReleased("SPACE");
+        game.update(FRAME);
+        assertEquals(EnginePhase.GAME_OVER, session.snapshot().engine().phase());
+        assertEquals(GameStatus.RUNNING, status(game));
+        assertNotNull(session.snapshot().lineClearAnimation());
+
+        if (pauseTrigger.equals("FOCUS_LOST")) {
+            game.onFocusLost();
+        } else {
+            game.onKeyPressed(pauseTrigger);
+            game.onKeyReleased(pauseTrigger);
+        }
+        game.update(FRAME);
+        assertEquals(GameStatus.PAUSED, status(game));
+        game.onKeyPressed("DOWN");
+        game.onKeyReleased("DOWN");
+        game.onKeyPressed("ENTER");
+        game.onKeyReleased("ENTER");
+        game.update(FRAME);
+        assertEquals(GameStatus.GAME_OVER, session.result().orElseThrow().reason());
+        assertNull(session.snapshot().lineClearAnimation());
+
+        game.update(GameScreen.GAME_OVER_DELAY_NANOS);
+        assertInstanceOf(NameEntryScreen.class, router.current());
+        router.charTyped('A');
+        TestApplication.tap(router, "ENTER");
+        var scoreboard = assertInstanceOf(ScoreboardScreen.class, router.current());
+        assertEquals(1, scoreboard.entries().size());
+        assertEquals(100, scoreboard.entries().getFirst().score());
+        assertTrue(scoreboard.highlightedRecordId().isPresent());
     }
 
     @Test
