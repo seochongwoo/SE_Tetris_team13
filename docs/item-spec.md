@@ -36,7 +36,7 @@
 | 글자 | 아이템    | 형태                        | 효과                                       | 상태 |
 | ---- | --------- | --------------------------- | ------------------------------------------ | ---- |
 | `L`  | 줄 삭제   | 일반 블럭의 한 칸(무작위)   | 고정 시 해당 줄 삭제                       | [확정] (구현됨) |
-| `@`  | 무게추    | 폭 4칸 전용 블럭            | 낙하하며 아래 블럭 모두 제거               | 표시 [팀 확정] (구현됨) |
+| `@`  | 무게추    | 폭 4칸 전용 블럭            | 낙하하며 아래 블럭 모두 제거               | 표시·동작 [팀 확정] (구현됨) |
 | `C`  | 연쇄 삭제 | 일반 블럭의 한 칸(무작위)   | 고정 시 맞닿은 같은 종류 블럭 덩어리 삭제  | [팀 확정] (구현됨) |
 | `B`  | 폭탄      | 1칸짜리 단독 블럭           | 고정 시 주위 3×3 칸 삭제                   | [팀 확정] (구현됨) |
 | `$`  | 점수 2배  | 일반 블럭의 한 칸(무작위)   | 이후 줄 삭제 동작 3번의 점수 ×2           | [팀 확정] (구현됨) |
@@ -48,13 +48,13 @@
 - 화면에서 블럭 한 칸은 글자 2칸으로 그리고 기본 블럭은 칸마다 무늬(`[]`, `##` 등)가 있으므로, 아이템 칸은 문자에 반전 배경을 더해 기본 무늬와 구분한다. 무게추는 모든 칸을 `@@`로 표시하고 반전 배경을 쓰지 않는다 [팀 확정]. 코드·로그의 내부 식별 문자 `W`는 화면 문자 `@`와 구분한다.
 - 블럭 일부에 포함되는 아이템(`L`, `C`, `$`)과 블럭 자체가 아이템인 것(`@`, `B`)을 모두 포함한다.
 
-### 무게추(`@`) 동작 구체화 [제안] (구현됨)
+### 무게추(`@`) 동작 구체화 [팀 확정] (구현됨)
 
-- 바닥이나 다른 블럭에 처음 닿기 전까지는 일반 블럭처럼 좌우 이동 가능, 회전은 불가
-- 닿은 뒤에는 좌우 이동 불가. 이후 자동 하강(또는 내리기)마다 아래 4칸 폭의 블럭을 지우며 한 칸씩 내려가 바닥에서 고정
+- 실제 하강을 시도하다 바닥이나 다른 블럭에 막히기 전까지는 좌우 이동 가능, 회전은 불가. 바로 위로 옆걸음하거나 초기 배치·스폰되는 것만으로는 잠기지 않는다.
+- 다음 자동 하강·내리기·한 번에 떨어뜨리기에서 아래 충돌을 확인하면 좌우 이동을 잠근다. 충돌 판정 후 아래 4칸 폭의 블럭을 지우며 내려가고, 아래가 다시 비어도 잠금은 유지한다. 바닥에 막힌 하강 시도에서는 즉시 고정한다. 이동 유예는 고정된 1초가 아니라 다음 하강 시도까지다.
 - 요구사항 예시 화면처럼 고정된 무게추는 일반 칸으로 보드에 남음
 - 지운 칸과 무게추의 하강 거리에는 점수 없음. 고정 후 꽉 찬 줄이 생기면 일반 줄 삭제 점수는 적용
-- 구현: `WeightBlock`은 `ItemKind`·`Item`을 구현하고 전용 `SHAPE`(위 2칸/아래 4칸, 회전 상태 1개)의 `movementRule()`에서 `WeightMovementRule`을 반환한다. `PlayerEngine.updateContact`가 초기 배치·스폰·이동·회전·하강 후 최초 아래쪽 접촉을 기억하며, `WeightMovementRule.allowsHorizontalMovement`는 접촉 후 좌우 이동을 막고 `allowsRotation`은 항상 회전을 막는다. `PlayerEngine.descendOneCell` → `DropRule.descend` → `WeightMovementRule.descend` 순서로 다음 위치의 칸을 지우고 한 칸 내려간다. 낙하 거리는 그대로 보고하며, `SinglePlayerSession`은 동작 전 블록이 무게추일 때 하강 점수를 제외한다.
+- 구현: `WeightBlock`은 `ItemKind`·`Item`을 구현하고 전용 `SHAPE`(위 2칸/아래 4칸, 회전 상태 1개)의 `movementRule()`에서 `WeightMovementRule`을 반환한다. `PlayerEngine.descendOneCell`이 칸을 지우기 전에 `updateContact`로 실제 하강 시도의 충돌을 기억하며, `WeightMovementRule.allowsHorizontalMovement`는 그 이후 좌우 이동을 막고 `allowsRotation`은 항상 회전을 막는다. 이어서 `DropRule.descend` → `WeightMovementRule.descend` 순서로 다음 위치의 칸을 지우고 한 칸 내려간다. 낙하 거리는 그대로 보고하며, `SinglePlayerSession`은 동작 전 블록이 무게추일 때 하강 점수를 제외한다.
 
 ### 연쇄 삭제(`C`) 구현 메모 [팀 확정]
 
@@ -101,7 +101,7 @@
   - 구현됨 (카드 6): `rule/ItemPieceSource`(10줄마다 아이템, 일반 공급자를 감싸는 형태), `item/ItemKind`·`item/AttachedItem`(아이템이 블럭에 실리는 방식), `item/ItemCatalog`(등장 아이템 목록, 새 아이템은 여기에 한 줄 추가)
   - 구현됨 (카드 3): `rule/WeightedRandomGenerator`(7-bag 대체, 블럭별 가중치를 생성자로 받음), 난이도별 가중치는 application의 `PieceWeightPolicy`
   - 구현됨 (카드 9~11): `item/ChainClearItem`(`C`), `item/BombItem`(`B`)·`item/SoloBlock`(1칸 블럭), `item/DoubleScoreItem`(`$`, 점수 처리는 `SinglePlayerSession`)
-  - 구현됨 (카드 7~8): `item/LineClearItem`(`L`), `item/WeightBlock`(화면 `@`, 내부 식별 `W`), `PlayerEngine`의 최초 접촉 상태 관리, `item/WeightMovementRule`의 접촉 후 이동 제한·낙하 삭제, `SinglePlayerSession`의 무게추 하강 점수 제외
+  - 구현됨 (카드 7~8): `item/LineClearItem`(`L`), `item/WeightBlock`(화면 `@`, 내부 식별 `W`), `PlayerEngine`의 하강 시도 중 충돌 이력 관리, `item/WeightMovementRule`의 충돌 후 이동 제한·낙하 삭제, `SinglePlayerSession`의 무게추 하강 점수 제외
 - **application**: `Difficulty`, `GameMode`, `Settings`(난이도), `GameResult`·`ScoreEntry`(모드·난이도), `ScoreboardService`(모드·난이도별 순위), `SpeedPolicy`(난이도별 증가율), `ApplicationContext.newGame`(모드·난이도 전달), `SinglePlayerSession`(줄 삭제 애니메이션 동안 대기, `$` 같은 보드 밖 아이템 효과)
 - **storage**: `PropertiesSettingsRepository`(설정 파일 `schemaVersion` 2), `BinaryScoreRepository`(점수 파일 버전 2, 기존 기록은 일반 모드·normal로 변환)
 - **bootstrap**: `AppComposition`(모드·난이도에 맞는 생성기·공급자·규칙 조립)
@@ -118,7 +118,7 @@
 | ---- | ------ |
 | `L` 줄 삭제 | `L`이 있는 줄만 삭제, 꽉 차지 않은 줄 삭제, 삭제된 줄 점수 계산, 꽉 찬 줄과 동시 삭제 시 합산 |
 | `L` 위치 | 시드를 바꿔 반복하면 블럭의 모든 칸 위치에 붙음 |
-| 무게추 | 낙하 중 좌우 이동 가능, 접촉 후 불가, 회전 불가, 아래 블럭 전부 제거, 바닥에서 고정 후 보드에 남음, 점수 없음 |
+| 무게추 | 블럭·바닥 바로 위에서도 하강 시도 전까지 좌우 이동 가능, 하강 시 충돌 후 잠금 유지, 회전 불가, 아래 블럭 전부 제거, 바닥에서 고정 후 `@` 무늬 유지, 점수 없음 |
 | `C` 연쇄 삭제 | 이웃 없음, 같은 종류 덩어리, 종류가 다른 이웃, 대각선 비연결, 보드 가장자리 |
 | `B` 폭탄 | 중앙, 보드 가장자리, 모서리에서 3×3 범위 |
 | `$` 점수 2배 | 3번 후 원복, 중복 획득 규칙 |
@@ -141,4 +141,5 @@
 
 - 자체 아이템은 `C`·`B`·`$` 세 가지와 현재 세부 규칙으로 확정. `V`는 확정안에 포함하지 않음.
 - 무게추 화면 문자는 `@`(한 칸당 `@@`), 형태는 위 2칸/아래 4칸으로 확정. 내부 식별 문자 `W`와 구분.
+- 무게추는 실제 하강 시도에서 아래 블럭·바닥에 막힌 시점부터 좌우 잠금. 초기 배치·스폰·옆걸음만으로 잠그지 않음.
 - `$` 재획득 시 남은 적용 횟수는 3으로 리셋. 나머지 세부 동작은 2장과 [평가용 명세서](item-specification.md)를 기준으로 함.

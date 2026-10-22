@@ -67,7 +67,6 @@ public final class PlayerEngine implements TetrisEnginePort {
         for (Position cell : initialPiece.cells()) {
             if (cell.y() < 0) throw new IllegalArgumentException("Initial piece must be visible");
         }
-        updateContact();
         phase = EnginePhase.RUNNING;
     }
 
@@ -127,7 +126,6 @@ public final class PlayerEngine implements TetrisEnginePort {
         Position moved = activePiece.origin().translate(dx, dy);
         if (board.canPlace(activePiece.shape(), activePiece.rotation(), moved)) {
             activePiece = activePiece.movedTo(moved);
-            updateContact();
         }
         return noEvent();
     }
@@ -140,7 +138,6 @@ public final class PlayerEngine implements TetrisEnginePort {
                 board, activePiece.shape(), activePiece.rotation(), activePiece.origin(), clockwise);
         if (result.rotated()) {
             activePiece = activePiece.rotatedTo(result.rotation(), result.origin());
-            updateContact();
         }
         return noEvent();
     }
@@ -184,14 +181,15 @@ public final class PlayerEngine implements TetrisEnginePort {
 
     /** 일반 블록은 충돌을 검사하고, 무게추는 다음 위치의 칸을 지우며 한 칸 내려간다. */
     private boolean descendOneCell() {
+        // 실제 하강 시도에서 막힌 경우만 기록한다. 무게추가 칸을 지우기 전에 검사해야 한다.
+        updateContact();
         ActivePiece next = DropRule.descend(board, activePiece);
         if (next == null) return false;
         activePiece = next;
-        updateContact();
         return true;
     }
 
-    /** 최초 아래쪽 접촉을 기억한다. 이동 제한 여부는 블록의 규칙이 결정한다. */
+    /** 하강을 시도하다 처음 막힌 상태를 기억한다. 이동 제한 여부는 블록의 규칙이 결정한다. */
     private void updateContact() {
         if (!DropRule.canDescend(board, activePiece)) {
             touchedDown = true;
@@ -248,7 +246,6 @@ public final class PlayerEngine implements TetrisEnginePort {
         Position origin = spawnOrigin(piece.shape());
         if (board.canPlace(piece.shape(), 0, origin)) {
             activePiece = new ActivePiece(piece, 0, origin);
-            updateContact();
             phase = EnginePhase.RUNNING;
         } else {
             activePiece = null;
