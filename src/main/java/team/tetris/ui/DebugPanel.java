@@ -94,6 +94,7 @@ final class DebugPanel extends JPanel {
         playingControls.add(button("다음 블록에 적용", () -> router.debugSession().ifPresent(debug ->
                 debug.replaceNext((TetrominoType) pieces.getSelectedItem(),
                         (DebugItem) items.getSelectedItem()))));
+        label("아이템 '없음' 적용 시 기존 아이템 제거");
         label("전용 모양 아이템은 선택한 블록을 대체합니다.");
         label("P 일시정지 중에는 재개 후 조작하세요.");
         add(state);

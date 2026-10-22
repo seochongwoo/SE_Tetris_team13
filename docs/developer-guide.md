@@ -94,6 +94,24 @@ src/main/resources/META-INF/services/team.tetris.application.port.GameUi
 
 `AppComposition`은 지정 디렉터리 아래의 설정·기록 저장소를 연결하고, 새 게임마다 저장된 난이도로 `WeightedRandomGenerator → PlainPieceSource(아이템 모드는 ItemPieceSource) → PlayerEngine → SinglePlayerSession`을 생성합니다.
 
+### 디버그 모드
+
+`--debug`를 붙이면 오른쪽에 디버그 패널이 표시됩니다. 일반 게임이나 아이템 모드를 시작하거나, 패널의 `보드·스탯 적용`으로 테스트할 상태를 만듭니다.
+
+```powershell
+.\gradlew.bat run --args='--debug'
+.\gradlew.bat run --args='--debug --data-dir C:/tetris-test-data'
+```
+
+Linux/macOS에서는 `./gradlew run --args='--debug'`로 실행합니다.
+
+- 보드의 채울 줄 수·빈칸 수·배치·블록 종류, 누적 삭제 줄 수와 난이도를 설정합니다. `스탯만 적용`으로 보드를 유지한 채 진행 상태를 바꿀 수 있습니다.
+- `자동 낙하 정지` 상태에서도 이동·회전·드롭이 가능하며, `중력 한 단계`로 낙하나 고정을 한 번 실행합니다. 일시정지 중에는 재개 후 조작합니다.
+- `다음 블록에 적용`은 미리보기를 선택한 블록·아이템으로 교체합니다. 아이템이 `없음`이면 기존 아이템도 제거되며, 무게추·폭탄처럼 전용 모양이 있는 아이템은 선택한 블록 모양을 대체합니다.
+- 같은 랜덤 결과 유지, 설정한 상태·직전 설정 복원, 직전 배치 되돌리기로 상황을 재현합니다. 게임 화면에는 착지 위치 미리보기가 표시됩니다.
+
+설정·점수·로그는 데이터 디렉터리의 `debug/` 아래 `settings.properties`, `scores.bin`, `debug.log`에 저장해 일반 실행과 분리합니다. 조작·상태 로그는 콘솔에도 출력합니다. `--data-dir`을 생략하면 사용자 홈의 `.se-tetris-team13/debug/`를 사용합니다. `--debug` 없이 실행하면 디버그 패널과 세션을 생성하지 않습니다.
+
 ## 3. 게임 진행 API
 
 ```java
