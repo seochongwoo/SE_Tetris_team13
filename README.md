@@ -27,6 +27,8 @@ Java 21(JDK)이 필요합니다.
 
 설정과 기록은 `%USERPROFILE%\.se-tetris-team13` 폴더에 저장됩니다.
 
+개발용 디버그 모드는 `.\gradlew.bat run --args="--debug"`로 실행합니다. 보드·스탯·다음 블록을 직접 정해 아이템 동작을 재현할 수 있으며, 설정과 기록은 `debug` 하위 폴더에 따로 저장됩니다 ([개발 가이드](docs/developer-guide.md) 2장 "디버그 모드").
+
 ## 조작
 
 | 동작 | 기본 키 |
@@ -49,7 +51,7 @@ Java 21(JDK)이 필요합니다.
 | 낙하 속도 | 처음 1초에 1칸. 10줄마다 레벨이 오르고, 레벨당 easy 80ms / normal 100ms / hard 120ms씩 빨라짐 (최소 100ms) |
 | 블록 등장 확률 | 룰렛 휠 선택. 다른 블록 가중치 10일 때 I블록 easy 12 / normal 10 / hard 8 |
 | 점수 | 블록이 1칸 떨어질 때마다 (레벨 + 1)점 (자동·수동 무관), 줄 삭제 시 100 × (지운 줄 수)² 추가 |
-| 삭제 연출 | 60ms 흰색 강조 → 240ms 동안 중앙부터 양쪽으로 삭제 → 삭제 결과 표시. 폭탄·연쇄는 삭제된 칸만 연출하며 무게추의 칸 삭제는 즉시 적용. 줄 삭제가 있을 때만 위 줄이 내려옴. 연출 중 이동·회전·낙하 정지 |
+| 삭제 연출 | 60ms 흰색 강조 → 240ms 동안 중앙부터 양쪽으로 삭제 → 삭제 결과 표시. 폭탄·연쇄는 삭제된 칸만 연출하며 무게추의 칸 삭제는 즉시 적용. 줄 삭제가 있을 때만 위 줄이 내려옴. 연출 중에는 블록이 멈추고, 그동안 누른 키는 보관했다가 연출이 끝나면 순서대로 처리 |
 | 게임 종료 | 새 블록을 놓을 수 없으면 종료. 상위 10위 안이면 이름(최대 12자)을 입력하고 순위표에 강조 표시 |
 
 ## 빌드와 테스트
@@ -87,7 +89,7 @@ Java 21(JDK)이 필요합니다.
 | [아이템 명세서](docs/item-specification.md) | 아이템 모드의 아이템 형태·기능 (평가용) |
 | [요구사항 추적표](docs/requirements-traceability.md) | 1·2차 요구사항별 구현 위치, 테스트, 상태 |
 | [요구사항별 코드 흐름](docs/requirements-code-map.md) | 요구사항마다 거치는 파일과 메서드 호출 흐름 |
-| [프로젝트 관리 규칙](docs/project-management.md) | 브랜치·PR·이슈·Trello 운영 규칙 |
+| [프로젝트 관리 규칙](docs/project-management.md) | 브랜치·PR·이슈·작업 보드(GitHub Projects) 운영 규칙 |
 | [프로젝트 진행 기록](docs/project-history.md) | 날짜별 결정 사항, 문서 수정, 검토·확인 내역 |
 | [평가 준비와 데모 순서](docs/evaluation-guide.md) | 평가 당일 준비물과 시연 순서 |
 | [개발 가이드](docs/developer-guide.md) | 구조, API, 확장 방법, 빌드 |
@@ -95,7 +97,7 @@ Java 21(JDK)이 필요합니다.
 | [2차 요구사항 분석](docs/requirements2-analysis.md) | 2차 요구사항이 구조에 미치는 영향 |
 | [작업 진행 제안](docs/requirements2-work-plan.md) · [백로그 진행 현황](docs/requirements2-backlog.md) | 2차 작업 분할과 진행 상황 |
 | [아이템 모드 설계 정리](docs/item-spec.md) | 아이템 규칙 논의와 구현 메모 (팀 내부용) |
-| [미확정 사항](docs/open-questions.md) | 요구사항 해석과 결정 기록 |
+| [미확정 사항](docs/open-questions.md) | 요구사항 해석, 팀 논의 안건과 결정 기록 |
 
 ## 팀
 

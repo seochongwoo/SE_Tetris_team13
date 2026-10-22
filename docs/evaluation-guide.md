@@ -13,11 +13,11 @@
 
 ## 2. 평가 전날 확인
 
-- [ ] `main`에 모든 카드가 머지되었고 [요구사항 추적표](requirements-traceability.md)에 ❌·⚠️ 항목이 없음
+- [ ] `main`에 모든 카드가 머지되었고 [요구사항 추적표](requirements-traceability.md)에 ❌ 항목이 없음. ⚠️는 N2-02(PR #1~#8 리뷰 기록 없음)만 남고, 질문을 받으면 #23부터 리뷰 기록이 있다고 설명
 - [ ] GitHub Releases에 최신 버전 zip이 있음
 - [ ] 데모 노트북에서 zip을 새로 풀어 `SETetris.exe`를 더블클릭해 실행됨 (Java가 없는 상태에서도 실행되는지)
 - [ ] `.\gradlew.bat clean build jacocoTestReport`가 통과하고, 커버리지 보고서를 열 수 있음
-- [ ] GitHub의 Issues, Pull Requests, Actions 화면과 Trello 보드에 바로 접속 가능
+- [ ] GitHub의 Issues, Pull Requests, Actions 화면과 GitHub Projects 보드에 바로 접속 가능
 - [ ] 시연용 기록 정리: 필요하면 설정에서 스코어보드를 초기화하거나, 미리 몇 판을 플레이해 순위표에 기록을 남겨 둠
 
 ## 3. 데모 순서
@@ -38,7 +38,7 @@
 | 10 | 스코어보드: ←→ 난이도, ↑↓ 모드 구분 | R2-05, R2-11 |
 | 11 | 아이템 모드: 10줄 후 NEXT에 아이템 블록, 아이템별 효과 ([아이템 명세서](item-specification.md) 5장 확인 방법) | R2-12~17 |
 | 12 | 확률 분포 테스트(`WeightedRandomGeneratorTest`, `AppCompositionTest`)와 커버리지 보고서 | R2-07~09, N1-05 |
-| 13 | GitHub Issues·PR·Actions, Trello 보드, [백로그 진행 현황](requirements2-backlog.md) | N1-02~04, N2-01~03 |
+| 13 | GitHub Issues(카드 이슈, `bug` 이슈 #27~#35)·PR(리뷰 기록, PR #25의 수정 요청 → 반영 → 승인)·Actions, GitHub Projects 보드, [백로그 진행 현황](requirements2-backlog.md) | N1-02~04, N2-01~03 |
 
 ## 4. 시연 시간 주의
 
@@ -46,6 +46,7 @@
 - 대비 방법
   - 아이템별 효과는 자동 테스트(`TeamItemsInEngineTest` 등)와 [아이템 명세서](item-specification.md)의 그림으로 먼저 설명하고, 실제 플레이에서는 나오는 아이템만 보여 줍니다.
   - 시연을 맡을 사람이 미리 연습해 10줄을 빠르게 지울 수 있게 합니다.
+  - 개발용 디버그 모드(`.\gradlew.bat run --args="--debug"`)로 누적 줄 수를 9로 두거나 다음 블록에 아이템을 지정해 바로 보여 줄 수 있습니다. 일반 게임에는 없는 착지·삭제 미리보기가 함께 보이므로, 기능 시연은 배포 실행 파일로 하고 디버그 모드는 "개발용 재현 도구"라고 설명한 뒤 보조로만 씁니다.
 - 줄 삭제가 잘 안 될 때를 대비해 일반 모드 시연은 easy 난이도(I블록이 더 자주 나옴)로 합니다.
 
 ## 5. 질문 대비
@@ -55,5 +56,6 @@
 | 이 요구사항은 코드 어디에 있나 | [요구사항별 코드 흐름](requirements-code-map.md) |
 | 왜 이 구조를 골랐나, 아이템을 어떻게 추가하나 | [아키텍처 결정 기록](architecture-decision.md), [2차 요구사항 분석](requirements2-analysis.md), [개발 가이드](developer-guide.md) 8장 |
 | 확률 생성은 어떻게 했나 | `core/rule/WeightedRandomGenerator` (누적 가중치 + 난수 구간 탐색) |
-| 요구사항이 모호한 부분은 어떻게 정했나 | [미확정 사항](open-questions.md), [요구사항 추적표](requirements-traceability.md) 4장 |
-| 업무 분담은 어떻게 했나 | [작업 진행 제안](requirements2-work-plan.md), [백로그 진행 현황](requirements2-backlog.md), Trello |
+| 요구사항이 모호한 부분은 어떻게 정했나 | [미확정 사항](open-questions.md)의 팀 논의 안건과 결정 근거, [요구사항 추적표](requirements-traceability.md) 4장 |
+| 이슈와 버그는 어떻게 추적했나 | 카드마다 이슈 하나, 버그는 `bug` 이슈(#27~#35)에 증상·원인·고친 커밋을 기록. 일부는 소급 등록했으며 [프로젝트 진행 기록](project-history.md)에 경위가 있음 |
+| 업무 분담은 어떻게 했나 | [작업 진행 제안](requirements2-work-plan.md), [백로그 진행 현황](requirements2-backlog.md), GitHub Projects 보드와 이슈 담당자 |
