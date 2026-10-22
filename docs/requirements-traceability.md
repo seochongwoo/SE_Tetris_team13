@@ -4,9 +4,8 @@
 
 - 상태: ✅ 충족 / 🔄 진행 중 / ❌ 미구현 / ⚠️ 보완 필요
 - 경로는 `src/main/java/team/tetris/` 기준, 테스트는 `src/test/java/team/tetris/` 아래 클래스 이름입니다.
-- 구현 확인: 2026-10-16, 카드 12와 게임 화면 모드·난이도 표시 포함
-- 리뷰 기준 전체 검증: 테스트 561개 통과, 라인 커버리지 94.8%
-- 2026-10-22 입력 버퍼링·게임 오버 종료·무게추 하강 충돌 잠금 수정 후 전체 검증: 테스트 575개 통과, 라인 커버리지 94.8% (2,722 / 2,871줄). `./gradlew --offline --no-daemon test jacocoTestReport`로 확인.
+- 마지막 확인: 2026-10-22, `main` (PR #25까지 머지). 요구사항 원문 PDF(1차 19쪽, 2차 12쪽)와 문장 단위로 대조
+- 검증 수치: Windows 11·Java 21에서 `clean build jacocoTestReport packageZip` 성공, 테스트 575개 통과, 라인 커버리지 94.8% (2,722 / 2,871줄)
 
 ## 1. 1차 요구사항
 
@@ -45,14 +44,14 @@
 
 | ID | 요구사항 (슬라이드) | 구현·근거 | 테스트 | 상태 |
 | --- | --- | --- | --- | --- |
-| N1-01 | Windows 11, Java 21, 1.2GHz·1GB RAM에서 문제없는 성능 (p4, p15) | 힙 상한 256MB(`build.gradle`), 프레임 16ms 루프 | `ResponsivenessTest` (프레임 처리 시간, 입력 반응) | ✅ |
+| N1-01 | Windows 11, Java 21, 1.2GHz·1GB RAM·500MB 여유 공간에서 문제없는 성능 (p4, p15) | 힙 상한 256MB(`build.gradle`), 프레임 16ms 루프. 배포 실행 폴더 71.6MB, 실행 메모리 약 122MB (2026-10-22 측정) | `ResponsivenessTest` (프레임 처리 시간, 입력 반응) | ✅ (최소 사양 PC 실기 플레이는 미확인) |
 | N1-02 | 산출물(코드, 문서, 논의) 추적 관리 (p4, p16) | GitHub 저장소, `docs/`, PR, [프로젝트 진행 기록](project-history.md) | - | ✅ |
-| N1-03 | 이슈와 해결 상황 기록 (p16) | GitHub Issues | - | ⚠️ 이슈 미등록 ([프로젝트 관리 규칙](project-management.md) 참고) |
-| N1-04 | 팀원별 업무 분담 기록 (p16) | Trello, [백로그 진행 현황](requirements2-backlog.md), [ADR 역할 분담](architecture-decision.md) | - | ✅ |
-| N1-05 | 단위 테스트, 라인 커버리지 50~70% 이상 (p17) | JUnit 5, JaCoCo | 전체 575개 (2026-10-22 검증) | ✅ 94.8% |
+| N1-03 | 이슈와 해결 상황 기록 (p16) | GitHub Issues: 카드 #9~#22·#26, 버그 #27~#35 (`bug` 라벨, 고친 커밋·PR 연결) | - | ✅ |
+| N1-04 | 팀원별 업무 분담 기록 (p16) | 이슈 담당자, GitHub Projects 보드, [백로그 진행 현황](requirements2-backlog.md), [ADR 역할 분담](architecture-decision.md) | - | ✅ |
+| N1-05 | 단위 테스트, 라인 커버리지 50~70% 이상 (p17) | JUnit 5, JaCoCo | 전체 575개 | ✅ 94.8% |
 | N1-06 | 비기능 요구사항 검증 테스트 1개 이상 (p17) | `test/performance` | `ResponsivenessTest` | ✅ |
 | N1-07 | 변경 시마다 테스트를 쉽게 실행하는 체계 (p17) | `gradlew build`, GitHub Actions(`.github/workflows/ci.yml`) | - | ✅ |
-| N1-08 | 배포 패키지를 쉽게 만드는 체계, 아이콘 포함 실행 파일, 명령어 없이 실행 (p18) | `gradlew packageZip` (jpackage, JRE 포함 `SETetris.exe`) | - | ✅ v1.0.0 / 🔄 2차 반영 배포는 카드 13 |
+| N1-08 | 배포 패키지를 쉽게 만드는 체계, 아이콘 포함 실행 파일, 명령어 없이 실행 (p18) | `gradlew packageZip` (jpackage, JRE 포함 `SETetris.exe`). 2026-10-22 `main`에서 생성·실행 확인 | - | ✅ v1.0.0 / 🔄 2차 반영 배포 v2.0.0은 카드 13 (#12) |
 
 ## 2. 2차 요구사항
 
@@ -61,11 +60,11 @@
 | ID | 요구사항 (슬라이드) | 구현 | 테스트 | 상태 |
 | --- | --- | --- | --- | --- |
 | R2-01 | 설정에서 easy·normal·hard 선택 (p3) | `application/model/Difficulty`, `SettingsScreen` | `SettingsScreenTest` | ✅ |
-| R2-02 | easy는 I블록 20% 더, hard는 20% 덜 등장 (p3, p4) | `application/PieceWeightPolicy` (I 12/10/8, 나머지 10) | `PieceWeightPolicyTest`, `AppCompositionTest` | ✅ |
+| R2-02 | easy는 I블록 20% 더, hard는 20% 덜 등장 (p3, p4) | `application/PieceWeightPolicy` (I 12/10/8, 나머지 10). p4 예시 "다른 블럭 가중치 10일 때 I형 12"와 같은 방식 | `PieceWeightPolicyTest`, `AppCompositionTest` | ✅ |
 | R2-03 | 줄 삭제에 따른 속도 증가가 easy 20% 덜, hard 20% 더 (p3) | `SpeedPolicy(Difficulty)` (레벨당 80/100/120ms) | `SpeedPolicyTest` | ✅ |
 | R2-04 | 난이도별 추가 규칙·점수 자유 (p3) | 추가 점수 배율 없음으로 결정 | - | ✅ |
 | R2-05 | 스코어보드에서 난이도 구분 (p3) | `ScoreboardService.list(mode, difficulty)`, `ScoreboardScreen` (←→) | `ScoreboardScreenTest`, `PersistenceServicesTest` | ✅ |
-| R2-06 | 줄 삭제 애니메이션 (p3) | `SinglePlayerSession`, `LineClearAnimation`, `TextRenderer`: 60ms 흰색 강조·240ms 중앙부터 양쪽으로 삭제 후 압축 표시 | `LineClearAnimationTest`, `LineClearRenderingTest`, `GameScreenTest` | ✅ 로컬 구현·검증, 카드 12 리뷰·머지 대기 |
+| R2-06 | 줄 삭제 애니메이션 (p3) | `SinglePlayerSession`, `LineClearAnimation`, `TextRenderer`: 60ms 흰색 강조·240ms 중앙부터 양쪽으로 삭제 후 압축 표시 | `LineClearAnimationTest`, `LineClearRenderingTest`, `GameScreenTest`, `AnimationInputTest` | ✅ PR #25 (#11) |
 
 ### 확률에 따른 블록 생성
 
@@ -83,10 +82,10 @@
 | R2-11 | 스코어보드에서 일반·아이템 모드 구분 (p6) | `ScoreEntry.mode`, `ScoreboardScreen` (↑↓) | `ScoreboardScreenTest`, `BinaryScoreRepositoryTest` | ✅ |
 | R2-12 | 10줄 삭제마다 아이템, 미리보기에 새로 나타나는 블록은 아이템 (p7) | `core/rule/ItemPieceSource` | `ItemPieceSourceTest`, `AppCompositionTest` | ✅ |
 | R2-13 | 블록 일부가 아이템인 경우와 블록 자체가 아이템인 경우 (p7) | `core/item/AttachedItem`, `core/item/SoloBlock` | `SoloBlockTest` | ✅ |
-| R2-14 | 아이템은 특징적인 모양·다른 문자, 아이템마다 다른 문자 (p7) | `BlockGlyphs.of(Item)`, `ColorPalette.itemStyle` | `ItemCatalogTest`, `TextRendererTest` | ✅ |
-| R2-15 | 줄 삭제 아이템 `L` (p8) | `LineClearItem` + `AttachedItem`, 줄 일괄 삭제·점수·누적 줄 수 반영 | `RequiredItemsTest`, `RequiredItemScoringTest` | 🔄 카드 7 (로컬 검증 완료, PR 전) |
-| R2-16 | 무게추 아이템 (p9) | `WeightBlock`, `PlayerEngine` 하강 시 충돌 후 잠금·낙하 삭제, 화면 `@`, 세션 하강 점수 제외 | `RequiredItemsTest`, `RequiredItemScoringTest`, `TextRendererTest` | 🔄 카드 8 (로컬 검증 완료, PR 전) |
-| R2-17 | 팀 구상 아이템 3개 이상 (p7) | `ChainClearItem`(`C`), `BombItem`(`B`), `DoubleScoreItem`(`$`) | `ChainClearItemTest`, `BombItemTest`, `DoubleScoreTest`, `TeamItemsInEngineTest` | ✅ 카드 9~11, 2026-10-22 팀 명세 확정 |
+| R2-14 | 아이템은 특징적인 모양·다른 문자, 아이템마다 다른 문자 (p7) | `BlockGlyphs.of(Item)`, `ColorPalette.itemStyle`. `L`·`C`·`B`·`$`는 반전색 글자, 무게추는 전용 모양과 `@@` 무늬 (`@`는 무게추만 사용) | `ItemCatalogTest`, `TextRendererTest` | ✅ |
+| R2-15 | 줄 삭제 아이템 `L` (p8) | `LineClearItem` + `AttachedItem`, 줄 일괄 삭제·점수·누적 줄 수 반영 | `RequiredItemsTest`, `RequiredItemScoringTest` | ✅ PR #24 (#9) |
+| R2-16 | 무게추 아이템 (p9) | `WeightBlock`, `PlayerEngine` 하강 시 충돌 후 잠금·낙하 삭제, 화면 `@`, 세션 하강 점수 제외 | `RequiredItemsTest`, `RequiredItemScoringTest`, `TextRendererTest` | ✅ PR #24 (#10), 잠금 시점은 PR #25에서 하강 충돌 기준으로 변경 |
+| R2-17 | 팀 구상 아이템 3개 이상 (p7) | `ChainClearItem`(`C`), `BombItem`(`B`), `DoubleScoreItem`(`$`) | `ChainClearItemTest`, `BombItemTest`, `DoubleScoreTest`, `TeamItemsInEngineTest` | ✅ PR #8 (카드 9~11), 2026-10-22 팀 명세 확정 |
 | R2-18 | 아이템을 추가하기 쉬운 구조 (p10) | `Item` 구현 + `ItemCatalog.entries()`에 이름과 생성 방식 | `ItemCatalogTest` | ✅ |
 | R2-19 | 1차 요구사항과 어긋나지 않는 규칙: 아이템 표시 + 색맹 모드, 난이도 설정 저장, 실행 환경 (p10) | 아이템은 문자로 구분, 설정 파일 v2에 난이도 저장 | `ColorPaletteTest`, `PropertiesSettingsRepositoryTest` | ✅ |
 | R2-20 | 팀 아이템 형태·기능 명세서를 평가팀에 제공 (p10) | [아이템 명세서](item-specification.md) | - | 🔄 5종 구현·팀 확정 반영, 평가팀 제공 대기 |
@@ -95,28 +94,28 @@
 
 | ID | 요구사항 (슬라이드) | 구현·근거 | 상태 |
 | --- | --- | --- | --- |
-| N2-01 | Trello 등으로 진척 상황·할 일 배정 관리, 팀원 생산성 확인 (p11) | Trello 보드, [백로그 진행 현황](requirements2-backlog.md) | ✅ |
-| N2-02 | Git·GitHub 버전 관리, 브랜치·PR 정책 (p11) | [프로젝트 관리 규칙](project-management.md), PR #1~#7 | ⚠️ PR 리뷰 기록 없음 |
-| N2-03 | 이슈를 GitHub Issue로 등록하고 해결 내역 추적 (p11) | GitHub Issues | ⚠️ 이슈 미등록 |
+| N2-01 | Trello 등으로 진척 상황·할 일 배정 관리, 팀원 생산성 확인 (p11) | GitHub Projects 보드, 이슈 담당자, [백로그 진행 현황](requirements2-backlog.md) | ✅ (평가 전 보드의 담당자·상태 최신화) |
+| N2-02 | Git·GitHub 버전 관리, 브랜치·PR 정책 (p11) | [프로젝트 관리 규칙](project-management.md), PR #1~#8, #23~#25 | ⚠️ PR #1~#8은 GitHub 리뷰 기록 없음. #23~#25부터 상대방 Review(Approve / Request changes → 수정 → Approve) 기록 |
+| N2-03 | 이슈를 GitHub Issue로 등록하고 해결 내역 추적 (p11) | GitHub Issues: 카드 #9~#22·#26 (PR 본문의 `Closes #번호`로 머지 시 자동 종료), 버그 #27~#35 (발견·원인·해결 커밋 기록) | ✅ |
 | N2-04 | 중간평가 라인 커버리지 50%, 기말 70% (p12) | JaCoCo | ✅ 94.8% |
 
 ## 3. 남은 작업
 
 | 항목 | 관련 ID | 카드 |
 | --- | --- | --- |
-| 줄 삭제 아이템 `L` PR 리뷰·머지 | R2-15 | 7 |
-| 무게추 아이템 PR 리뷰·머지 | R2-16 | 8 |
-| 줄 삭제 애니메이션 PR 리뷰·머지 | R2-06 | 12 |
-| 2차 반영 배포 패키지 v2.0.0 | N1-08 | 13 |
-| 확정한 아이템 명세서 평가팀 제공 | R2-20 | 11 |
-| GitHub Issue 등록, PR에 `Closes #번호`와 상대방 리뷰 | N1-03, N2-02, N2-03 | 운영 |
+| 2차 반영 배포 패키지 v2.0.0 (버전, `packageZip`, GitHub Release) | N1-08 | 13 (#12) |
+| 확정한 아이템 명세서 평가팀 제공 | R2-20 | 13 (#12) |
+| 팀 논의 안건 ⑤~⑨ 확인 ([미확정 사항](open-questions.md)) | R2-05, R2-12, R2-16, R1-08, R2-03 | 운영 |
+| 앞으로의 PR에 `Closes #번호`와 상대방 Review 기록 | N2-02 | 운영 |
 
 ## 4. 해석이 필요한 항목
 
-e-class 답변 전까지 아래처럼 구현했습니다. 답변을 받으면 결과를 [미확정 사항](open-questions.md)과 이 표에 기록합니다.
+요구사항 원문에서 해석이 갈리는 부분은 팀 내부 논의로 정합니다. 안건별 원문, 구현, 결정과 근거는 [미확정 사항](open-questions.md)의 "2차 요구사항 팀 논의 안건"에 기록합니다.
 
-| 질문 | 현재 구현 |
-| --- | --- |
-| 난이도를 아이템 모드에도 적용하는가? | 적용. 스코어보드는 모드 × 난이도로 구분 |
-| `L` 등 아이템으로 지운 줄도 10줄 카운트에 포함하는가? | 포함 |
-| 아이템 카운트는 게임 전체 누적인가, 아이템이 나온 뒤 초기화되는가? | 게임 전체 누적 |
+| 질문 | 현재 구현 | 상태 |
+| --- | --- | --- |
+| 줄 삭제 연출 중 누른 키를 어떻게 처리하는가? (1차 p8 "반복된 키 입력이 무시되지 않고") | 보관했다가 연출 후 순서대로 처리 | 10-22 결정 |
+| 무게추는 언제 "닿았다"고 보는가? | 하강을 시도하다 막힌 순간 좌우 잠금 | 10-22 결정 |
+| 난이도를 아이템 모드에도 적용하는가? (원문: "기존의 일반 게임 모드에 난이도 설정을 추가") | 적용. 스코어보드는 모드 × 난이도로 구분 | 유지 제안 |
+| `L` 등 아이템으로 지운 줄도 10줄 카운트에 포함하는가? | 포함 | 유지 제안 |
+| 아이템 카운트는 게임 전체 누적인가, 아이템이 나온 뒤 초기화되는가? | 게임 전체 누적 | 유지 제안 |
