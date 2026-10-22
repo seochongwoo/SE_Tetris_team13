@@ -1,5 +1,7 @@
 package team.tetris.core.item;
 
+import java.util.ArrayList;
+import java.util.List;
 import team.tetris.core.ActivePiece;
 import team.tetris.core.Board;
 import team.tetris.core.Cell;
@@ -11,6 +13,7 @@ final class BoardContext implements ItemContext {
 
     final Board board;
     int clearRowCalls;
+    final List<Integer> requestedRows = new ArrayList<>();
 
     BoardContext(int width, int height) {
         board = new Board(width, height);
@@ -53,6 +56,7 @@ final class BoardContext implements ItemContext {
     @Override
     public void clearRow(int row) {
         clearRowCalls++;
+        requestedRows.add(row);
     }
 
     @Override

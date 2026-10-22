@@ -19,6 +19,8 @@ import team.tetris.core.TemporaryBlock;
 import team.tetris.core.TetrominoType;
 import team.tetris.core.item.Item;
 import team.tetris.core.item.ItemContext;
+import team.tetris.core.item.LineClearItem;
+import team.tetris.core.item.WeightBlock;
 import team.tetris.core.rule.PieceSource;
 import team.tetris.ui.TestApplication;
 import team.tetris.ui.input.InputMapper;
@@ -194,5 +196,34 @@ class TextRendererTest {
 
         assertTrue(renderer.render(doubled).text().contains("x2 (2)"));
         assertTrue(!renderer.render(plain).text().contains("x2 ("));
+    }
+
+    @Test
+    void lineAndWeightSymbolsAppearOnTheBoardAndPreviewInBothPalettes() {
+        Piece[] pieces = {Piece.of(TetrominoType.I).withItem(0, new LineClearItem()),
+                new WeightBlock().toItemPiece(null, null)};
+        for (boolean colorBlind : new boolean[] {false, true}) {
+            ColorPalette colors = ColorPalette.of(colorBlind);
+            TextRenderer itemRenderer = new TextRenderer(colors, new InputMapper(Settings.defaults()));
+            for (Piece piece : pieces) {
+                PieceSource source = new PieceSource() {
+                    public Piece next() { return piece; }
+                    public Piece peek() { return piece; }
+                };
+                SinglePlayerSession game = new SinglePlayerSession(new PlayerEngine(10, 20, source));
+                TextFrame frame = itemRenderer.render(game.snapshot());
+                Position position = game.snapshot().engine().activePiece().cells()[0];
+                char symbol = piece.itemAt(0).symbol();
+                assertEquals(symbol, frame.codePointAt(TextRenderer.columnOf(position.x()),
+                        TextRenderer.rowOf(position.y())));
+                assertEquals(colors.itemStyle(piece.shape()), frame.styleAt(
+                        TextRenderer.columnOf(position.x()), TextRenderer.rowOf(position.y())));
+                boolean previewHasSymbol = false;
+                for (int row = TextRenderer.BOARD_TOP + 2; row < TextRenderer.BOARD_TOP + 6; row++) {
+                    previewHasSymbol |= frame.rowText(row).substring(TextRenderer.PANEL_LEFT).contains("" + symbol);
+                }
+                assertTrue(previewHasSymbol);
+            }
+        }
     }
 }

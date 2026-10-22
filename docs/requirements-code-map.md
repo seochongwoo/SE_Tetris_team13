@@ -330,9 +330,18 @@ PlayerEngine.lockActivePieceAndSpawnNext
 
 테스트: `ChainClearItemTest`, `BombItemTest`, `DoubleScoreTest`, `TeamItemsInEngineTest`
 
+### R2-15~16 줄 삭제·무게추
+
+| 아이템 | 코드 흐름 |
+| --- | --- |
+| `L` 줄 삭제 | `LineClearItem.onLock` → `ItemContext.clearRow(position.y())` → `Board.clearRows`에서 완성 줄과 합산·중복 제거 → 일반 점수·누적 줄 수 반영 |
+| `W` 무게추 | `WeightBlock`의 폭 4칸 모양 → `PlayerEngine.updateWeightContact`가 아래 접촉 즉시 좌우 잠금 → `descendOneCell`에서 다음 위치의 칸 삭제 → 바닥 고정. `SinglePlayerSession.accept`는 동작 전 블록이 무게추이면 하강 점수 제외 |
+
+두 아이템은 `ItemCatalog`에 등록되어 기존 미리보기·아이템 문자 렌더링을 사용합니다. 테스트: `RequiredItemsTest`, `RequiredItemScoringTest`, `TextRendererTest`.
+
 ### R2-18 아이템을 추가하기 쉬운 구조
 
-새 아이템은 아래 두 곳만 고치면 게임에 나옵니다.
+고정 시 발동하는 새 아이템은 아래 두 곳을 고치면 게임에 나옵니다. 무게추처럼 이동 규칙이 다른 아이템은 엔진의 이동 처리도 확장합니다.
 
 1. `core/item/`에 `Item` 구현 클래스 추가: `symbol()`과 `onLock(ItemContext, Position)`
 2. `core/item/ItemCatalog.all()`에 한 줄 추가
@@ -348,6 +357,4 @@ PlayerEngine.lockActivePieceAndSpawnNext
 
 | 요구사항 | 이미 있는 것 | 추가할 곳 |
 | --- | --- | --- |
-| R2-15 줄 삭제 `L` | `ItemContext.clearRow`, 줄 일괄 삭제, 점수·10줄 카운트 연결 | `core/item/LineClearItem`(`onLock`에서 `clearRow(position.y())`) + `ItemCatalog`에 `new AttachedItem(new LineClearItem())` |
-| R2-16 무게추 | 4칸 너비 모양을 표현할 `Shape`, 회전 금지(`rotationStates() == 1`), 블록 대체(`ItemKind`) | 무게추 `Shape`와 `ItemKind`, `PlayerEngine`에 "닿은 뒤 좌우 이동 금지"와 "떨어지며 아래 칸 삭제" 처리, 무게추 점수 0 처리 |
 | R2-06 줄 삭제 애니메이션 | `ClearResult`의 `ClearedRow.cells()`(지워지기 직전 칸 내용) | 세션 또는 `GameScreen`에서 연출 시간 동안 대기하며 지운 줄을 반짝이게 그리기 (`TextRenderer`) |

@@ -1,5 +1,7 @@
 package team.tetris.core;
 
+import team.tetris.core.rule.PieceMovementRule;
+
 /**
  * 블록 모양 데이터. 회전 상태별로 차지하는 칸의 상대 좌표를 제공한다.
  *
@@ -20,6 +22,11 @@ public interface Shape {
 
     /** 회전 상태 수. 1이면 회전하지 않는 블록이다. */
     int rotationStates();
+
+    /** 블록별 이동·회전·낙하 규칙. 일반 블록은 기본 충돌 규칙을 사용한다. */
+    default PieceMovementRule movementRule() {
+        return PieceMovementRule.NORMAL;
+    }
 
     /** 블록을 이루는 칸 수. */
     default int cellCount() {

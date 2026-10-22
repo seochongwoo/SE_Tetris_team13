@@ -8,6 +8,7 @@ import team.tetris.application.model.Difficulty;
 import team.tetris.core.EnginePhase;
 import team.tetris.core.GameAction;
 import team.tetris.core.item.DoubleScoreItem;
+import team.tetris.core.item.WeightBlock;
 import team.tetris.core.port.TetrisEnginePort;
 import team.tetris.core.result.EngineStep;
 import team.tetris.core.result.ItemActivation;
@@ -132,6 +133,11 @@ public final class SinglePlayerSession implements GameSession {
 
     private void accept(EngineStep step, int levelBeforeStep) {
         int distance = step.dropResult() == null ? 0 : step.dropResult().cellsDropped();
+        // 고정 결과에는 다음 블록이 이미 스폰돼 있으므로 동작 전 블록으로 판정한다.
+        if (view.engine().activePiece() != null
+                && view.engine().activePiece().shape() == WeightBlock.SHAPE) {
+            distance = 0;
+        }
         int lines = step.clearResult() == null ? 0 : step.clearResult().lineCount();
         long gained = scorePolicy.scoreFor(distance, lines, levelBeforeStep);
         if (gained < 0) {

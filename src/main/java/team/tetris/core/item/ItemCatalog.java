@@ -23,6 +23,8 @@ public final class ItemCatalog {
 
     public static List<Entry> entries() {
         return List.of(
+                new Entry("줄 삭제", new AttachedItem(new LineClearItem())),
+                new Entry("무게추", new WeightBlock()),
                 new Entry("연쇄 삭제", new AttachedItem(new ChainClearItem())),
                 new Entry("폭탄", new SoloBlock(new BombItem())),
                 new Entry("점수 2배", new AttachedItem(new DoubleScoreItem())));
