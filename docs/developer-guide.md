@@ -485,6 +485,24 @@ JDK 21과 Gradle Wrapper를 사용합니다. 저장소 루트의 Windows PowerSh
 
 zip을 풀고 `SETetris\SETetris.exe`를 실행합니다. `runtime\`·`app\` 폴더가 exe와 같은 위치에 있어야 합니다. 실행 폴더만 필요하면 `.\gradlew.bat packageApp`을 씁니다. 포함 모듈은 jdeps 결과(`java.base`, `java.desktop`)로 줄였고, 최소 사양(RAM 1GB)을 고려해 힙 상한을 256MB로 둡니다. 저장 데이터는 exe 위치가 아니라 사용자 홈의 `.se-tetris-team13/`에 남습니다.
 
+### 디버그 모드 (개발용)
+
+아이템 동작처럼 실제 플레이로는 만들기 어려운 상황을 재현하기 위한 개발 도구입니다. 요구사항에 없는 기능이며, `--debug`를 줄 때만 켜집니다.
+
+```powershell
+.\gradlew.bat run --args="--debug"
+.\gradlew.bat run --args="--debug --data-dir C:/tetris-test-data"
+```
+
+- 창 제목에 `[DEBUG]`가 붙고 오른쪽에 제어 패널이 생깁니다. 일반 실행과 배포 실행 파일에서는 디버그 코드가 동작하지 않습니다 (`ApplicationContext.debugEnabled()` 기본값 false).
+- 저장 위치: 데이터 폴더 아래 `debug/`에 설정·기록·`debug.log`를 따로 둡니다. 실제 설정과 스코어보드에 섞이지 않으며, 디버그 판은 게임 오버가 되어도 순위 등록으로 넘어가지 않습니다.
+- 보드·스탯: 아래부터 채울 줄 수(0~18, 위 두 줄은 생성 공간), 줄마다 비울 칸 수와 배치(같은 열 / 줄마다 무작위), 채울 블록(임시 블록 / 7종 무작위), 누적 삭제 줄 수(아이템 등장 기준과 레벨에 반영), 난이도. 같은 시드로 같은 보드를 다시 만들 수 있습니다.
+- 진행 제어: 자동 낙하 정지(이동·회전은 가능), 중력 한 단계, 설정한 상태로 되돌리기, 직전 설정으로 되돌리기, 직전 블록 배치로 되돌리기(같은 시드로 조작을 다시 재생).
+- 다음 블록: 블록 종류와 아이템을 지정합니다. 아이템 목록은 `ItemCatalog.entries()`에서 자동으로 가져오므로 새 아이템을 따로 등록할 필요가 없습니다.
+- 화면: 디버그 판에만 착지 위치(`░░`)와 하드 드롭 시 지워질 칸 미리보기(`HardDropPreview`)를 표시합니다.
+- 기록: 동작마다 보드·점수·블록·아이템 공급 상태를 콘솔과 `debug.log`에 남깁니다.
+- 알려진 제한: 다음 블록에 아이템이 실려 있을 때 "다음 블록에 적용"으로 바꾸면 그 아이템이 사라지고, 해당 10줄 보상은 다시 나오지 않습니다 (`DebugPieceSource.next()`가 원래 미리보기를 버림. 다음 10줄부터는 정상).
+
 ### CI와 화면 검증
 
 [Windows Java CI](../.github/workflows/ci.yml)는 push·pull request·수동 실행 시 Windows와 Java 21에서 빌드·테스트·커버리지를 생성합니다. 생성된 보고서는 `test-and-coverage-reports` 아티팩트로 14일 보관합니다. 원격 성공 여부는 해당 커밋의 Actions 결과로 확인합니다.

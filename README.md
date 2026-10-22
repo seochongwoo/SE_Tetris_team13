@@ -27,6 +27,8 @@ Java 21(JDK)이 필요합니다.
 
 설정과 기록은 `%USERPROFILE%\.se-tetris-team13` 폴더에 저장됩니다.
 
+개발용 디버그 모드는 `.\gradlew.bat run --args="--debug"`로 실행합니다. 보드·스탯·다음 블록을 직접 정해 아이템 동작을 재현할 수 있으며, 설정과 기록은 `debug` 하위 폴더에 따로 저장됩니다 ([개발 가이드](docs/developer-guide.md) 10장).
+
 ## 조작
 
 | 동작 | 기본 키 |
@@ -87,7 +89,7 @@ Java 21(JDK)이 필요합니다.
 | [아이템 명세서](docs/item-specification.md) | 아이템 모드의 아이템 형태·기능 (평가용) |
 | [요구사항 추적표](docs/requirements-traceability.md) | 1·2차 요구사항별 구현 위치, 테스트, 상태 |
 | [요구사항별 코드 흐름](docs/requirements-code-map.md) | 요구사항마다 거치는 파일과 메서드 호출 흐름 |
-| [프로젝트 관리 규칙](docs/project-management.md) | 브랜치·PR·이슈·Trello 운영 규칙 |
+| [프로젝트 관리 규칙](docs/project-management.md) | 브랜치·PR·이슈·작업 보드(GitHub Projects) 운영 규칙 |
 | [프로젝트 진행 기록](docs/project-history.md) | 날짜별 결정 사항, 문서 수정, 검토·확인 내역 |
 | [평가 준비와 데모 순서](docs/evaluation-guide.md) | 평가 당일 준비물과 시연 순서 |
 | [개발 가이드](docs/developer-guide.md) | 구조, API, 확장 방법, 빌드 |
@@ -95,7 +97,7 @@ Java 21(JDK)이 필요합니다.
 | [2차 요구사항 분석](docs/requirements2-analysis.md) | 2차 요구사항이 구조에 미치는 영향 |
 | [작업 진행 제안](docs/requirements2-work-plan.md) · [백로그 진행 현황](docs/requirements2-backlog.md) | 2차 작업 분할과 진행 상황 |
 | [아이템 모드 설계 정리](docs/item-spec.md) | 아이템 규칙 논의와 구현 메모 (팀 내부용) |
-| [미확정 사항](docs/open-questions.md) | 요구사항 해석과 결정 기록 |
+| [미확정 사항](docs/open-questions.md) | 요구사항 해석, 팀 논의 안건과 결정 기록 |
 
 ## 팀
 

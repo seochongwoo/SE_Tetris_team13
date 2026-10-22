@@ -4,7 +4,7 @@
 
 - 경로는 `src/main/java/team/tetris/` 기준입니다.
 - `A → B`는 A가 B를 호출한다는 뜻입니다.
-- 마지막 확인: 2026-10-13, `feat/team-items` 브랜치
+- 마지막 확인: 2026-10-22, PR #23~#25를 모두 포함한 `fix/ui-and-animations`
 
 ## 0. 공통 뼈대
 
