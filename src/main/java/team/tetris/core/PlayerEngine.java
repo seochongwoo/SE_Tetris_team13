@@ -14,6 +14,7 @@ import team.tetris.core.result.EngineStep;
 import team.tetris.core.result.ItemActivation;
 import team.tetris.core.result.LockResult;
 import team.tetris.core.rule.PieceGenerator;
+import team.tetris.core.rule.DropRule;
 import team.tetris.core.rule.PieceSource;
 import team.tetris.core.rule.PlainPieceSource;
 import team.tetris.core.rule.RotationResult;
@@ -51,6 +52,20 @@ public final class PlayerEngine implements TetrisEnginePort {
     /** 아이템 없이 생성기가 정한 모양만 나오는 엔진 (일반 모드). */
     public PlayerEngine(int width, int height, PieceGenerator generator) {
         this(width, height, new PlainPieceSource(generator));
+    }
+
+    /** 검증된 초기 배치로 시작한다. source의 첫 블록은 다음 미리보기가 된다. */
+    public PlayerEngine(Cell[][] cells, ActivePiece initialPiece, PieceSource source) {
+        this.board = new Board(cells);
+        this.source = Objects.requireNonNull(source, "source");
+        this.activePiece = Objects.requireNonNull(initialPiece, "initialPiece");
+        if (!board.canPlace(initialPiece.shape(), initialPiece.rotation(), initialPiece.origin())) {
+            throw new IllegalArgumentException("Initial piece overlaps the board or its boundary");
+        }
+        for (Position cell : initialPiece.cells()) {
+            if (cell.y() < 0) throw new IllegalArgumentException("Initial piece must be visible");
+        }
+        phase = EnginePhase.RUNNING;
     }
 
     @Override
@@ -126,7 +141,7 @@ public final class PlayerEngine implements TetrisEnginePort {
      */
     private EngineStep descendOrLock() {
         Position lowered = activePiece.origin().translate(0, 1);
-        if (board.canPlace(activePiece.shape(), activePiece.rotation(), lowered)) {
+        if (DropRule.canDescend(board, activePiece)) {
             activePiece = activePiece.movedTo(lowered);
             return new EngineStep(snapshot(), new DropResult(1), null, null);
         }
@@ -134,13 +149,13 @@ public final class PlayerEngine implements TetrisEnginePort {
     }
 
     private EngineStep hardDrop() {
-        Position position = activePiece.origin();
+        ActivePiece landing = activePiece;
         int cellsDropped = 0;
-        while (board.canPlace(activePiece.shape(), activePiece.rotation(), position.translate(0, 1))) {
-            position = position.translate(0, 1);
+        while (DropRule.canDescend(board, landing)) {
+            landing = landing.movedTo(landing.origin().translate(0, 1));
             cellsDropped++;
         }
-        activePiece = activePiece.movedTo(position);
+        activePiece = landing;
         return lockActivePieceAndSpawnNext(new DropResult(cellsDropped));
     }
 

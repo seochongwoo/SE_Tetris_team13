@@ -6,10 +6,12 @@ import team.tetris.application.GameSnapshot;
 import team.tetris.core.ActivePiece;
 import team.tetris.core.Cell;
 import team.tetris.core.EngineSnapshot;
+import team.tetris.core.EnginePhase;
 import team.tetris.core.Piece;
 import team.tetris.core.Position;
 import team.tetris.core.Shape;
 import team.tetris.core.item.Item;
+import team.tetris.core.rule.DropRule;
 import team.tetris.ui.input.InputMapper;
 import team.tetris.ui.input.KeyNames;
 import team.tetris.ui.render.palette.BlockGlyphs;
@@ -48,10 +50,17 @@ public final class TextRenderer implements Renderer {
 
     private final ColorPalette palette;
     private final InputMapper keys;
+    private final boolean showLanding;
 
     public TextRenderer(ColorPalette palette, InputMapper keys) {
+        this(palette, keys, false);
+    }
+
+    /** showLanding은 디버그 화면에서만 켜는 착지 미리보기다. */
+    public TextRenderer(ColorPalette palette, InputMapper keys, boolean showLanding) {
         this.palette = palette;
         this.keys = keys;
+        this.showLanding = showLanding;
     }
 
     /** 보드 칸 x가 화면에서 시작하는 열. */
@@ -70,6 +79,9 @@ public final class TextRenderer implements Renderer {
         EngineSnapshot engine = snapshot.engine();
         Cell[][] board = engine.board();
         drawBoard(frame, board);
+        if (showLanding && (engine.phase() == EnginePhase.RUNNING || engine.phase() == EnginePhase.PAUSED)) {
+            drawLanding(frame, board, engine.activePiece());
+        }
         drawActivePiece(frame, engine.activePiece(), board[0].length, board.length);
         drawNext(frame, engine.nextPiece());
         drawStats(frame, snapshot);
@@ -103,6 +115,16 @@ public final class TextRenderer implements Renderer {
             int y = cells[i].y();
             if (x >= 0 && x < width && y >= 0 && y < height) {
                 drawCell(frame, columnOf(x), rowOf(y), piece.shape(), piece.itemAt(i));
+            }
+        }
+    }
+
+    private void drawLanding(TextFrame frame, Cell[][] board, ActivePiece piece) {
+        ActivePiece landing = DropRule.landingPiece(board, piece);
+        if (landing == null || landing.origin().equals(piece.origin())) return;
+        for (Position cell : landing.cells()) {
+            if (cell.x() >= 0 && cell.x() < board[0].length && cell.y() >= 0 && cell.y() < board.length) {
+                frame.put(columnOf(cell.x()), rowOf(cell.y()), BlockGlyphs.GHOST, palette.blockStyle(piece.shape()));
             }
         }
     }

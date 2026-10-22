@@ -10,6 +10,14 @@ import java.util.function.Function;
 import team.tetris.application.model.Difficulty;
 import team.tetris.application.model.GameMode;
 import team.tetris.application.*;
+import team.tetris.application.debug.DebugSetup;
+import team.tetris.application.debug.DebugPieceGenerator;
+import team.tetris.application.debug.DebugSession;
+import team.tetris.application.port.DebugLogSink;
+import team.tetris.core.ActivePiece;
+import team.tetris.core.Position;
+import team.tetris.core.TetrominoType;
+import team.tetris.core.rule.DebugPieceSource;
 import team.tetris.core.PlayerEngine;
 import team.tetris.core.item.ItemCatalog;
 import team.tetris.core.item.ItemKind;
@@ -20,6 +28,7 @@ import team.tetris.core.rule.PlainPieceSource;
 import team.tetris.core.rule.WeightedRandomGenerator;
 import team.tetris.storage.BinaryScoreRepository;
 import team.tetris.storage.PropertiesSettingsRepository;
+import team.tetris.storage.ConsoleFileDebugLog;
 
 /** 저장소·서비스·정책·엔진 조립. 게임 규칙과 정렬은 각 구성 요소에 위임. */
 public final class AppComposition implements ApplicationContext {
@@ -30,10 +39,18 @@ public final class AppComposition implements ApplicationContext {
     private final ScoreRule scoring;
     private final Function<Difficulty, ? extends SpeedRule> speeds;
     private final List<ItemKind> itemKinds;
+    private final boolean debug;
+    private final DebugLogSink debugLog;
 
     /** 실제 게임 구성: 저장된 난이도별 가중치 생성기와 속도 규칙, {@link ItemCatalog}의 아이템. */
     public AppComposition(Path dataDirectory) {
-        this(dataDirectory, AppComposition::generatorFor, new ScorePolicy(), SpeedPolicy::new, ItemCatalog.all());
+        this(dataDirectory, false);
+    }
+
+    /** 디버그 실행은 지정 경로 아래 debug 폴더에 설정과 기록을 격리한다. */
+    public AppComposition(Path dataDirectory, boolean debug) {
+        this(debug ? dataDirectory.resolve("debug") : dataDirectory, AppComposition::generatorFor,
+                new ScorePolicy(), SpeedPolicy::new, ItemCatalog.all(), debug);
     }
 
     /** 새 게임마다 독립된 블록 생성기를 반환하는 팩터리 주입 필요. */
@@ -60,8 +77,16 @@ public final class AppComposition implements ApplicationContext {
     public AppComposition(Path dataDirectory, Function<Difficulty, ? extends PieceGenerator> generators,
                           ScoreRule scoring, Function<Difficulty, ? extends SpeedRule> speeds,
                           List<ItemKind> itemKinds) {
+        this(dataDirectory, generators, scoring, speeds, itemKinds, false);
+    }
+
+    private AppComposition(Path dataDirectory, Function<Difficulty, ? extends PieceGenerator> generators,
+                           ScoreRule scoring, Function<Difficulty, ? extends SpeedRule> speeds,
+                           List<ItemKind> itemKinds, boolean debug) {
+        this.debug = debug;
         this.itemKinds = List.copyOf(itemKinds);
         Path directory = Objects.requireNonNull(dataDirectory, "dataDirectory").toAbsolutePath().normalize();
+        debugLog = debug ? new ConsoleFileDebugLog(directory.resolve("debug.log")) : null;
         this.generators = Objects.requireNonNull(generators, "generators");
         this.scoring = Objects.requireNonNull(scoring, "scoring");
         this.speeds = Objects.requireNonNull(speeds, "speeds");
@@ -94,6 +119,7 @@ public final class AppComposition implements ApplicationContext {
     @Override
     public StartedGame newGame(GameMode mode) {
         Objects.requireNonNull(mode, "mode");
+        if (debug) return newDebugGame(DebugSetup.empty(settings.loadOrDefault().value().difficulty()), mode);
         var loaded = settings.loadOrDefault();
         var difficulty = loaded.value().difficulty();
         var speed = Objects.requireNonNull(speeds.apply(difficulty), "speed");
@@ -104,5 +130,28 @@ public final class AppComposition implements ApplicationContext {
         var engine = new PlayerEngine(10, 20, pieces);
         var session = new SinglePlayerSession(engine, scoring, speed, mode, difficulty);
         return new StartedGame(session, loaded);
+    }
+
+    @Override public boolean debugEnabled() { return debug; }
+
+    @Override
+    public StartedGame newDebugGame(DebugSetup setup, GameMode mode) {
+        if (!debug) throw new IllegalStateException("Debug mode is not enabled");
+        Objects.requireNonNull(setup, "setup");
+        Objects.requireNonNull(mode, "mode");
+        var loaded = settings.loadOrDefault();
+        var difficulty = setup.difficulty();
+        var generator = new DebugPieceGenerator(difficulty, setup.seed());
+        PieceSource pieces = new PlainPieceSource(generator);
+        ItemPieceSource itemSource = null;
+        if (mode == GameMode.ITEM) {
+            itemSource = new ItemPieceSource(pieces, itemKinds, new Random(setup.seed() ^ 37), setup.clearedLines());
+            pieces = itemSource;
+        }
+        var source = new DebugPieceSource(pieces);
+        var engine = new PlayerEngine(setup.board(), new ActivePiece(TetrominoType.T, 0, new Position(3, 0)), source);
+        var session = new SinglePlayerSession(engine, scoring, speeds.apply(difficulty), mode, difficulty,
+                setup.clearedLines());
+        return new StartedGame(new DebugSession(session, engine, source, generator, itemSource, setup, mode, debugLog), loaded);
     }
 }

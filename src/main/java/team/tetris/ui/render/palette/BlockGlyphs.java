@@ -1,6 +1,7 @@
 package team.tetris.ui.render.palette;
 
 import team.tetris.core.Shape;
+import team.tetris.core.TemporaryBlock;
 import team.tetris.core.TetrominoType;
 import team.tetris.core.item.Item;
 
@@ -13,13 +14,20 @@ public final class BlockGlyphs {
     /** 빈 칸. */
     public static final String EMPTY = " .";
 
+    /** 디버그 모드의 하드 드롭 착지 그림자. */
+    public static final String GHOST = "░░";
+
     /** 테트로미노가 아닌 블록(무게추 등)의 무늬. */
     public static final String SPECIAL = "@@";
+
+    /** 디버그 보드 채우기용 임시 블록. */
+    public static final String TEMPORARY = "▒▒";
 
     private BlockGlyphs() {
     }
 
     public static String of(Shape shape) {
+        if (shape == TemporaryBlock.INSTANCE) return TEMPORARY;
         if (!(shape instanceof TetrominoType type)) {
             return SPECIAL;
         }

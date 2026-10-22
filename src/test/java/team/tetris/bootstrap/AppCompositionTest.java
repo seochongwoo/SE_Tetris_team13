@@ -27,6 +27,21 @@ import team.tetris.core.rule.PieceGenerator;
 class AppCompositionTest {
     @TempDir Path directory;
 
+    @Test
+    void debugFlagSupportsEitherArgumentOrderAndRejectsMalformedOptions() {
+        for (String[] args : new String[][] {
+                {"--debug", "--data-dir", directory.toString()},
+                {"--data-dir", directory.toString(), "--debug"}}) {
+            TetrisApplication.main(args);
+            assertTrue(TestGameUi.application.debugEnabled());
+        }
+        for (String[] args : new String[][] {
+                {"--debug", "--debug"}, {"--data-dir", "--debug"},
+                {"--debug", "unknown"}, {"--data-dir", "a", "--data-dir", "b"}}) {
+            assertThrows(IllegalArgumentException.class, () -> TetrisApplication.dataDirectory(args, directory));
+        }
+    }
+
     private static PieceGenerator squares() {
         return new PieceGenerator() {
             public TetrominoType next() { return TetrominoType.O; }

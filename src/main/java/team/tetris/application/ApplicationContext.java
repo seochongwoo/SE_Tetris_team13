@@ -11,6 +11,12 @@ public interface ApplicationContext {
     /** mode로 새 게임 시작. 모드는 결과·기록·순위 구분까지 유지된다. */
     StartedGame newGame(GameMode mode);
 
+    default boolean debugEnabled() { return false; }
+
+    default StartedGame newDebugGame(team.tetris.application.debug.DebugSetup setup, GameMode mode) {
+        throw new IllegalStateException("Debug mode is not enabled");
+    }
+
     /** 일반 모드로 새 게임 시작. */
     default StartedGame newGame() {
         return newGame(GameMode.NORMAL);
