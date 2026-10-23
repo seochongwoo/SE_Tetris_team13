@@ -47,6 +47,22 @@ jacocoTestReport {
     }
 }
 
+// 2차 요구사항(기말 라인 커버리지 70%)보다 낮아지면 build가 실패한다.
+jacocoTestCoverageVerification {
+    dependsOn test
+    violationRules {
+        rule {
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.70
+            }
+        }
+    }
+}
+
+check.dependsOn jacocoTestCoverageVerification
+
 // ---------------------------------------------------------------------------
 // 배포: jpackage로 JRE를 포함한 Windows 실행 폴더(SETetris\SETetris.exe)를 만든다.
 // Java가 설치되지 않은 PC에서도 exe 더블클릭만으로 실행된다. 설치 프로그램(--type exe)과 달리
@@ -54,7 +70,7 @@ jacocoTestReport {
 //   gradlew packageApp   → build\jpackage\SETetris\SETetris.exe
 //   gradlew packageZip   → build\distributions\SETetris-<version>-windows.zip (배포용)
 // ---------------------------------------------------------------------------
-version = '1.0.0'
+version = '2.0.0'
 
 def appName = 'SETetris'
 def jpackageInput = layout.buildDirectory.dir('jpackage-input')

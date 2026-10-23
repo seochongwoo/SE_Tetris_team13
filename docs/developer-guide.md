@@ -486,7 +486,7 @@ JDK 21과 Gradle Wrapper를 사용합니다. 저장소 루트의 Windows PowerSh
 | 커버리지 XML·CSV | `build/reports/jacoco/test/`                |
 | 배포 ZIP·TAR     | `build/distributions/`                      |
 
-커버리지 최소값은 현재 빌드에서 강제하지 않습니다. 테스트 개수와 커버리지는 해당 실행의 보고서에서 확인합니다.
+`build`는 `jacocoTestCoverageVerification`을 함께 실행해 전체 라인 커버리지가 70%(2차 요구사항 기말 기준) 미만이면 실패합니다. 테스트 개수와 커버리지는 해당 실행의 보고서에서 확인합니다.
 
 ### 배포 패키지 (실행 파일)
 

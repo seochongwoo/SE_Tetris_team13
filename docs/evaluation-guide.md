@@ -37,7 +37,7 @@
 | 9 | 게임 오버 → 이름 입력 → 순위표 강조 → 메뉴로 | R1-23~26 |
 | 10 | 스코어보드: ←→ 난이도, ↑↓ 모드 구분 | R2-05, R2-11 |
 | 11 | 아이템 모드: 10줄 후 NEXT에 아이템 블록, 아이템별 효과 ([아이템 명세서](item-specification.md) 5장 확인 방법) | R2-12~17 |
-| 12 | 확률 분포 테스트(`WeightedRandomGeneratorTest`, `AppCompositionTest`)와 커버리지 보고서 | R2-07~09, N1-05 |
+| 12 | 확률 분포 테스트(`WeightedRandomGeneratorTest`, `AppCompositionTest`)와 커버리지 보고서, 70% 미만이면 build가 실패하는 검사 | R2-07~09, N1-05, N2-04 |
 | 13 | GitHub Issues(카드 이슈, `bug` 이슈 #27~#35)·PR(리뷰 기록, PR #25의 수정 요청 → 반영 → 승인)·Actions, GitHub Projects 보드, [백로그 진행 현황](requirements2-backlog.md) | N1-02~04, N2-01~03 |
 
 ## 4. 시연 시간 주의

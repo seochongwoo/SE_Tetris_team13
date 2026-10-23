@@ -61,7 +61,7 @@ Java 21(JDK)이 필요합니다.
 ```
 
 - 테스트: JUnit 5. 결과는 `build/reports/tests/test/index.html`
-- 커버리지: JaCoCo. 결과는 `build/reports/jacoco/test/html/index.html`
+- 커버리지: JaCoCo. 결과는 `build/reports/jacoco/test/html/index.html`. 라인 커버리지가 70% 미만이면 `build`가 실패합니다.
 - CI: push와 PR마다 GitHub Actions(Windows, Java 21)에서 빌드·테스트·커버리지를 실행합니다.
 
 배포 패키지는 다음 명령으로 만듭니다. 결과는 `build/distributions/SETetris-<버전>-windows.zip`입니다.
