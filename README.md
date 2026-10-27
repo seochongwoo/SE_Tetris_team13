@@ -96,6 +96,7 @@ Java 21(JDK)이 필요합니다.
 | [아키텍처 결정 기록](docs/architecture-decision.md) | 헥사고날 구조를 고른 이유 |
 | [2차 요구사항 분석](docs/requirements2-analysis.md) | 2차 요구사항이 구조에 미치는 영향 |
 | [작업 진행 제안](docs/requirements2-work-plan.md) · [백로그 진행 현황](docs/requirements2-backlog.md) | 2차 작업 분할과 진행 상황 |
+| [3차 요구사항 분석](docs/requirements3-analysis.md) · [3차 백로그](docs/requirements3-backlog.md) | 대전·P2P 요구사항 목록, 숨은 요구사항, 구조 변경 방향, 작업 카드 |
 | [아이템 모드 설계 정리](docs/item-spec.md) | 아이템 규칙 논의와 구현 메모 (팀 내부용) |
 | [미확정 사항](docs/open-questions.md) | 요구사항 해석, 팀 논의 안건과 결정 기록 |
 
