@@ -28,6 +28,7 @@ import team.tetris.core.item.ItemContext;
 import team.tetris.core.item.LineClearItem;
 import team.tetris.core.item.WeightBlock;
 import team.tetris.core.rule.PieceSource;
+import team.tetris.ui.DisplayNames;
 import team.tetris.ui.TestApplication;
 import team.tetris.ui.input.InputMapper;
 import team.tetris.ui.render.palette.BlockGlyphs;
@@ -50,7 +51,7 @@ class TextRendererTest {
         for (GameCommand command : new GameCommand[]{GameCommand.MOVE_LEFT, GameCommand.PAUSE,
                 GameCommand.RESUME, GameCommand.HARD_DROP, GameCommand.QUIT_GAME}) {
             var frame = renderer.render(game.snapshot());
-            assertEquals(label + " / " + difficulty.name(), panelText(frame, 1).strip());
+            assertEquals(label + " / " + DisplayNames.of(difficulty), panelText(frame, 1).strip());
             assertTrue(panelText(frame, 11).startsWith("SCORE"));
             game.handle(command);
         }

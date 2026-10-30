@@ -25,10 +25,16 @@ import team.tetris.ui.TestApplication;
 
 class SettingsScreenTest {
 
-    private static final int FIRST_KEY_ROW = 3;
-    private static final int CLEAR_ROW = 11;
-    private static final int RESET_ROW = 12;
-    private static final int BACK_ROW = 13;
+    private static final int DIFFICULTY_ROW = 0;
+    private static final int SIZE_ROW = 1;
+    private static final int COLOR_ROW = 2;
+    private static final int KEYS_ROW = 3;
+    private static final int CLEAR_ROW = 4;
+    private static final int RESET_ROW = 5;
+    private static final int BACK_ROW = 6;
+    /** 조작 키 페이지 안의 줄. */
+    private static final int FIRST_KEY_ROW = 0;
+    private static final int KEY_PAGE_BACK_ROW = 8;
 
     private final TestApplication app = new TestApplication();
     private final ScreenRouter router = app.router();
@@ -51,27 +57,61 @@ class SettingsScreenTest {
         }
     }
 
+    private void openKeyPage() {
+        moveTo(KEYS_ROW);
+        tap("ENTER");
+        assertTrue(screen.isEditingKeys());
+    }
+
     private Settings saved() throws Exception {
         return app.settings().get();
     }
 
     @Test
-    void difficultyCyclesAndSurvivesOtherSettingsEditsAndReset() throws Exception {
-        moveTo(2);
+    void difficultyIsTheFirstRowAndShowsEveryChoiceInKorean() {
+        assertEquals(DIFFICULTY_ROW, screen.cursor());
+        String text = router.render().text();
+
+        assertTrue(text.contains("[보통]"), text);
+        assertTrue(text.contains("쉬움") && text.contains("어려움"));
+        assertFalse(text.contains("NORMAL"));
+        assertTrue(text.contains("모든 블록이 같은 확률로"));
+    }
+
+    @Test
+    void arrowsMoveToTheNeighbourChoiceAndStopAtTheEnds() throws Exception {
         tap("LEFT");
         assertEquals(Difficulty.EASY, saved().difficulty());
+        assertTrue(screen.message().contains("난이도 쉬움"));
+        assertTrue(router.render().text().contains("I 블록이 더 자주"));
+
         tap("LEFT");
-        assertEquals(Difficulty.HARD, saved().difficulty());
-        assertTrue(router.render().text().contains("HARD"));
-        moveTo(0);
+        assertEquals(Difficulty.EASY, saved().difficulty());
+
         tap("RIGHT");
-        moveTo(1);
+        tap("RIGHT");
+        assertEquals(Difficulty.HARD, saved().difficulty());
+        assertTrue(router.render().text().contains("[어려움]"));
+        tap("RIGHT");
+        assertEquals(Difficulty.HARD, saved().difficulty());
+    }
+
+    @Test
+    void difficultyCyclesWithEnterAndSurvivesOtherSettingsEditsAndReset() throws Exception {
+        tap("RIGHT");
+        assertEquals(Difficulty.HARD, saved().difficulty());
+        moveTo(SIZE_ROW);
+        tap("RIGHT");
+        moveTo(COLOR_ROW);
         tap("ENTER");
+        openKeyPage();
         moveTo(FIRST_KEY_ROW);
         tap("ENTER");
         tap("A");
+        tap("ESCAPE");
+        assertFalse(screen.isEditingKeys());
         assertEquals(Difficulty.HARD, saved().difficulty());
-        moveTo(2);
+        moveTo(DIFFICULTY_ROW);
         tap("ENTER");
         assertEquals(Difficulty.EASY, saved().difficulty());
         moveTo(RESET_ROW);
@@ -82,6 +122,7 @@ class SettingsScreenTest {
 
     @Test
     void arrowKeysChangeTheScreenSizeAndSaveIt() throws Exception {
+        moveTo(SIZE_ROW);
         tap("RIGHT");
         assertEquals(ScreenSize.LARGE, saved().screenSize());
         assertEquals(ScreenSize.LARGE, app.applied().screenSize());
@@ -90,21 +131,22 @@ class SettingsScreenTest {
         tap("LEFT");
         tap("LEFT");
         assertEquals(ScreenSize.SMALL, saved().screenSize());
-        assertTrue(router.render().text().contains("◄ 작게 ►"));
+        assertTrue(router.render().text().contains("[작게]"));
     }
 
     @Test
     void enterTogglesColorBlindModeAndSwitchesThePalette() throws Exception {
-        moveTo(1);
+        moveTo(COLOR_ROW);
         tap("ENTER");
 
         assertTrue(saved().colorBlindMode());
         assertTrue(router.palette().colorBlind());
-        assertTrue(router.render().text().contains("켜짐"));
+        assertTrue(router.render().text().contains("[켜짐]"));
     }
 
     @Test
     void selectingAKeyRowThenPressingAKeyRebindsIt() throws Exception {
+        openKeyPage();
         moveTo(FIRST_KEY_ROW);
         tap("ENTER");
         assertTrue(screen.isWaitingForKey());
@@ -118,6 +160,7 @@ class SettingsScreenTest {
 
     @Test
     void holdingTheEnterThatOpenedTheKeyPromptDoesNotBindEnter() throws Exception {
+        openKeyPage();
         moveTo(FIRST_KEY_ROW);
         router.keyPressed("ENTER");
         router.keyPressed("ENTER"); // 떼지 않은 채 OS 자동 반복
@@ -146,6 +189,7 @@ class SettingsScreenTest {
 
     @Test
     void conflictingKeyIsRejectedAndNothingIsSaved() throws Exception {
+        openKeyPage();
         moveTo(FIRST_KEY_ROW + 1);
         tap("ENTER");
 
@@ -157,6 +201,7 @@ class SettingsScreenTest {
 
     @Test
     void backspaceCancelsWaitingForAKey() throws Exception {
+        openKeyPage();
         moveTo(FIRST_KEY_ROW);
         tap("ENTER");
 
@@ -183,6 +228,7 @@ class SettingsScreenTest {
 
     @Test
     void resetRestoresTheDefaultSettings() throws Exception {
+        moveTo(SIZE_ROW);
         tap("RIGHT");
         moveTo(RESET_ROW);
 
@@ -231,12 +277,44 @@ class SettingsScreenTest {
 
         brokenRouter.keyPressed("RIGHT");
 
-        assertEquals(ScreenSize.MEDIUM, brokenRouter.settings().screenSize());
-        TestApplication.tap(brokenRouter, "DOWN");
+        assertEquals(Difficulty.NORMAL, brokenRouter.settings().difficulty());
         TestApplication.tap(brokenRouter, "DOWN");
         TestApplication.tap(brokenRouter, "LEFT");
-        assertEquals(Difficulty.NORMAL, brokenRouter.settings().difficulty());
+        assertEquals(ScreenSize.MEDIUM, brokenRouter.settings().screenSize());
         assertNull(brokenApp.applied());
         assertTrue(((SettingsScreen) brokenRouter.current()).message().contains("저장하지 못했습니다"));
+    }
+
+    @Test
+    void keyPageListsTheEightControlsAndReturnsWithBackOrEscape() {
+        openKeyPage();
+        String text = router.render().text();
+        assertTrue(text.contains("조작 키 설정"));
+        assertTrue(text.contains("한 번에 떨어뜨리기") && text.contains("게임 메뉴"));
+
+        moveTo(KEY_PAGE_BACK_ROW);
+        tap("ENTER");
+        assertFalse(screen.isEditingKeys());
+        assertEquals(KEYS_ROW, screen.cursor());
+
+        tap("ENTER");
+        tap("ESCAPE");
+        assertFalse(screen.isEditingKeys());
+        assertInstanceOf(SettingsScreen.class, router.current());
+
+        tap("ENTER");
+        tap("Q");
+        assertTrue(screen.message().contains("사용할 수 있는 키"));
+    }
+
+    @Test
+    void mainListHasSevenRowsAndKeyRowsMovedOut() {
+        String text = router.render().text();
+
+        assertTrue(text.contains("조작 키 설정"));
+        assertFalse(text.contains("한 번에 떨어뜨리기"));
+        moveTo(BACK_ROW);
+        tap("DOWN");
+        assertEquals(DIFFICULTY_ROW, screen.cursor());
     }
 }
