@@ -1,5 +1,6 @@
 package team.tetris.ui.screen;
 
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -45,7 +46,7 @@ public final class SettingsScreen implements Screen {
     private static final List<Row> ROWS = List.of(
             new Row(Kind.DIFFICULTY, "난이도", null),
             new Row(Kind.SCREEN_SIZE, "화면 크기", "창과 글자 크기를 바꿉니다"),
-            new Row(Kind.COLOR_BLIND, "색맹 모드", "적록·청황 색맹도 구분하기 쉬운 색으로 바꿉니다|블록 무늬는 두 모드 모두 표시됩니다"),
+            new Row(Kind.COLOR_BLIND, "색맹 모드", "적록·청황 색맹도 구분하기 쉬운 색을 씁니다|블록 무늬는 두 모드 모두 표시됩니다"),
             new Row(Kind.KEYS, "조작 키 설정", "게임 조작 키 8개를 바꿉니다"),
             new Row(Kind.CLEAR_SCORES, "스코어보드 초기화", "모든 모드·난이도의 기록을 지웁니다"),
             new Row(Kind.RESET, "기본 설정으로 되돌리기", "모든 설정을 처음 값으로 되돌립니다"),
@@ -301,6 +302,19 @@ public final class SettingsScreen implements Screen {
             case NORMAL -> "모든 블록이 같은 확률로 나오는|기본 난이도입니다";
             case HARD -> "I 블록이 덜 나오고|레벨이 오르면 속도가 빨리 빨라집니다";
         };
+    }
+
+    /** 화면에 나올 수 있는 모든 설명 줄 (테스트용: 화면 폭을 넘으면 끝이 잘린다). */
+    static List<String> allHelpLines() {
+        List<String> lines = new ArrayList<>();
+        for (Difficulty difficulty : Difficulty.values()) {
+            Settings settings = new Settings(Settings.defaults().screenSize(), Settings.defaults().keyBindings(),
+                    false, difficulty);
+            for (Row row : ROWS) {
+                lines.addAll(List.of(helpOf(row, settings).split("\\|")));
+            }
+        }
+        return lines;
     }
 
     // ---- 그리기 ----

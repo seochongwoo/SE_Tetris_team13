@@ -9,8 +9,10 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GraphicsEnvironment;
 import java.awt.Rectangle;
+import java.awt.Shape;
 import java.awt.RenderingHints;
 import java.awt.font.TextLayout;
+import java.awt.geom.AffineTransform;
 import java.awt.geom.Path2D;
 import java.awt.geom.Rectangle2D;
 import java.util.HashMap;
@@ -162,7 +164,7 @@ public final class TextFramePanel extends JComponent {
         for (int i = 0; i < families.length; i++) {
             Font plain = new Font(families[i], Font.PLAIN, size);
             if (i == 1) {
-                plain = plain.deriveFont(koreanFontSize(plain, size));
+                plain = koreanFont(plain, size);
             }
             fonts[i] = new Font[] {plain, plain.deriveFont(Font.BOLD)};
             for (Font font : fonts[i]) {
@@ -174,15 +176,22 @@ public final class TextFramePanel extends JComponent {
     }
 
     /**
-     * 한글 글꼴 크기. 영문보다 좁게 그려지면 한 글자가 두 칸을 거의 채우도록 키우되, 받침 있는 글자와 괄호가
-     * 줄 높이(위아래 1px 여유) 안에 들어가도록 줄인다. 줄 높이가 글자 크기의 1.1배로 빠듯해서, 그대로 두면
-     * 글자 아래가 선택 막대 밖으로 나가 잘려 보인다.
+     * 한글 글꼴. 받침 있는 글자와 괄호가 줄 높이(위아래 1px 여유) 안에 들어가는 가장 큰 정수 크기를 고르고,
+     * 한 글자가 두 칸 폭을 거의 채우도록 가로로만 늘린다.
+     *
+     * <p>크기를 정수로 두는 이유: 소수 크기에서는 글자 모양 보정이 어긋나 "같"처럼 획이 뭉개진다. 가로로 늘리는
+     * 이유: 한글이 두 칸보다 좁으면 가운데 정렬한 문장이 왼쪽으로 쏠리고 단어 사이가 벌어져 보인다.
      */
-    private float koreanFontSize(Font plain, int size) {
-        float advance = getFontMetrics(plain).charWidth('한');
-        float scale = Math.max(1f, Math.min(1.15f, 2 * cellWidth * 0.92f / advance));
-        float limit = (cellHeight - 2f) / inkOf(KOREAN_EXTENT_SAMPLE, plain.deriveFont(Font.BOLD)).height;
-        return size * Math.min(scale, limit);
+    private Font koreanFont(Font plain, int size) {
+        int fitted = size;
+        while (fitted > MIN_FONT_SIZE
+                && inkOf(KOREAN_EXTENT_SAMPLE, plain.deriveFont(Font.BOLD, (float) fitted)).height > cellHeight - 2) {
+            fitted--;
+        }
+        Font sized = plain.deriveFont((float) fitted);
+        float advance = getFontMetrics(sized).charWidth('한');
+        float stretch = Math.max(1f, Math.min(1.25f, 2 * cellWidth * 0.94f / advance));
+        return stretch == 1f ? sized : sized.deriveFont(AffineTransform.getScaleInstance(stretch, 1));
     }
 
     private Rectangle inkOf(String text, Font font) {
@@ -339,17 +348,13 @@ public final class TextFramePanel extends JComponent {
                 }
                 int closing = -1;
                 if (span == 2 && font.equals(fontFor('한', style.bold()))) {
-                    // 한글로 시작하는 문구는 한 칸 띄어쓰기까지 이어서 한 번에 그린다. 격자에서는 공백도 한 칸이라
-                    // 글자마다 따로 그리면 글자와 단어 사이가 벌어져 보인다. 두 칸 이상 띄우면 다른 열로 본다.
+                    // 한글로 시작하는 단어는 띄어쓰기 전까지 한 번에 그린다. 단어마다 자기 칸에서 시작하므로
+                    // 띄어쓰기와 가운데 정렬은 격자를 그대로 따른다. (공백까지 이어 그리면 글꼴의 공백이 한 칸보다
+                    // 좁아 문장이 짧아지고 왼쪽으로 쏠린다.)
                     StringBuilder run = new StringBuilder(glyph);
                     int next = col + 2;
                     while (next < current.columns()) {
                         int width = runWidthAt(current, next, row, style, font);
-                        if (width == 0 && current.codePointAt(next, row) == ' ' && next + 1 < current.columns()
-                                && style.equals(current.styleAt(next, row))
-                                && runWidthAt(current, next + 1, row, style, font) > 0) {
-                            width = 1;
-                        }
                         if (width == 0) {
                             break;
                         }
@@ -377,15 +382,34 @@ public final class TextFramePanel extends JComponent {
 
     private void drawText(Graphics2D g, TextFrame current, TextStyle style, Font font, String text, int x, int y) {
         g.setFont(font);
+        int baseline = y + baselines.get(font);
+        // 한글은 글자 외곽선을 도형으로 채워 그린다. 맑은 고딕을 작은 크기로 그리면 글자 보정 때문에 "같"의
+        // ㅌ처럼 획이 뭉개지기 때문이다.
+        Shape outline = font.getFamily().equals(fonts[1][0].getFamily())
+                ? new TextLayout(text, font, g.getFontRenderContext()).getOutline(null) : null;
         if (current.backdrop() != null && style.background().equals(current.styleAt(0, 0).background())) {
             // 그림 위에서도 읽히도록 글자 둘레에 어두운 테두리와 그림자를 두른다.
             g.setColor(TEXT_SHADOW);
             for (int[] offset : SHADOW_OFFSETS) {
-                g.drawString(text, x + offset[0], y + baselines.get(font) + offset[1]);
+                drawAt(g, text, outline, x + offset[0], baseline + offset[1]);
             }
         }
         g.setColor(style.foreground());
-        g.drawString(text, x, y + baselines.get(font));
+        drawAt(g, text, outline, x, baseline);
+    }
+
+    private static void drawAt(Graphics2D g, String text, Shape outline, int x, int baseline) {
+        if (outline == null) {
+            g.drawString(text, x, baseline);
+            return;
+        }
+        Graphics2D shifted = (Graphics2D) g.create();
+        try {
+            shifted.translate(x, baseline);
+            shifted.fill(outline);
+        } finally {
+            shifted.dispose();
+        }
     }
 
     /**
