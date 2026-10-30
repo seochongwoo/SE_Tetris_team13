@@ -50,7 +50,7 @@ UI는 엔진·파일 저장소를 직접 생성하지 않습니다. 새 게임, 
 
 ## 2. 빠른 시작과 UI 연결
 
-현재 `TetrisUi`가 Swing 창과 키 이벤트를 연결하고, `ScreenRouter`가 시작·게임·설정·이름 입력·순위 화면을 전환합니다. `TextFramePanel`은 문자 격자를 그립니다. 아래는 별도 UI를 연결할 때 참고할 공개 API 예제입니다.
+현재 `TetrisUi`가 Swing 창과 키 이벤트를 연결하고, `ScreenRouter`가 시작·게임·설정·이름 입력·순위 화면을 전환합니다. `TextFramePanel`은 문자 격자를 그립니다. 글자는 Consolas(영문)와 맑은 고딕(한글)으로 그리고, 없으면 Java 기본 고정폭 글꼴을 씁니다. 블록 칸(`TextFrame.putTile`로 찍은 `BlockTile`)은 `TilePainter`가 무늬 타일로, 상자 테두리 글자는 둥근 선으로, 기본과 다른 배경색 구간은 둥근 막대로 그립니다. `TextFrame.shade()`는 일시정지·게임 종료 때 뒤 화면을 어둡게 덮습니다. 화면 로직과 테스트는 지금처럼 글자 격자만 보면 됩니다. 아래는 별도 UI를 연결할 때 참고할 공개 API 예제입니다.
 
 ```java
 import java.nio.file.Path;
@@ -161,7 +161,7 @@ public record GameSnapshot(
 
 `TextRenderer.drawStats`는 NEXT 위에 현재 판의 모드와 난이도를 `일반 / EASY`, `아이템 / HARD` 형식으로 표시합니다. `GameSnapshot.mode()`와 `difficulty()`를 사용하므로 일시정지·종료 상태에도 같은 분류를 유지합니다.
 
-보드의 빈 칸은 `BlockGlyphs.EMPTY`의 전각 가운뎃점(`・`)으로 표시합니다. `TextFramePanel`은 글자의 실제 그려지는 영역을 기준으로 두 글자 폭의 보드 칸 중앙에 배치하며, 화면 크기와 HiDPI 배율이 바뀌어도 중앙 정렬을 유지합니다.
+보드의 빈 칸은 글자 격자에 `BlockGlyphs.EMPTY`의 전각 가운뎃점(`・`)으로 기록하고, 화면에는 옅은 사각 타일로 그립니다. 타일 없이 찍힌 `・`는 `TextFramePanel`이 글자의 실제 그려지는 영역을 기준으로 두 글자 폭의 보드 칸 중앙에 배치하며, 화면 크기와 HiDPI 배율이 바뀌어도 중앙 정렬을 유지합니다.
 
 ### 일시정지 메뉴와 키 충돌
 

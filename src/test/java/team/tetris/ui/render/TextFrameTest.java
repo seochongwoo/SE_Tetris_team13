@@ -100,4 +100,57 @@ class TextFrameTest {
         assertEquals(TextFrame.ROWS, frame.rows());
         assertEquals(TextFrame.ROWS, frame.text().split("\n").length);
     }
+
+    @Test
+    void tileKeepsItsGlyphInTheTextAndCoversTwoCells() {
+        TextFrame frame = new TextFrame(6, 1, BASE);
+        BlockTile tile = new BlockTile(BlockTile.Kind.SOLID, Color.RED, BlockTile.Pattern.DOT, null);
+
+        frame.putTile(2, 0, "##", RED, tile);
+
+        assertEquals("  ##  ", frame.rowText(0));
+        assertEquals(tile, frame.tileAt(2, 0));
+        assertTrue(frame.isTileContinuation(3, 0));
+        assertFalse(frame.isTileContinuation(2, 0));
+        assertEquals(null, frame.tileAt(3, 0));
+    }
+
+    @Test
+    void writingOverEitherHalfOfATileRemovesIt() {
+        TextFrame frame = new TextFrame(6, 1, BASE);
+        BlockTile tile = new BlockTile(BlockTile.Kind.EMPTY, Color.GRAY, BlockTile.Pattern.NONE, null);
+        frame.putTile(0, 0, "・", BASE, tile);
+        frame.putTile(2, 0, "・", BASE, tile);
+
+        frame.put(0, 0, "x", BASE);
+        frame.put(3, 0, "y", BASE);
+
+        assertEquals(null, frame.tileAt(0, 0));
+        assertEquals(null, frame.tileAt(2, 0));
+        assertFalse(frame.isTileContinuation(1, 0));
+    }
+
+    @Test
+    void tileOutsideTheFrameIsIgnored() {
+        TextFrame frame = new TextFrame(3, 1, BASE);
+        BlockTile tile = new BlockTile(BlockTile.Kind.SOLID, Color.RED, BlockTile.Pattern.DOT, null);
+
+        frame.putTile(2, 0, "##", RED, tile);
+        frame.putTile(0, 1, "##", RED, tile);
+
+        assertEquals(null, frame.tileAt(2, 0));
+    }
+
+    @Test
+    void shadeDarkensWhatIsAlreadyDrawnButNotWhatComesAfter() {
+        TextFrame frame = new TextFrame(4, 2, BASE);
+        frame.put(0, 0, "ab", BASE);
+
+        frame.shade();
+        frame.put(1, 1, "c", RED);
+
+        assertTrue(frame.isShaded(0, 0));
+        assertTrue(frame.isShaded(3, 1));
+        assertFalse(frame.isShaded(1, 1));
+    }
 }

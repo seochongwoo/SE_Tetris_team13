@@ -231,8 +231,10 @@ public final class GameScreen implements Screen {
             frame.put(1, TextFrame.ROWS - 1, settingsWarning, palette.warningStyle());
         }
         if (snapshot.status() == GameStatus.PAUSED) {
+            frame.shade();
             drawPauseMenu(frame);
         } else if (snapshot.status() == GameStatus.GAME_OVER) {
+            frame.shade();
             drawGameOver(frame, snapshot.score());
         }
         return frame;

@@ -2,16 +2,21 @@ package team.tetris.ui.render;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.image.BufferedImage;
+import java.util.HashSet;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import team.tetris.application.model.Settings.ScreenSize;
+import team.tetris.core.TetrominoType;
 import team.tetris.ui.render.palette.BlockGlyphs;
+import team.tetris.ui.render.palette.ColorPalette;
 
 class TextFramePanelTest {
 
@@ -105,5 +110,117 @@ class TextFramePanelTest {
 
         panel.setTextInput(false);
         assertFalse(panel.isTextInput());
+    }
+
+    private static BufferedImage paint(TextFrame frame) {
+        var panel = new TextFramePanel(ScreenSize.MEDIUM, frame);
+        panel.setSize(panel.getPreferredSize());
+        var image = new BufferedImage(panel.getWidth(), panel.getHeight(), BufferedImage.TYPE_INT_RGB);
+        var graphics = image.createGraphics();
+        try {
+            panel.paint(graphics);
+        } finally {
+            graphics.dispose();
+        }
+        return image;
+    }
+
+    private static String pixels(BufferedImage image) {
+        StringBuilder text = new StringBuilder();
+        for (int y = 0; y < image.getHeight(); y++) {
+            for (int x = 0; x < image.getWidth(); x++) {
+                text.append(Integer.toHexString(image.getRGB(x, y))).append(',');
+            }
+        }
+        return text.toString();
+    }
+
+    @Test
+    void everyBlockPatternLooksDifferentEvenInTheSameColor() {
+        // 색을 구분하지 못해도 무늬만으로 블록을 알아볼 수 있어야 한다.
+        var style = new TextStyle(Color.WHITE, Color.BLACK, false);
+        Set<String> seen = new HashSet<>();
+        for (BlockTile.Pattern pattern : BlockTile.Pattern.values()) {
+            var frame = new TextFrame(2, 1, style);
+            frame.putTile(0, 0, "  ", style, new BlockTile(BlockTile.Kind.SOLID, Color.GRAY, pattern, null));
+            assertTrue(seen.add(pixels(paint(frame))), "Pattern looks like another: " + pattern);
+        }
+    }
+
+    @Test
+    void tetrominoesUseSevenDifferentPatterns() {
+        Set<BlockTile.Pattern> patterns = new HashSet<>();
+        for (TetrominoType type : TetrominoType.values()) {
+            patterns.add(ColorPalette.colorBlindFriendly().blockTile(type).pattern());
+        }
+        assertEquals(TetrominoType.values().length, patterns.size());
+    }
+
+    @Test
+    void tilesReplaceTheirGlyphOnScreen() {
+        var style = new TextStyle(Color.WHITE, Color.BLACK, false);
+        var withTile = new TextFrame(2, 1, style);
+        withTile.putTile(0, 0, "##", style, new BlockTile(BlockTile.Kind.SOLID, Color.RED, BlockTile.Pattern.NONE, null));
+        var textOnly = new TextFrame(2, 1, style);
+        textOnly.put(0, 0, "##", style);
+
+        BufferedImage tile = paint(withTile);
+        // 타일 가운데는 블록 색(빨강 계열)으로 칠해진다.
+        Color center = new Color(tile.getRGB(tile.getWidth() / 2, tile.getHeight() / 2));
+        assertTrue(center.getRed() > 150 && center.getGreen() < 80, "center: " + center);
+        assertNotEquals(pixels(paint(textOnly)), pixels(tile));
+    }
+
+    @Test
+    void shadedCellsAreDarkerThanTheSameCellsUnshaded() {
+        ColorPalette palette = ColorPalette.standard();
+        var frame = new TextFrame(4, 1, palette.base());
+        frame.putTile(0, 0, "[]", palette.blockStyle(TetrominoType.I), palette.blockTile(TetrominoType.I));
+        Color bright = new Color(paint(frame).getRGB(5, 10));
+
+        frame.shade();
+        Color dark = new Color(paint(frame).getRGB(5, 10));
+
+        assertTrue(dark.getBlue() < bright.getBlue(), bright + " -> " + dark);
+    }
+
+    @Test
+    void paintsEveryKindOfCellWithoutFailing() {
+        ColorPalette palette = ColorPalette.standard();
+        var frame = new TextFrame(30, 4, palette.base());
+        frame.box(0, 0, 30, 4, palette.borderStyle(), palette.base());
+        frame.put(1, 1, "► 게임 시작   ", palette.highlightStyle());
+        frame.put(16, 1, "사용할 수 있는 키: ← →", palette.warningStyle());
+        frame.putTile(1, 2, BlockGlyphs.EMPTY, palette.dimStyle(), palette.emptyTile());
+        frame.putTile(3, 2, BlockGlyphs.GHOST, palette.blockStyle(TetrominoType.T), palette.ghostTile(TetrominoType.T));
+        frame.putTile(5, 2, "L ", palette.itemStyle(TetrominoType.S),
+                new BlockTile(BlockTile.Kind.ITEM, palette.block(TetrominoType.S), BlockTile.Pattern.NONE, "L"));
+        frame.putTile(7, 2, "##", palette.removalPreviewStyle(TetrominoType.O), palette.previewTile(TetrominoType.O, null));
+        frame.putTile(9, 2, "B ", palette.removalPreviewStyle(TetrominoType.Z),
+                new BlockTile(BlockTile.Kind.PREVIEW, palette.block(TetrominoType.Z), BlockTile.Pattern.NONE, "B"));
+        frame.put(11, 2, "█・", palette.blockStyle(TetrominoType.L));
+
+        BufferedImage image = paint(frame);
+
+        assertTrue(image.getWidth() > 0 && image.getHeight() > 0);
+    }
+
+    @Test
+    void symbolAfterKoreanTextIsDrawnWithAFontThatHasIt() {
+        // 설정 화면의 "◄ 보통 ►": 맑은 고딕에는 ►가 없어 한글 문구에 이어 그리면 깨져 보였다.
+        var style = new TextStyle(Color.WHITE, Color.BLACK, false);
+        var phrase = new TextFrame(8, 1, style);
+        phrase.put(0, 0, "보통 ►", style);
+        var alone = new TextFrame(8, 1, style);
+        alone.put(5, 0, "►", style);
+
+        BufferedImage withText = paint(phrase);
+        BufferedImage symbolOnly = paint(alone);
+        int cellWidth = withText.getWidth() / 8;
+        for (int y = 0; y < withText.getHeight(); y++) {
+            for (int x = 5 * cellWidth; x < 6 * cellWidth; x++) {
+                assertEquals(symbolOnly.getRGB(x, y), withText.getRGB(x, y), "pixel " + x + "," + y);
+            }
+        }
     }
 }

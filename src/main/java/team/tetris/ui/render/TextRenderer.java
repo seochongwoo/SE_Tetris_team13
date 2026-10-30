@@ -130,7 +130,7 @@ public final class TextRenderer implements Renderer {
                 if (animation.flashing()) {
                     frame.put(columnOf(x), rowOf(y), "  ", palette.lineClearStyle());
                 } else if (Math.abs(2 * x - left - right) / 2 < removedRings) {
-                    frame.put(columnOf(x), rowOf(y), BlockGlyphs.EMPTY, palette.dimStyle());
+                    frame.putTile(columnOf(x), rowOf(y), BlockGlyphs.EMPTY, palette.dimStyle(), palette.emptyTile());
                 }
             }
         }
@@ -144,7 +144,7 @@ public final class TextRenderer implements Renderer {
             for (int x = 0; x < width; x++) {
                 Cell cell = board[y][x];
                 if (cell.isEmpty()) {
-                    frame.put(columnOf(x), rowOf(y), BlockGlyphs.EMPTY, palette.dimStyle());
+                    frame.putTile(columnOf(x), rowOf(y), BlockGlyphs.EMPTY, palette.dimStyle(), palette.emptyTile());
                 } else {
                     drawCell(frame, columnOf(x), rowOf(y), cell.occupiedBy(), cell.item());
                 }
@@ -170,8 +170,8 @@ public final class TextRenderer implements Renderer {
         for (Position position : preview.removedCells()) {
             Cell cell = board[position.y()][position.x()];
             String glyph = cell.item() == null ? BlockGlyphs.of(cell.occupiedBy()) : BlockGlyphs.of(cell.item());
-            frame.put(columnOf(position.x()), rowOf(position.y()), glyph,
-                    palette.removalPreviewStyle(cell.occupiedBy()));
+            frame.putTile(columnOf(position.x()), rowOf(position.y()), glyph,
+                    palette.removalPreviewStyle(cell.occupiedBy()), palette.previewTile(cell.occupiedBy(), cell.item()));
         }
     }
 
@@ -182,7 +182,8 @@ public final class TextRenderer implements Renderer {
             if (cell.x() >= 0 && cell.x() < board[0].length && cell.y() >= 0 && cell.y() < board.length) {
                 // 무게추 착지 위치에 있는 기존 블록의 삭제 강조를 그림자로 덮지 않는다.
                 if (preview.removedCells().contains(cell)) continue;
-                frame.put(columnOf(cell.x()), rowOf(cell.y()), BlockGlyphs.GHOST, palette.blockStyle(piece.shape()));
+                frame.putTile(columnOf(cell.x()), rowOf(cell.y()), BlockGlyphs.GHOST, palette.blockStyle(piece.shape()),
+                        palette.ghostTile(piece.shape()));
             }
         }
     }
@@ -251,9 +252,9 @@ public final class TextRenderer implements Renderer {
 
     private void drawCell(TextFrame frame, int col, int row, Shape shape, Item item) {
         if (item != null && !(item instanceof WeightBlock)) {
-            frame.put(col, row, BlockGlyphs.of(item), palette.itemStyle(shape));
+            frame.putTile(col, row, BlockGlyphs.of(item), palette.itemStyle(shape), palette.itemTile(shape, item));
         } else {
-            frame.put(col, row, BlockGlyphs.of(shape), palette.blockStyle(shape));
+            frame.putTile(col, row, BlockGlyphs.of(shape), palette.blockStyle(shape), palette.blockTile(shape));
         }
     }
 }

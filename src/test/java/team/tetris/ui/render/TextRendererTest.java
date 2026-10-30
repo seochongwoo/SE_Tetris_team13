@@ -57,6 +57,21 @@ class TextRendererTest {
     }
 
     @Test
+    void boardCellsAreTilesWithTheBlocksColorAndPattern() {
+        session.handle(GameCommand.HARD_DROP);
+        TextFrame frame = renderer.render(session.snapshot());
+
+        BlockTile empty = frame.tileAt(TextRenderer.columnOf(0), TextRenderer.rowOf(0));
+        assertEquals(BlockTile.Kind.EMPTY, empty.kind());
+        BlockTile placed = frame.tileAt(TextRenderer.columnOf(4), TextRenderer.rowOf(19));
+        assertEquals(palette.blockTile(TetrominoType.T), placed);
+        assertEquals(BlockTile.Pattern.DIAMOND, placed.pattern());
+        // 글자 무늬도 그대로 남아 있어 텍스트로도 블록을 확인할 수 있다.
+        assertEquals('<', frame.codePointAt(TextRenderer.columnOf(4), TextRenderer.rowOf(19)));
+        assertEquals('>', frame.codePointAt(TextRenderer.columnOf(4) + 1, TextRenderer.rowOf(19)));
+    }
+
+    @Test
     void drawsABorderAroundATenByTwentyBoard() {
         TextFrame frame = renderer.render(session.snapshot());
 
