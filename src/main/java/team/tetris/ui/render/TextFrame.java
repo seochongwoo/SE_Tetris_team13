@@ -1,6 +1,9 @@
 package team.tetris.ui.render;
 
+import java.awt.Rectangle;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -25,6 +28,7 @@ public final class TextFrame {
     private final BlockTile[][] tiles;
     private final boolean[][] shaded;
     private Backdrop backdrop;
+    private final List<Rectangle> plates = new ArrayList<>();
 
     public TextFrame(int columns, int rows, TextStyle base) {
         if (columns <= 0 || rows <= 0) {
@@ -119,6 +123,18 @@ public final class TextFrame {
 
     public void setBackdrop(Backdrop backdrop) {
         this.backdrop = backdrop;
+    }
+
+    /**
+     * 배경 그림 위, 글자 아래에 반투명한 어두운 판을 깐다(격자 칸 단위). 움직이는 배경 위에서 메뉴처럼
+     * 읽어야 하는 글자를 돋보이게 할 때 쓴다.
+     */
+    public void addPlate(int col, int row, int width, int height) {
+        plates.add(new Rectangle(col, row, width, height));
+    }
+
+    public List<Rectangle> plates() {
+        return plates.stream().map(Rectangle::new).toList();
     }
 
     public void putCentered(int row, String text, TextStyle style) {

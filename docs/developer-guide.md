@@ -50,7 +50,7 @@ UI는 엔진·파일 저장소를 직접 생성하지 않습니다. 새 게임, 
 
 ## 2. 빠른 시작과 UI 연결
 
-현재 `TetrisUi`가 Swing 창과 키 이벤트를 연결하고, `ScreenRouter`가 시작·게임·설정·이름 입력·순위 화면을 전환합니다. `TextFramePanel`은 문자 격자를 그립니다. 글자는 Consolas(영문)와 맑은 고딕(한글)으로 그리고, 없으면 Java 기본 고정폭 글꼴을 씁니다. 블록 칸(`TextFrame.putTile`로 찍은 `BlockTile`)은 `TilePainter`가 무늬 타일로, 상자 테두리 글자는 둥근 선으로, 기본과 다른 배경색 구간은 둥근 막대로 그립니다. `TextFrame.shade()`는 일시정지·게임 종료 때 뒤 화면을 어둡게 덮습니다. `TextFrame.setBackdrop(Backdrop)`으로 움직이는 배경(메뉴의 성과 구름, 게임 화면 보드 바깥의 블록 조각)을 지정하면 `BackdropPainter`가 시간에 따라 픽셀 단위로 그립니다. 화면은 경과 시간만 넘기므로 같은 시점이면 같은 그림이 나옵니다. 화면 로직과 테스트는 지금처럼 글자 격자만 보면 됩니다. 아래는 별도 UI를 연결할 때 참고할 공개 API 예제입니다.
+현재 `TetrisUi`가 Swing 창과 키 이벤트를 연결하고, `ScreenRouter`가 시작·게임·설정·이름 입력·순위 화면을 전환합니다. `TextFramePanel`은 문자 격자를 그립니다. 글자는 Consolas(영문)와 맑은 고딕(한글)으로 그리고, 없으면 Java 기본 고정폭 글꼴을 씁니다. 블록 칸(`TextFrame.putTile`로 찍은 `BlockTile`)은 `TilePainter`가 무늬 타일로, 상자 테두리 글자는 둥근 선으로, 기본과 다른 배경색 구간은 둥근 막대로 그립니다. `TextFrame.shade()`는 일시정지·게임 종료 때 뒤 화면을 어둡게 덮습니다. `TextFrame.setBackdrop(Backdrop)`으로 움직이는 배경을 지정합니다. 메인 메뉴(대성당)는 `PixelMenuPainter`가 배경·로고·메뉴 패널(`TextFrame.addPlate`)·선택 막대를 한 장의 저해상도 캔버스에 안티앨리어싱 없이 그린 뒤 정수 배율로만 확대해 도트 크기를 통일하고, 게임 화면 보드 바깥의 블록 조각은 `BackdropPainter`가 그립니다. 화면은 경과 시간만 넘기므로 같은 시점이면 같은 그림이 나옵니다. 화면 로직과 테스트는 지금처럼 글자 격자만 보면 됩니다. 아래는 별도 UI를 연결할 때 참고할 공개 API 예제입니다.
 
 ```java
 import java.nio.file.Path;

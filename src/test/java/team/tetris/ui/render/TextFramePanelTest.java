@@ -231,18 +231,18 @@ class TextFramePanelTest {
     }
 
     @Test
-    void castleStaysStillWhileCloudsDriftBy() {
+    void cathedralStaysStillWhileCloudsDriftBy() {
         ColorPalette palette = ColorPalette.standard();
         var early = TextFrame.blank(palette.base());
-        early.setBackdrop(Backdrop.castle(0));
+        early.setBackdrop(Backdrop.cathedral(0));
         var later = TextFrame.blank(palette.base());
-        later.setBackdrop(Backdrop.castle(3_000_000_000L));
+        later.setBackdrop(Backdrop.cathedral(3_000_000_000L));
 
         BufferedImage first = paint(early);
         BufferedImage second = paint(later);
         int height = first.getHeight();
 
-        // 아래쪽 성은 그대로이고, 위쪽 하늘의 구름만 움직인다.
+        // 아래쪽 대성당은 그대로이고, 위쪽 하늘의 구름만 움직인다.
         assertEquals(pixelsFrom(first, height * 3 / 4, height), pixelsFrom(second, height * 3 / 4, height));
         assertNotEquals(pixelsFrom(first, 0, height / 2), pixelsFrom(second, 0, height / 2));
         // 같은 시점은 언제나 같은 그림이다.
@@ -266,5 +266,42 @@ class TextFramePanelTest {
         assertEquals(pixels(plain.getSubimage(0, 0, holeWidth, plain.getHeight())),
                 pixels(first.getSubimage(0, 0, holeWidth, first.getHeight())));
         assertNotEquals(pixels(first), pixels(second));
+    }
+
+    @Test
+    void menuArtUsesOneIntegerScaledPixelGrid() {
+        // 로고·패널·선택 막대·배경이 모두 같은 크기의 도트로 그려져야 한다: 도트 한 칸 안의 화면 픽셀은 모두 같은 색.
+        ColorPalette palette = ColorPalette.standard();
+        var frame = TextFrame.blank(palette.base());
+        frame.setBackdrop(Backdrop.cathedral(1_000_000_000L));
+        frame.put(3, 2, "███", palette.blockStyle(TetrominoType.T));
+        frame.addPlate(25, 9, 18, 11);
+        frame.fill(26, 10, 16, 1, palette.highlightStyle());
+        frame.put(27, 10, "►", palette.highlightStyle());
+        BufferedImage image = paint(frame);
+        int scale = PixelMenuPainter.scaleFor(20);
+        assertEquals(2, scale);
+
+        for (int y = 0; y + scale <= image.getHeight(); y += scale) {
+            for (int x = 0; x + scale <= image.getWidth(); x += scale) {
+                int rgb = image.getRGB(x, y);
+                // 글자가 없는 자리만 본다. (글자는 도트 위에 따로 그린다)
+                if (y / 20 == 10 && x >= 26 * 10) {
+                    continue;
+                }
+                for (int dy = 0; dy < scale; dy++) {
+                    for (int dx = 0; dx < scale; dx++) {
+                        assertEquals(rgb, image.getRGB(x + dx, y + dy), "dot at " + x + "," + y);
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    void largerScreensUseLargerIntegerScales() {
+        assertEquals(2, PixelMenuPainter.scaleFor(15));
+        assertEquals(2, PixelMenuPainter.scaleFor(20));
+        assertEquals(3, PixelMenuPainter.scaleFor(26));
     }
 }

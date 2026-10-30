@@ -13,7 +13,6 @@ import java.awt.RenderingHints;
 import java.awt.font.TextLayout;
 import java.awt.geom.Path2D;
 import java.awt.geom.Rectangle2D;
-import java.awt.geom.RoundRectangle2D;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -46,7 +45,10 @@ public final class TextFramePanel extends JComponent {
     /** 한글용 글꼴 후보. */
     private static final List<String> KOREAN_FAMILIES = List.of("Malgun Gothic", "맑은 고딕");
     /** 움직이는 배경 위에서 글자가 읽히도록 글자 아래에 까는 그림자 색. */
-    private static final Color TEXT_SHADOW = new Color(0, 0, 0, 200);
+    private static final Color TEXT_SHADOW = new Color(0, 0, 0, 170);
+    private static final int[][] SHADOW_OFFSETS = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}, {1, 1}, {2, 2}};
+    /** 배경 그림 위에 까는 판의 색. 흰 글자 대비가 4.5:1 이상이 되도록 어둡게 덮는다. */
+    private static final Color PLATE = new Color(0, 0, 0, 150);
     /** 일시정지·게임 종료 때 뒤 화면을 어둡게 덮는 색. */
     private static final Color SHADE = new Color(0, 0, 0, 165);
     private static Set<String> installedFamilies;
@@ -198,10 +200,22 @@ public final class TextFramePanel extends JComponent {
             Color base = current.styleAt(0, 0).background();
             g.setColor(base);
             g.fillRect(0, 0, getWidth(), getHeight());
-            if (current.backdrop() != null) {
-                BackdropPainter.paint(g, current.backdrop(), getWidth(), getHeight(), cellWidth, cellHeight, base);
+            boolean pixelMenu = current.backdrop() != null
+                    && current.backdrop().scene() == Backdrop.Scene.CATHEDRAL;
+            if (pixelMenu) {
+                // 메인 메뉴는 그림 요소(배경·로고·패널·선택 막대)를 한 도트 캔버스에 그린다.
+                PixelMenuPainter.paint(g, current, getWidth(), getHeight(), cellWidth, cellHeight);
+            } else {
+                if (current.backdrop() != null) {
+                    BackdropPainter.paint(g, current.backdrop(), getWidth(), getHeight(), cellWidth, cellHeight);
+                }
+                g.setColor(PLATE);
+                for (Rectangle plate : current.plates()) {
+                    g.fillRect(plate.x * cellWidth, plate.y * cellHeight, plate.width * cellWidth,
+                            plate.height * cellHeight);
+                }
+                paintBackgrounds(g, current, base);
             }
-            paintBackgrounds(g, current, base);
             for (int row = 0; row < current.rows(); row++) {
                 for (int col = 0; col < current.columns(); col++) {
                     BlockTile tile = current.tileAt(col, row);
@@ -211,7 +225,7 @@ public final class TextFramePanel extends JComponent {
                     }
                 }
             }
-            paintGlyphs(g, current);
+            paintGlyphs(g, current, pixelMenu);
             g.setColor(SHADE);
             for (int row = 0; row < current.rows(); row++) {
                 for (int col = 0; col < current.columns(); col++) {
@@ -227,10 +241,9 @@ public final class TextFramePanel extends JComponent {
 
     /**
      * 기본 배경과 다른 배경색(선택 줄, 삭제 강조 등)을 칠한다. 한 줄에서 같은 색이 이어지는 구간을
-     * 둥근 막대 하나로 칠해 칸 경계가 보이지 않게 한다.
+     * 막대 하나로 칠해 칸 경계가 보이지 않게 한다. 도트 배경과 어울리도록 모서리는 직각이다.
      */
     private void paintBackgrounds(Graphics2D g, TextFrame current, Color base) {
-        float arc = cellHeight * 0.6f;
         for (int row = 0; row < current.rows(); row++) {
             int col = 0;
             while (col < current.columns()) {
@@ -244,8 +257,7 @@ public final class TextFramePanel extends JComponent {
                     end++;
                 }
                 g.setColor(color);
-                g.fill(new RoundRectangle2D.Float(col * cellWidth, row * cellHeight + 1,
-                        (end - col) * cellWidth, cellHeight - 2, arc, arc));
+                g.fillRect(col * cellWidth, row * cellHeight + 1, (end - col) * cellWidth, cellHeight - 2);
                 col = end;
             }
         }
@@ -259,7 +271,8 @@ public final class TextFramePanel extends JComponent {
         return current.styleAt(col, row).background();
     }
 
-    private void paintGlyphs(Graphics2D g, TextFrame current) {
+    /** pixelMenu이면 도트 캔버스가 이미 그린 로고 칸(█)과 선택 표시(►)는 건너뛴다. */
+    private void paintGlyphs(Graphics2D g, TextFrame current, boolean pixelMenu) {
         Map<Font, Rectangle2D> markerBounds = new HashMap<>(); // 같은 프레임에서는 글꼴별로 한 번만 측정한다.
         for (int row = 0; row < current.rows(); row++) {
             for (int col = 0; col < current.columns(); col++) {
@@ -276,6 +289,9 @@ public final class TextFramePanel extends JComponent {
                 int y = row * cellHeight;
                 g.setColor(style.foreground());
                 if (paintLine(g, codePoint, x, y)) {
+                    continue;
+                }
+                if (pixelMenu && (codePoint == '█' || codePoint == '►')) {
                     continue;
                 }
                 if (codePoint == '█') {
@@ -320,9 +336,11 @@ public final class TextFramePanel extends JComponent {
                     col = next - 1;
                 }
                 if (current.backdrop() != null && style.background().equals(current.styleAt(0, 0).background())) {
+                    // 그림 위에서도 읽히도록 글자 둘레에 어두운 테두리와 그림자를 두른다.
                     g.setColor(TEXT_SHADOW);
-                    g.drawString(glyph, x + 1, y + baselines.get(font) + 1);
-                    g.drawString(glyph, x + 2, y + baselines.get(font) + 2);
+                    for (int[] offset : SHADOW_OFFSETS) {
+                        g.drawString(glyph, x + offset[0], y + baselines.get(font) + offset[1]);
+                    }
                     g.setColor(style.foreground());
                 }
                 g.drawString(glyph, x, y + baselines.get(font));

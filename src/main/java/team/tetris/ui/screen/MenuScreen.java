@@ -1,5 +1,6 @@
 package team.tetris.ui.screen;
 
+import java.awt.Color;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -8,6 +9,7 @@ import team.tetris.ui.ScreenRouter;
 import team.tetris.ui.input.KeyNames;
 import team.tetris.ui.render.Backdrop;
 import team.tetris.ui.render.TextFrame;
+import team.tetris.ui.render.TextStyle;
 import team.tetris.ui.render.palette.ColorPalette;
 
 /**
@@ -36,8 +38,18 @@ public final class MenuScreen implements Screen {
     private static final TetrominoType[] TITLE_COLORS = {
         TetrominoType.Z, TetrominoType.L, TetrominoType.O, TetrominoType.S, TetrominoType.I, TetrominoType.T
     };
-    private static final int TITLE_TOP = 2;
-    private static final int ITEMS_TOP = 11;
+    /** 로고 맨 윗줄. 부제는 로고 바로 아래(7행 위)에 두어 대성당 첨탑과 떨어뜨린다. */
+    private static final int TITLE_TOP = 1;
+    /** 메뉴 패널: 왼쪽의 대성당을 가리지 않도록 오른쪽 하늘 영역에 둔다(격자 칸). */
+    static final int PANEL_LEFT = 25;
+    static final int PANEL_WIDTH = 18;
+    private static final int PANEL_TOP = 9;
+    /** 배경의 대성당이 서는 땅의 행. 패널은 이 위에서 끝난다. */
+    private static final int GROUND_ROW = 21;
+    /** 맨 아래 안내 줄. 창 아래 가장자리에 붙지 않게 한 줄 띄운다. */
+    static final int HINT_ROW = TextFrame.ROWS - 2;
+    static final String KEY_HINT = "↑↓ 이동 · Enter 선택";
+    private static final Color HINT = new Color(208, 208, 208);
 
     private final ScreenRouter router;
     private final List<MenuItem> items;
@@ -89,29 +101,46 @@ public final class MenuScreen implements Screen {
     public TextFrame render() {
         ColorPalette palette = router.palette();
         TextFrame frame = TextFrame.blank(palette.base());
-        frame.setBackdrop(Backdrop.castle(clockNanos));
+        frame.setBackdrop(Backdrop.cathedral(clockNanos));
         drawTitle(frame, palette);
-        frame.putCentered(TITLE_TOP + 6, "SE Tetris · Team 13", palette.dimStyle());
+        TextStyle light = new TextStyle(HINT, palette.background(), false);
+        frame.putCentered(TITLE_TOP + 5, "SE Tetris · Team 13", light);
 
+        // 대성당은 왼쪽, 메뉴는 오른쪽 하늘의 패널 위에 둔다. 항목은 두 줄 간격.
+        int itemsTop = itemsTop(items.size());
+        int panelRight = PANEL_LEFT + PANEL_WIDTH;
+        frame.addPlate(PANEL_LEFT, itemsTop - 1, PANEL_WIDTH, items.size() * 2 + 1);
+        frame.addPlate(1, HINT_ROW, TextFrame.COLUMNS - 2, 1);
         for (int i = 0; i < items.size(); i++) {
-            int row = ITEMS_TOP + i * 2;
+            int row = itemsTop + i * 2;
             String label = items.get(i).label();
             if (i == cursor) {
-                String text = " ► " + label + "   ";
-                int width = TextFrame.displayWidth(text);
-                frame.put((TextFrame.COLUMNS - width) / 2, row, text, palette.highlightStyle());
+                frame.fill(PANEL_LEFT + 1, row, PANEL_WIDTH - 2, 1, palette.highlightStyle());
+                frame.put(PANEL_LEFT + 2, row, "►", palette.highlightStyle());
+                frame.putCentered(PANEL_LEFT + 1, panelRight - 1, row, label, palette.highlightStyle());
             } else {
-                frame.putCentered(row, label, palette.base());
+                frame.putCentered(PANEL_LEFT + 1, panelRight - 1, row, label, palette.base());
             }
         }
 
-        router.notice().ifPresent(notice ->
-                frame.putCentered(TextFrame.ROWS - 4, notice, palette.warningStyle()));
+        router.notice().ifPresent(notice -> {
+            int width = TextFrame.displayWidth(notice) + 2;
+            frame.addPlate((TextFrame.COLUMNS - width) / 2, HINT_ROW - 1, width, 1);
+            frame.putCentered(HINT_ROW - 1, notice, palette.warningStyle());
+        });
+        // 안내는 아래쪽 띠 한 줄. 다른 키를 누르면 같은 자리에 사용할 수 있는 키를 경고색으로 보여준다.
         if (showKeyHint) {
-            frame.putCentered(TextFrame.ROWS - 3, "사용할 수 있는 키: ↑ ↓ Enter", palette.warningStyle());
+            frame.putCentered(HINT_ROW, "사용할 수 있는 키: ↑ ↓ Enter", palette.warningStyle());
+        } else {
+            frame.putCentered(HINT_ROW, KEY_HINT, light);
         }
-        frame.putCentered(TextFrame.ROWS - 2, "↑↓ 이동   Enter 선택", palette.dimStyle());
         return frame;
+    }
+
+    /** 메뉴 항목 첫 줄. 항목이 적으면 패널 안에서 세로 가운데로 내린다. */
+    static int itemsTop(int itemCount) {
+        int panelRows = GROUND_ROW - PANEL_TOP;
+        return PANEL_TOP + 1 + Math.max(0, (panelRows - (itemCount * 2 + 1)) / 2);
     }
 
     private static void drawTitle(TextFrame frame, ColorPalette palette) {

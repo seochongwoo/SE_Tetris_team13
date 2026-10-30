@@ -43,6 +43,8 @@ public record ColorPalette(
 
     /** 두 팔레트 공통 배경: 블록 색이 잘 보이도록 검정에 가까운 짙은 남색. */
     static final Color BACKGROUND = new Color(12, 14, 24);
+    /** 두 팔레트 공통 선택 막대 색: 로고와 어울리는 따뜻한 노랑. 글자는 배경색으로 반전한다. */
+    static final Color HIGHLIGHT = new Color(230, 185, 58);
 
     public static ColorPalette of(boolean colorBlindMode) {
         return colorBlindMode ? colorBlindFriendly() : standard();
@@ -58,7 +60,7 @@ public record ColorPalette(
         blocks.put(TetrominoType.J, new Color(60, 110, 255));
         blocks.put(TetrominoType.L, new Color(255, 140, 0));
         return new ColorPalette(false, blocks, BACKGROUND, new Color(230, 230, 230), new Color(110, 110, 110),
-                new Color(255, 215, 0), new Color(255, 90, 90), new Color(200, 200, 200), new Color(255, 215, 0));
+                new Color(255, 215, 0), new Color(255, 90, 90), new Color(200, 200, 200), HIGHLIGHT);
     }
 
     public static ColorPalette colorBlindFriendly() {
@@ -71,7 +73,7 @@ public record ColorPalette(
         blocks.put(TetrominoType.J, new Color(0, 114, 178));
         blocks.put(TetrominoType.L, new Color(230, 159, 0));
         return new ColorPalette(true, blocks, BACKGROUND, Color.WHITE, new Color(130, 130, 130),
-                new Color(240, 228, 66), new Color(230, 159, 0), new Color(220, 220, 220), new Color(86, 180, 233));
+                new Color(240, 228, 66), new Color(230, 159, 0), new Color(220, 220, 220), HIGHLIGHT);
     }
 
     public Color block(TetrominoType type) {

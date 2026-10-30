@@ -14,8 +14,8 @@ import java.util.Objects;
 public record Backdrop(Scene scene, long timeNanos, int level, Rectangle hole) {
 
     public enum Scene {
-        /** 메인 메뉴: 블록으로 쌓은 성은 그대로 있고 구름만 흘러간다. */
-        CASTLE,
+        /** 메인 메뉴: 양파 돔 대성당은 그대로 있고 구름만 흘러간다. */
+        CATHEDRAL,
         /** 게임 화면: 보드 바깥으로 작은 블록 조각이 천천히 떠오른다. */
         DRIFT
     }
@@ -30,8 +30,8 @@ public record Backdrop(Scene scene, long timeNanos, int level, Rectangle hole) {
         return hole == null ? null : new Rectangle(hole);
     }
 
-    public static Backdrop castle(long timeNanos) {
-        return new Backdrop(Scene.CASTLE, timeNanos, 0, null);
+    public static Backdrop cathedral(long timeNanos) {
+        return new Backdrop(Scene.CATHEDRAL, timeNanos, 0, null);
     }
 
     public static Backdrop drift(long timeNanos, int level, Rectangle hole) {

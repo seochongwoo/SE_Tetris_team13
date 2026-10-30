@@ -17,6 +17,7 @@ import team.tetris.storage.memory.InMemoryScoreRepository;
 import team.tetris.ui.ScreenRouter;
 import team.tetris.ui.TestApplication;
 import team.tetris.ui.render.Backdrop;
+import team.tetris.ui.render.TextFrame;
 
 class MenuScreenTest {
 
@@ -41,7 +42,7 @@ class MenuScreenTest {
         for (String label : List.of("게임 시작", "아이템 모드", "설정", "스코어보드", "종료")) {
             assertTrue(text.contains(label), label);
         }
-        assertTrue(text.contains("↑↓ 이동   Enter 선택"));
+        assertTrue(text.contains(MenuScreen.KEY_HINT));
     }
 
     @Test
@@ -115,11 +116,44 @@ class MenuScreenTest {
     }
 
     @Test
-    void castleBackdropAdvancesWithTime() {
-        assertEquals(Backdrop.castle(0), router.render().backdrop());
+    void cathedralBackdropAdvancesWithTime() {
+        assertEquals(Backdrop.cathedral(0), router.render().backdrop());
 
         router.update(1_500_000_000L);
 
-        assertEquals(Backdrop.castle(1_500_000_000L), router.render().backdrop());
+        assertEquals(Backdrop.cathedral(1_500_000_000L), router.render().backdrop());
+    }
+
+    @Test
+    void menuSitsOnAPanelBelowTheSkyWithOneHintBandAboveTheBottomEdge() {
+        var frame = router.render();
+        int items = menu().items().size();
+        int itemsTop = MenuScreen.itemsTop(items);
+
+        assertTrue(frame.plates().stream().anyMatch(plate -> plate.y < itemsTop && plate.y + plate.height > itemsTop + items));
+        assertTrue(frame.plates().stream().anyMatch(plate -> plate.y == MenuScreen.HINT_ROW));
+        assertTrue(MenuScreen.HINT_ROW < TextFrame.ROWS - 1);
+        assertTrue(frame.rowText(MenuScreen.HINT_ROW).contains(MenuScreen.KEY_HINT));
+        assertTrue(frame.rowText(itemsTop).contains(menu().items().get(0).label()));
+        assertTrue(frame.rowText(itemsTop).contains("►"));
+    }
+
+    @Test
+    void wrongKeyHintReplacesTheHintBand() {
+        tap("A");
+
+        var hint = router.render().rowText(MenuScreen.HINT_ROW);
+
+        assertTrue(hint.contains("사용할 수 있는 키"));
+        assertFalse(hint.contains(MenuScreen.KEY_HINT));
+    }
+
+    @Test
+    void selectionMarkerStaysWhileTimePasses() {
+        int row = MenuScreen.itemsTop(menu().items().size());
+
+        router.update(1_234_000_000L);
+
+        assertTrue(router.render().rowText(row).contains("►"));
     }
 }

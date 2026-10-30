@@ -160,9 +160,9 @@ class TextFrameTest {
         TextFrame frame = new TextFrame(4, 2, BASE);
         assertEquals(null, frame.backdrop());
 
-        frame.setBackdrop(Backdrop.castle(5));
+        frame.setBackdrop(Backdrop.cathedral(5));
 
-        assertEquals(Backdrop.castle(5), frame.backdrop());
+        assertEquals(Backdrop.cathedral(5), frame.backdrop());
     }
 
     @Test
@@ -174,6 +174,17 @@ class TextFrameTest {
         backdrop.hole().height = 99;
 
         assertEquals(new Rectangle(1, 1, 4, 4), backdrop.hole());
-        assertEquals(null, Backdrop.castle(0).hole());
+        assertEquals(null, Backdrop.cathedral(0).hole());
+    }
+
+    @Test
+    void platesAreKeptInOrderAndCopiedOut() {
+        TextFrame frame = new TextFrame(10, 5, BASE);
+        frame.addPlate(1, 2, 3, 1);
+        frame.addPlate(0, 4, 10, 1);
+
+        frame.plates().get(0).width = 99;
+
+        assertEquals(java.util.List.of(new Rectangle(1, 2, 3, 1), new Rectangle(0, 4, 10, 1)), frame.plates());
     }
 }
