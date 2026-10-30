@@ -317,4 +317,12 @@ class SettingsScreenTest {
         tap("DOWN");
         assertEquals(DIFFICULTY_ROW, screen.cursor());
     }
+
+    @Test
+    void everyHelpLineFitsOnScreen() {
+        for (String line : SettingsScreen.allHelpLines()) {
+            assertTrue(team.tetris.ui.render.TextFrame.displayWidth(line) <= team.tetris.ui.render.TextFrame.COLUMNS - 2,
+                    line);
+        }
+    }
 }
