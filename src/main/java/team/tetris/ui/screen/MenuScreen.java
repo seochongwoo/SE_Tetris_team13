@@ -6,6 +6,7 @@ import java.util.Objects;
 import team.tetris.core.TetrominoType;
 import team.tetris.ui.ScreenRouter;
 import team.tetris.ui.input.KeyNames;
+import team.tetris.ui.render.Backdrop;
 import team.tetris.ui.render.TextFrame;
 import team.tetris.ui.render.palette.ColorPalette;
 
@@ -42,6 +43,7 @@ public final class MenuScreen implements Screen {
     private final List<MenuItem> items;
     private int cursor;
     private boolean showKeyHint;
+    private long clockNanos;
 
     public MenuScreen(ScreenRouter router, List<MenuItem> items) {
         this.router = Objects.requireNonNull(router, "router");
@@ -77,10 +79,17 @@ public final class MenuScreen implements Screen {
         cursor = Math.floorMod(cursor + delta, items.size());
     }
 
+    /** 배경 구름이 흘러가도록 시간을 쌓는다. */
+    @Override
+    public void update(long elapsedNanos) {
+        clockNanos += elapsedNanos;
+    }
+
     @Override
     public TextFrame render() {
         ColorPalette palette = router.palette();
         TextFrame frame = TextFrame.blank(palette.base());
+        frame.setBackdrop(Backdrop.castle(clockNanos));
         drawTitle(frame, palette);
         frame.putCentered(TITLE_TOP + 6, "SE Tetris · Team 13", palette.dimStyle());
 

@@ -1,5 +1,6 @@
 package team.tetris.ui.screen;
 
+import java.awt.Rectangle;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Optional;
@@ -15,6 +16,7 @@ import team.tetris.ui.ScreenRouter;
 import team.tetris.ui.input.InputMapper;
 import team.tetris.ui.input.KeyNames;
 import team.tetris.ui.input.RepeatController;
+import team.tetris.ui.render.Backdrop;
 import team.tetris.ui.render.Renderer;
 import team.tetris.ui.render.TextFrame;
 import team.tetris.ui.render.TextRenderer;
@@ -31,6 +33,9 @@ import team.tetris.ui.render.palette.ColorPalette;
 public final class GameScreen implements Screen {
 
     static final long GAME_OVER_DELAY_NANOS = 1_200_000_000L;
+    /** 배경 조각을 그리지 않는 보드 영역 (테두리 포함, 격자 칸 단위). */
+    static final Rectangle BOARD_AREA = new Rectangle(TextRenderer.BOARD_LEFT, TextRenderer.BOARD_TOP,
+            TextRenderer.CELL_WIDTH * 10 + 2, 22);
     private static final String[] PAUSE_ITEMS = {"재개", "메뉴로", "프로그램 종료"};
     private static final int RESUME_ITEM = 0;
     private static final int QUIT_ITEM = 1;
@@ -45,6 +50,7 @@ public final class GameScreen implements Screen {
     private final Renderer renderer;
     private final ColorPalette palette;
     private final String settingsWarning;
+    private final GameBanner banner;
     private final Deque<GameCommand> pending = new ArrayDeque<>();
     private final Deque<GameCommand> animationInput = new ArrayDeque<>();
     private long clockNanos;
@@ -69,6 +75,8 @@ public final class GameScreen implements Screen {
         this.renderer = new TextRenderer(palette, keys, session instanceof DebugSession);
         this.settingsWarning = started.settings().error().isPresent()
                 ? "설정을 읽지 못해 기본값으로 진행합니다" : null;
+        GameSnapshot start = session.snapshot();
+        this.banner = new GameBanner(start.clearedLines(), start.level());
     }
 
     /** 이 화면이 진행 중인 세션 (테스트와 성능 측정용). */
@@ -203,6 +211,11 @@ public final class GameScreen implements Screen {
         if (session.snapshot().status() != GameStatus.PAUSED) {
             pauseCursor = RESUME_ITEM;
         }
+        GameSnapshot now = session.snapshot();
+        if (now.status() == GameStatus.RUNNING) {
+            banner.advance(elapsedNanos);
+        }
+        banner.observe(now.clearedLines(), now.level());
 
         Optional<GameResult> result = session.result();
         if (result.isEmpty()) {
@@ -227,8 +240,12 @@ public final class GameScreen implements Screen {
     public TextFrame render() {
         GameSnapshot snapshot = session.snapshot();
         TextFrame frame = renderer.render(snapshot);
+        frame.setBackdrop(Backdrop.drift(clockNanos, snapshot.level(), BOARD_AREA));
         if (settingsWarning != null) {
             frame.put(1, TextFrame.ROWS - 1, settingsWarning, palette.warningStyle());
+        }
+        if (snapshot.status() == GameStatus.RUNNING) {
+            banner.draw(frame, palette);
         }
         if (snapshot.status() == GameStatus.PAUSED) {
             frame.shade();

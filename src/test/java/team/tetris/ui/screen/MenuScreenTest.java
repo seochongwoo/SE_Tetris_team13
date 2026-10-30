@@ -16,6 +16,7 @@ import team.tetris.application.port.StorageException;
 import team.tetris.storage.memory.InMemoryScoreRepository;
 import team.tetris.ui.ScreenRouter;
 import team.tetris.ui.TestApplication;
+import team.tetris.ui.render.Backdrop;
 
 class MenuScreenTest {
 
@@ -111,5 +112,14 @@ class MenuScreenTest {
     @Test
     void requiresAtLeastOneItem() {
         assertThrows(IllegalArgumentException.class, () -> new MenuScreen(router, List.of()));
+    }
+
+    @Test
+    void castleBackdropAdvancesWithTime() {
+        assertEquals(Backdrop.castle(0), router.render().backdrop());
+
+        router.update(1_500_000_000L);
+
+        assertEquals(Backdrop.castle(1_500_000_000L), router.render().backdrop());
     }
 }

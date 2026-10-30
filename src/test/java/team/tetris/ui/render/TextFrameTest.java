@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.awt.Color;
+import java.awt.Rectangle;
 import org.junit.jupiter.api.Test;
 
 class TextFrameTest {
@@ -152,5 +153,27 @@ class TextFrameTest {
         assertTrue(frame.isShaded(0, 0));
         assertTrue(frame.isShaded(3, 1));
         assertFalse(frame.isShaded(1, 1));
+    }
+
+    @Test
+    void frameHasNoBackdropUntilAScreenSetsOne() {
+        TextFrame frame = new TextFrame(4, 2, BASE);
+        assertEquals(null, frame.backdrop());
+
+        frame.setBackdrop(Backdrop.castle(5));
+
+        assertEquals(Backdrop.castle(5), frame.backdrop());
+    }
+
+    @Test
+    void backdropKeepsItsOwnCopyOfTheHole() {
+        Rectangle hole = new Rectangle(1, 1, 4, 4);
+        Backdrop backdrop = Backdrop.drift(0, 2, hole);
+
+        hole.width = 99;
+        backdrop.hole().height = 99;
+
+        assertEquals(new Rectangle(1, 1, 4, 4), backdrop.hole());
+        assertEquals(null, Backdrop.castle(0).hole());
     }
 }

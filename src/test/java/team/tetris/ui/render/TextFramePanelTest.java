@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.util.HashSet;
 import java.util.Set;
@@ -222,5 +223,48 @@ class TextFramePanelTest {
                 assertEquals(symbolOnly.getRGB(x, y), withText.getRGB(x, y), "pixel " + x + "," + y);
             }
         }
+    }
+
+    /** y행부터 끝까지의 픽셀. */
+    private static String pixelsFrom(BufferedImage image, int fromY, int toY) {
+        return pixels(image.getSubimage(0, fromY, image.getWidth(), toY - fromY));
+    }
+
+    @Test
+    void castleStaysStillWhileCloudsDriftBy() {
+        ColorPalette palette = ColorPalette.standard();
+        var early = TextFrame.blank(palette.base());
+        early.setBackdrop(Backdrop.castle(0));
+        var later = TextFrame.blank(palette.base());
+        later.setBackdrop(Backdrop.castle(3_000_000_000L));
+
+        BufferedImage first = paint(early);
+        BufferedImage second = paint(later);
+        int height = first.getHeight();
+
+        // 아래쪽 성은 그대로이고, 위쪽 하늘의 구름만 움직인다.
+        assertEquals(pixelsFrom(first, height * 3 / 4, height), pixelsFrom(second, height * 3 / 4, height));
+        assertNotEquals(pixelsFrom(first, 0, height / 2), pixelsFrom(second, 0, height / 2));
+        // 같은 시점은 언제나 같은 그림이다.
+        assertEquals(pixels(first), pixels(paint(early)));
+    }
+
+    @Test
+    void driftBackdropLeavesTheHoleUntouchedAndMovesElsewhere() {
+        ColorPalette palette = ColorPalette.standard();
+        Rectangle hole = new Rectangle(0, 0, 22, TextFrame.ROWS);
+        BufferedImage plain = paint(TextFrame.blank(palette.base()));
+        var early = TextFrame.blank(palette.base());
+        early.setBackdrop(Backdrop.drift(0, 0, hole));
+        var later = TextFrame.blank(palette.base());
+        later.setBackdrop(Backdrop.drift(4_000_000_000L, 3, hole));
+
+        BufferedImage first = paint(early);
+        BufferedImage second = paint(later);
+        int holeWidth = first.getWidth() * 22 / TextFrame.COLUMNS;
+
+        assertEquals(pixels(plain.getSubimage(0, 0, holeWidth, plain.getHeight())),
+                pixels(first.getSubimage(0, 0, holeWidth, first.getHeight())));
+        assertNotEquals(pixels(first), pixels(second));
     }
 }

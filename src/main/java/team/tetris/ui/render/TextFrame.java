@@ -24,6 +24,7 @@ public final class TextFrame {
     /** 타일로 그릴 블록 칸. 타일이 시작하는 칸에만 두고, 오른쪽 칸까지 두 칸을 덮는다. */
     private final BlockTile[][] tiles;
     private final boolean[][] shaded;
+    private Backdrop backdrop;
 
     public TextFrame(int columns, int rows, TextStyle base) {
         if (columns <= 0 || rows <= 0) {
@@ -109,6 +110,15 @@ public final class TextFrame {
 
     public boolean isShaded(int col, int row) {
         return shaded[row][col];
+    }
+
+    /** 글자 뒤에 깔 움직이는 배경. 없으면 null. */
+    public Backdrop backdrop() {
+        return backdrop;
+    }
+
+    public void setBackdrop(Backdrop backdrop) {
+        this.backdrop = backdrop;
     }
 
     public void putCentered(int row, String text, TextStyle style) {

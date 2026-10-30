@@ -45,6 +45,8 @@ public final class TextFramePanel extends JComponent {
     private static final List<String> LATIN_FAMILIES = List.of("Consolas", "Cascadia Mono");
     /** 한글용 글꼴 후보. */
     private static final List<String> KOREAN_FAMILIES = List.of("Malgun Gothic", "맑은 고딕");
+    /** 움직이는 배경 위에서 글자가 읽히도록 글자 아래에 까는 그림자 색. */
+    private static final Color TEXT_SHADOW = new Color(0, 0, 0, 200);
     /** 일시정지·게임 종료 때 뒤 화면을 어둡게 덮는 색. */
     private static final Color SHADE = new Color(0, 0, 0, 165);
     private static Set<String> installedFamilies;
@@ -196,6 +198,9 @@ public final class TextFramePanel extends JComponent {
             Color base = current.styleAt(0, 0).background();
             g.setColor(base);
             g.fillRect(0, 0, getWidth(), getHeight());
+            if (current.backdrop() != null) {
+                BackdropPainter.paint(g, current.backdrop(), getWidth(), getHeight(), cellWidth, cellHeight, base);
+            }
             paintBackgrounds(g, current, base);
             for (int row = 0; row < current.rows(); row++) {
                 for (int col = 0; col < current.columns(); col++) {
@@ -313,6 +318,12 @@ public final class TextFramePanel extends JComponent {
                     }
                     glyph = run.toString();
                     col = next - 1;
+                }
+                if (current.backdrop() != null && style.background().equals(current.styleAt(0, 0).background())) {
+                    g.setColor(TEXT_SHADOW);
+                    g.drawString(glyph, x + 1, y + baselines.get(font) + 1);
+                    g.drawString(glyph, x + 2, y + baselines.get(font) + 2);
+                    g.setColor(style.foreground());
                 }
                 g.drawString(glyph, x, y + baselines.get(font));
             }
