@@ -49,6 +49,11 @@ public final class TextFramePanel extends JComponent {
     private static final int[][] SHADOW_OFFSETS = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}, {1, 1}, {2, 2}};
     /** 배경 그림 위에 까는 판의 색. 흰 글자 대비가 4.5:1 이상이 되도록 어둡게 덮는다. */
     private static final Color PLATE = new Color(0, 0, 0, 150);
+    /** 한글 글꼴에서 가장 위아래로 긴 글자들. 이 범위가 줄 안에 들어가게 크기와 기준선을 잡는다. */
+    static final String KOREAN_EXTENT_SAMPLE = "한읽움뷁[]";
+    static final String LATIN_EXTENT_SAMPLE = "H[]gy|";
+    /** 한글 문구에 잇지 않고 영문 글꼴로 따로 그리는 괄호. 맑은 고딕의 괄호는 아래로 길어 줄 밖으로 나간다. */
+    private static final String BRACKETS = "[]()";
     /** 일시정지·게임 종료 때 뒤 화면을 어둡게 덮는 색. */
     private static final Color SHADE = new Color(0, 0, 0, 165);
     private static Set<String> installedFamilies;
@@ -136,8 +141,9 @@ public final class TextFramePanel extends JComponent {
                 frame.rows() * lineHeight(size));
     }
 
+    /** 줄 높이. 작은 글자에서도 괄호·아래로 긴 글자가 위아래 1px 여유 안에 들어가도록 글자 크기 + 2px 이상. */
     private static int lineHeight(int size) {
-        return Math.round(size * LINE_HEIGHT_RATIO);
+        return Math.max(Math.round(size * LINE_HEIGHT_RATIO), size + 2);
     }
 
     private static boolean fits(Dimension size, Dimension limit) {
@@ -147,7 +153,8 @@ public final class TextFramePanel extends JComponent {
     private void applyFontSize(int size) {
         fontSize = size;
         String[] families = {family(LATIN_FAMILIES), family(KOREAN_FAMILIES), Font.MONOSPACED};
-        String[] samples = {"H", "한", "H"};
+        // 기준선을 잡는 글자: 가장 위아래로 긴 글자와 괄호까지 포함해, 어떤 글자도 줄 밖으로 나가지 않게 한다.
+        String[] samples = {LATIN_EXTENT_SAMPLE, KOREAN_EXTENT_SAMPLE, LATIN_EXTENT_SAMPLE};
         fonts = new Font[families.length][];
         baselines.clear();
         cellHeight = lineHeight(size);
@@ -155,20 +162,31 @@ public final class TextFramePanel extends JComponent {
         for (int i = 0; i < families.length; i++) {
             Font plain = new Font(families[i], Font.PLAIN, size);
             if (i == 1) {
-                // 한글 글꼴은 영문보다 좁게 그려져 단어가 띄엄띄엄 보인다. 한 글자가 두 칸을 거의 채우도록 키운다.
-                float advance = getFontMetrics(plain).charWidth('한');
-                float scale = Math.max(1f, Math.min(1.15f, 2 * cellWidth * 0.92f / advance));
-                plain = plain.deriveFont(size * scale);
+                plain = plain.deriveFont(koreanFontSize(plain, size));
             }
             fonts[i] = new Font[] {plain, plain.deriveFont(Font.BOLD)};
             for (Font font : fonts[i]) {
-                FontMetrics metrics = getFontMetrics(font);
-                Rectangle ink = new TextLayout(samples[i], font, metrics.getFontRenderContext())
-                        .getPixelBounds(null, 0, 0);
+                Rectangle ink = inkOf(samples[i], font);
                 // 잉크 위쪽은 기준선 위 -ink.y, 높이는 ink.height. 남는 공간을 위아래로 나눈다.
                 baselines.put(font, Math.round((cellHeight - ink.height) / 2f) - ink.y);
             }
         }
+    }
+
+    /**
+     * 한글 글꼴 크기. 영문보다 좁게 그려지면 한 글자가 두 칸을 거의 채우도록 키우되, 받침 있는 글자와 괄호가
+     * 줄 높이(위아래 1px 여유) 안에 들어가도록 줄인다. 줄 높이가 글자 크기의 1.1배로 빠듯해서, 그대로 두면
+     * 글자 아래가 선택 막대 밖으로 나가 잘려 보인다.
+     */
+    private float koreanFontSize(Font plain, int size) {
+        float advance = getFontMetrics(plain).charWidth('한');
+        float scale = Math.max(1f, Math.min(1.15f, 2 * cellWidth * 0.92f / advance));
+        float limit = (cellHeight - 2f) / inkOf(KOREAN_EXTENT_SAMPLE, plain.deriveFont(Font.BOLD)).height;
+        return size * Math.min(scale, limit);
+    }
+
+    private Rectangle inkOf(String text, Font font) {
+        return new TextLayout(text, font, getFontMetrics(font).getFontRenderContext()).getPixelBounds(null, 0, 0);
     }
 
     /** codePoint를 그릴 수 있는 첫 글꼴. */
@@ -312,8 +330,14 @@ public final class TextFramePanel extends JComponent {
                     continue;
                 }
                 int span = TextFrame.isWide(codePoint) ? 2 : 1;
-                // 첫 글자를 자기 칸 가운데에 맞춘다. 글꼴이 달라도 글자 위치가 칸을 벗어나지 않는다.
-                x += Math.round((span * cellWidth - g.getFontMetrics().stringWidth(glyph)) / 2f);
+                if (codePoint == '[' || codePoint == '(') {
+                    // 여는 괄호는 칸 오른쪽에 붙여 뒤 글자와 벌어지지 않게 한다.
+                    x += cellWidth - g.getFontMetrics().stringWidth(glyph);
+                } else {
+                    // 첫 글자를 자기 칸 가운데에 맞춘다. 글꼴이 달라도 글자 위치가 칸을 벗어나지 않는다.
+                    x += Math.round((span * cellWidth - g.getFontMetrics().stringWidth(glyph)) / 2f);
+                }
+                int closing = -1;
                 if (span == 2 && font.equals(fontFor('한', style.bold()))) {
                     // 한글로 시작하는 문구는 한 칸 띄어쓰기까지 이어서 한 번에 그린다. 격자에서는 공백도 한 칸이라
                     // 글자마다 따로 그리면 글자와 단어 사이가 벌어져 보인다. 두 칸 이상 띄우면 다른 열로 본다.
@@ -334,18 +358,34 @@ public final class TextFramePanel extends JComponent {
                     }
                     glyph = run.toString();
                     col = next - 1;
-                }
-                if (current.backdrop() != null && style.background().equals(current.styleAt(0, 0).background())) {
-                    // 그림 위에서도 읽히도록 글자 둘레에 어두운 테두리와 그림자를 두른다.
-                    g.setColor(TEXT_SHADOW);
-                    for (int[] offset : SHADOW_OFFSETS) {
-                        g.drawString(glyph, x + offset[0], y + baselines.get(font) + offset[1]);
+                    // 문구 바로 뒤의 닫는 괄호는 칸 위치 대신 문구 끝에 붙여 그린다.
+                    if (next < current.columns() && style.equals(current.styleAt(next, row))
+                            && (current.codePointAt(next, row) == ']' || current.codePointAt(next, row) == ')')) {
+                        closing = current.codePointAt(next, row);
+                        col = next;
                     }
-                    g.setColor(style.foreground());
                 }
-                g.drawString(glyph, x, y + baselines.get(font));
+                drawText(g, current, style, font, glyph, x, y);
+                if (closing >= 0) {
+                    Font bracketFont = fontFor(closing, style.bold());
+                    drawText(g, current, style, bracketFont, String.valueOf((char) closing),
+                            x + g.getFontMetrics(font).stringWidth(glyph) + 1, y);
+                }
             }
         }
+    }
+
+    private void drawText(Graphics2D g, TextFrame current, TextStyle style, Font font, String text, int x, int y) {
+        g.setFont(font);
+        if (current.backdrop() != null && style.background().equals(current.styleAt(0, 0).background())) {
+            // 그림 위에서도 읽히도록 글자 둘레에 어두운 테두리와 그림자를 두른다.
+            g.setColor(TEXT_SHADOW);
+            for (int[] offset : SHADOW_OFFSETS) {
+                g.drawString(text, x + offset[0], y + baselines.get(font) + offset[1]);
+            }
+        }
+        g.setColor(style.foreground());
+        g.drawString(text, x, y + baselines.get(font));
     }
 
     /**
@@ -359,7 +399,7 @@ public final class TextFramePanel extends JComponent {
         }
         int codePoint = current.codePointAt(col, row);
         if (codePoint == ' ' || codePoint == '・' || codePoint == '█' || (codePoint >= 0x2500 && codePoint <= 0x257F)
-                || !font.canDisplay(codePoint)) {
+                || BRACKETS.indexOf(codePoint) >= 0 || !font.canDisplay(codePoint)) {
             return 0;
         }
         int width = TextFrame.isWide(codePoint) ? 2 : 1;

@@ -304,4 +304,36 @@ class TextFramePanelTest {
         assertEquals(2, PixelMenuPainter.scaleFor(20));
         assertEquals(3, PixelMenuPainter.scaleFor(26));
     }
+
+    @ParameterizedTest
+    @CsvSource({"SMALL", "MEDIUM", "LARGE"})
+    void koreanTextAndBracketsStayInsideTheSelectionBar(ScreenSize size) {
+        // 선택 막대는 칸 위아래를 1px씩 남긴다. 받침 있는 한글과 괄호가 그 밖으로 나가면 잘려 보인다.
+        for (boolean bold : new boolean[] {false, true}) {
+            var style = new TextStyle(Color.WHITE, Color.BLACK, bold);
+            var frame = new TextFrame(16, 1, style);
+            frame.put(0, 0, "[쉬움] 뷁읽 [보통]", style);
+            var panel = new TextFramePanel(size, frame);
+            panel.setSize(panel.getPreferredSize());
+            var image = new BufferedImage(panel.getWidth(), panel.getHeight(), BufferedImage.TYPE_INT_RGB);
+            var graphics = image.createGraphics();
+            try {
+                panel.paint(graphics);
+            } finally {
+                graphics.dispose();
+            }
+            int top = image.getHeight();
+            int bottom = -1;
+            for (int y = 0; y < image.getHeight(); y++) {
+                for (int x = 0; x < image.getWidth(); x++) {
+                    if (image.getRGB(x, y) != Color.BLACK.getRGB()) {
+                        top = Math.min(top, y);
+                        bottom = Math.max(bottom, y);
+                    }
+                }
+            }
+            assertTrue(top >= 1 && bottom <= image.getHeight() - 2,
+                    size + " bold=" + bold + ": ink " + top + ".." + bottom + " in " + image.getHeight());
+        }
+    }
 }
