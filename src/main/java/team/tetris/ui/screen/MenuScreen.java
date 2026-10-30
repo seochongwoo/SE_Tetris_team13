@@ -48,8 +48,11 @@ public final class MenuScreen implements Screen {
     private static final int GROUND_ROW = 21;
     /** 맨 아래 안내 줄. 창 아래 가장자리에 붙지 않게 한 줄 띄운다. */
     static final int HINT_ROW = TextFrame.ROWS - 2;
-    static final String KEY_HINT = "↑↓ 이동 · Enter 선택";
+    /** 아래쪽 안내: 짝수 번째는 키캡으로 그릴 키 이름, 홀수 번째는 설명. */
+    static final List<String> HINT_PARTS = List.of("↑", "", "↓", "이동 ·", "Enter", "선택");
     private static final Color HINT = new Color(208, 208, 208);
+    /** 키캡 바탕색. 도트 화면에서는 윗변이 밝고 아랫변이 어두운 키캡으로 그려진다. */
+    private static final Color KEYCAP = new Color(196, 198, 214);
 
     private final ScreenRouter router;
     private final List<MenuItem> items;
@@ -132,9 +135,28 @@ public final class MenuScreen implements Screen {
         if (showKeyHint) {
             frame.putCentered(HINT_ROW, "사용할 수 있는 키: ↑ ↓ Enter", palette.warningStyle());
         } else {
-            frame.putCentered(HINT_ROW, KEY_HINT, light);
+            drawKeyHint(frame, light, new TextStyle(palette.background(), KEYCAP, true));
         }
         return frame;
+    }
+
+    /** 키 이름은 양옆에 한 칸씩 띄운 키캡으로, 설명은 그 사이에 둔다. 전체를 가운데 정렬한다. */
+    private static void drawKeyHint(TextFrame frame, TextStyle text, TextStyle keycap) {
+        StringBuilder plain = new StringBuilder();
+        for (int i = 0; i < HINT_PARTS.size(); i++) {
+            String part = HINT_PARTS.get(i);
+            if (!part.isEmpty()) {
+                plain.append(i % 2 == 0 ? " " + part + " " : part).append(' ');
+            }
+        }
+        int col = (TextFrame.COLUMNS - TextFrame.displayWidth(plain.toString().strip())) / 2;
+        for (int i = 0; i < HINT_PARTS.size(); i++) {
+            String part = HINT_PARTS.get(i);
+            if (part.isEmpty()) {
+                continue;
+            }
+            col = frame.put(col, HINT_ROW, i % 2 == 0 ? " " + part + " " : part, i % 2 == 0 ? keycap : text) + 1;
+        }
     }
 
     /** 메뉴 항목 첫 줄. 항목이 적으면 패널 안에서 세로 가운데로 내린다. */
