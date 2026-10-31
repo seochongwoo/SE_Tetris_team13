@@ -6,6 +6,9 @@ import java.util.Map;
 import java.util.Objects;
 import team.tetris.core.Shape;
 import team.tetris.core.TetrominoType;
+import team.tetris.core.item.Item;
+import team.tetris.core.item.WeightBlock;
+import team.tetris.ui.render.BlockTile;
 import team.tetris.ui.render.TextStyle;
 
 /**
@@ -38,6 +41,11 @@ public record ColorPalette(
         Objects.requireNonNull(highlight, "highlight");
     }
 
+    /** 두 팔레트 공통 배경: 블록 색이 잘 보이도록 검정에 가까운 짙은 남색. */
+    static final Color BACKGROUND = new Color(12, 14, 24);
+    /** 두 팔레트 공통 선택 막대 색: 로고와 어울리는 따뜻한 노랑. 글자는 배경색으로 반전한다. */
+    static final Color HIGHLIGHT = new Color(230, 185, 58);
+
     public static ColorPalette of(boolean colorBlindMode) {
         return colorBlindMode ? colorBlindFriendly() : standard();
     }
@@ -51,8 +59,8 @@ public record ColorPalette(
         blocks.put(TetrominoType.Z, new Color(255, 0, 0));
         blocks.put(TetrominoType.J, new Color(60, 110, 255));
         blocks.put(TetrominoType.L, new Color(255, 140, 0));
-        return new ColorPalette(false, blocks, Color.BLACK, new Color(230, 230, 230), new Color(110, 110, 110),
-                new Color(255, 215, 0), new Color(255, 90, 90), new Color(200, 200, 200), new Color(255, 215, 0));
+        return new ColorPalette(false, blocks, BACKGROUND, new Color(230, 230, 230), new Color(110, 110, 110),
+                new Color(255, 215, 0), new Color(255, 90, 90), new Color(200, 200, 200), HIGHLIGHT);
     }
 
     public static ColorPalette colorBlindFriendly() {
@@ -64,8 +72,8 @@ public record ColorPalette(
         blocks.put(TetrominoType.Z, new Color(213, 94, 0));
         blocks.put(TetrominoType.J, new Color(0, 114, 178));
         blocks.put(TetrominoType.L, new Color(230, 159, 0));
-        return new ColorPalette(true, blocks, Color.BLACK, Color.WHITE, new Color(130, 130, 130),
-                new Color(240, 228, 66), new Color(230, 159, 0), new Color(220, 220, 220), new Color(86, 180, 233));
+        return new ColorPalette(true, blocks, BACKGROUND, Color.WHITE, new Color(130, 130, 130),
+                new Color(240, 228, 66), new Color(230, 159, 0), new Color(220, 220, 220), HIGHLIGHT);
     }
 
     public Color block(TetrominoType type) {
@@ -113,6 +121,33 @@ public record ColorPalette(
     /** 아이템이 실린 칸: 블록 색을 배경으로 칠하고 글자는 배경색으로 반전해 일반 무늬와 구분한다. */
     public TextStyle itemStyle(Shape shape) {
         return new TextStyle(background, colorOf(shape), true);
+    }
+
+    /** 보드 빈 칸 타일. */
+    public BlockTile emptyTile() {
+        return new BlockTile(BlockTile.Kind.EMPTY, dim, BlockTile.Pattern.NONE, null);
+    }
+
+    /** 블록 칸 타일: 블록 색과 블록별 무늬. */
+    public BlockTile blockTile(Shape shape) {
+        return new BlockTile(BlockTile.Kind.SOLID, colorOf(shape), BlockGlyphs.patternOf(shape), null);
+    }
+
+    /** 착지 그림자 타일: 같은 색·무늬의 테두리만 그린다. */
+    public BlockTile ghostTile(Shape shape) {
+        return new BlockTile(BlockTile.Kind.GHOST, colorOf(shape), BlockGlyphs.patternOf(shape), null);
+    }
+
+    /** 아이템이 실린 칸 타일: 무늬 대신 아이템 문자를 그린다. */
+    public BlockTile itemTile(Shape shape, Item item) {
+        return new BlockTile(BlockTile.Kind.ITEM, colorOf(shape), BlockTile.Pattern.NONE, String.valueOf(item.symbol()));
+    }
+
+    /** 디버그 삭제 예고 타일. item이 있으면 아이템 문자를 함께 그린다. */
+    public BlockTile previewTile(Shape shape, Item item) {
+        String label = item == null || item instanceof WeightBlock ? null : String.valueOf(item.symbol());
+        return new BlockTile(BlockTile.Kind.PREVIEW, colorOf(shape),
+                label == null ? BlockGlyphs.patternOf(shape) : BlockTile.Pattern.NONE, label);
     }
 
     private Color colorOf(Shape shape) {

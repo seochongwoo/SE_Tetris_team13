@@ -1,5 +1,9 @@
 package team.tetris.ui.render;
 
+import java.awt.Rectangle;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -20,6 +24,11 @@ public final class TextFrame {
     private final int rows;
     private final int[][] codePoints;
     private final TextStyle[][] styles;
+    /** 타일로 그릴 블록 칸. 타일이 시작하는 칸에만 두고, 오른쪽 칸까지 두 칸을 덮는다. */
+    private final BlockTile[][] tiles;
+    private final boolean[][] shaded;
+    private Backdrop backdrop;
+    private final List<Rectangle> plates = new ArrayList<>();
 
     public TextFrame(int columns, int rows, TextStyle base) {
         if (columns <= 0 || rows <= 0) {
@@ -30,6 +39,8 @@ public final class TextFrame {
         this.rows = rows;
         this.codePoints = new int[rows][columns];
         this.styles = new TextStyle[rows][columns];
+        this.tiles = new BlockTile[rows][columns];
+        this.shaded = new boolean[rows][columns];
         for (int row = 0; row < rows; row++) {
             for (int col = 0; col < columns; col++) {
                 codePoints[row][col] = ' ';
@@ -67,6 +78,63 @@ public final class TextFrame {
             x += width;
         }
         return x;
+    }
+
+    /**
+     * 블록 한 칸을 찍는다. 글자 격자에는 glyph(두 칸)가 들어가고, 화면에는 tile 그림으로 그려진다.
+     * 나중에 같은 칸에 다른 글자를 찍으면 타일은 지워진다.
+     */
+    public void putTile(int col, int row, String glyph, TextStyle style, BlockTile tile) {
+        Objects.requireNonNull(tile, "tile");
+        put(col, row, glyph, style);
+        if (row >= 0 && row < rows && col >= 0 && col + 1 < columns) {
+            tiles[row][col] = tile;
+        }
+    }
+
+    /** (col, row)에서 시작하는 타일. 없으면 null. */
+    public BlockTile tileAt(int col, int row) {
+        return tiles[row][col];
+    }
+
+    /** (col, row)가 왼쪽 칸에서 시작한 타일의 오른쪽 절반인가. */
+    public boolean isTileContinuation(int col, int row) {
+        return col > 0 && tiles[row][col - 1] != null;
+    }
+
+    /**
+     * 지금까지 찍힌 내용 전체를 어둡게 표시한다. 일시정지 메뉴처럼 위에 겹쳐 그릴 내용을 돋보이게 할 때
+     * 쓰며, 이후에 찍는 칸은 다시 밝게 그려진다.
+     */
+    public void shade() {
+        for (boolean[] row : shaded) {
+            Arrays.fill(row, true);
+        }
+    }
+
+    public boolean isShaded(int col, int row) {
+        return shaded[row][col];
+    }
+
+    /** 글자 뒤에 깔 움직이는 배경. 없으면 null. */
+    public Backdrop backdrop() {
+        return backdrop;
+    }
+
+    public void setBackdrop(Backdrop backdrop) {
+        this.backdrop = backdrop;
+    }
+
+    /**
+     * 배경 그림 위, 글자 아래에 반투명한 어두운 판을 깐다(격자 칸 단위). 움직이는 배경 위에서 메뉴처럼
+     * 읽어야 하는 글자를 돋보이게 할 때 쓴다.
+     */
+    public void addPlate(int col, int row, int width, int height) {
+        plates.add(new Rectangle(col, row, width, height));
+    }
+
+    public List<Rectangle> plates() {
+        return plates.stream().map(Rectangle::new).toList();
     }
 
     public void putCentered(int row, String text, TextStyle style) {
@@ -193,6 +261,14 @@ public final class TextFrame {
         if (width == 2) {
             codePoints[row][x + 1] = CONTINUATION;
             styles[row][x + 1] = style;
+        }
+        // 덮어쓴 칸에 걸친 타일과 어둡게 표시는 지운다.
+        if (x > 0) {
+            tiles[row][x - 1] = null;
+        }
+        for (int i = x; i < x + width; i++) {
+            tiles[row][i] = null;
+            shaded[row][i] = false;
         }
     }
 }
