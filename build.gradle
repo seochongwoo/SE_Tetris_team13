@@ -70,7 +70,7 @@ check.dependsOn jacocoTestCoverageVerification
 //   gradlew packageApp   → build\jpackage\SETetris\SETetris.exe
 //   gradlew packageZip   → build\distributions\SETetris-<version>-windows.zip (배포용)
 // ---------------------------------------------------------------------------
-version = '2.0.0'
+version = '2.1.0'
 
 def appName = 'SETetris'
 def jpackageInput = layout.buildDirectory.dir('jpackage-input')
