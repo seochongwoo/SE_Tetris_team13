@@ -5,6 +5,7 @@ import team.tetris.core.TemporaryBlock;
 import team.tetris.core.TetrominoType;
 import team.tetris.core.item.Item;
 import team.tetris.core.item.WeightBlock;
+import team.tetris.ui.render.BlockTile.Pattern;
 
 /**
  * 블록 한 칸을 그리는 두 글자 무늬. 색을 구분하기 어려워도 모양과 무늬만으로 블록을 알아볼 수
@@ -40,6 +41,23 @@ public final class BlockGlyphs {
             case Z -> "\\\\";
             case J -> "((";
             case L -> "))";
+        };
+    }
+
+    /** 타일로 그릴 때의 무늬. 글자 무늬({@link #of(Shape)})와 같은 뜻을 그림으로 옮긴 것이다. */
+    public static Pattern patternOf(Shape shape) {
+        if (shape == TemporaryBlock.INSTANCE) return Pattern.CHECKER;
+        if (!(shape instanceof TetrominoType type)) {
+            return Pattern.CROSS;
+        }
+        return switch (type) {
+            case I -> Pattern.SQUARE;
+            case O -> Pattern.DOT;
+            case T -> Pattern.DIAMOND;
+            case S -> Pattern.SLASH;
+            case Z -> Pattern.BACKSLASH;
+            case J -> Pattern.LEFT;
+            case L -> Pattern.RIGHT;
         };
     }
 

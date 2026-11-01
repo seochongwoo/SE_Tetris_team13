@@ -26,8 +26,8 @@
 | R1-11 | 반복 키 입력이 무시되지 않고 즉시 반응 (p8) | `ui/input/RepeatController`, `ui/screen/GameScreen` (삭제 연출 중 이동·회전·드롭·키 반복을 보관하고 종료 후 순서대로 적용) | `RepeatControllerTest`, `ResponsivenessTest`, `GameScreenTest`, `AnimationInputTest` | ✅ |
 | R1-12 | 일시정지·재개 키 (p8) | `GameScreen` (P 키, Esc 게임 메뉴) | `GameScreenTest` | ✅ |
 | R1-13 | 진행·일시정지 중 게임 종료 방법 (OS 기능 제외) (p8) | `GameScreen` 게임 메뉴 "메뉴로 / 프로그램 종료" | `GameScreenTest` | ✅ |
-| R1-14 | 블록마다 다른 색, 비슷한·좌우 반전 블록은 대비되는 색·무늬 (p9) | `ui/render/palette/ColorPalette`, `BlockGlyphs` | `ColorPaletteTest` | ✅ |
-| R1-15 | 색맹 모드: 적록·청황 색맹도 블록 구분 (p10) | `ColorPalette` (색맹용 팔레트 + 블록별 무늬) | `ColorPaletteTest`, `SettingsScreenTest` | ✅ |
+| R1-14 | 블록마다 다른 색, 비슷한·좌우 반전 블록은 대비되는 색·무늬 (p9) | `ui/render/palette/ColorPalette`, `BlockGlyphs`. 화면에는 블록별 무늬 타일(`BlockTile`, `TilePainter`)로 그림. S/Z(사선 / \), J/L(◀ ▶)은 거울상 무늬 | `ColorPaletteTest`, `TextFramePanelTest` | ✅ |
+| R1-15 | 색맹 모드: 적록·청황 색맹도 블록 구분 (p10) | `ColorPalette` (색맹용 Okabe-Ito 팔레트 + 블록별 무늬 타일). 무늬는 색과 무관하게 7종이 모두 달라 어떤 색각 이상에서도 구분 | `ColorPaletteTest`, `SettingsScreenTest`, `TextFramePanelTest` (같은 색에서도 무늬가 모두 다른지 검사) | ✅ |
 | R1-16 | 1칸 떨어질 때마다 점수 (자동·수동 무관), 실시간 표시 (p11) | `application/ScorePolicy`, `TextRenderer` | `ScorePolicyTest`, `SinglePlayerSessionTest` | ✅ |
 | R1-17 | 속도가 빨라지면 추가 점수 (p11) | `ScorePolicy` (떨어진 칸 × (레벨 + 1)) | `ScorePolicyTest` | ✅ |
 | R1-18 | 제시되지 않은 점수 방식 1개 이상 (p11) | `ScorePolicy` (줄 삭제 100 × 줄 수²) | `ScorePolicyTest` | ✅ |

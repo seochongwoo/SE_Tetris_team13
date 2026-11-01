@@ -16,6 +16,8 @@ import team.tetris.application.port.StorageException;
 import team.tetris.storage.memory.InMemoryScoreRepository;
 import team.tetris.ui.ScreenRouter;
 import team.tetris.ui.TestApplication;
+import team.tetris.ui.render.Backdrop;
+import team.tetris.ui.render.TextFrame;
 
 class MenuScreenTest {
 
@@ -40,7 +42,7 @@ class MenuScreenTest {
         for (String label : List.of("게임 시작", "아이템 모드", "설정", "스코어보드", "종료")) {
             assertTrue(text.contains(label), label);
         }
-        assertTrue(text.contains("↑↓ 이동   Enter 선택"));
+        assertTrue(text.contains("이동") && text.contains("Enter") && text.contains("선택"));
     }
 
     @Test
@@ -111,5 +113,66 @@ class MenuScreenTest {
     @Test
     void requiresAtLeastOneItem() {
         assertThrows(IllegalArgumentException.class, () -> new MenuScreen(router, List.of()));
+    }
+
+    @Test
+    void cathedralBackdropAdvancesWithTime() {
+        assertEquals(Backdrop.cathedral(0), router.render().backdrop());
+
+        router.update(1_500_000_000L);
+
+        assertEquals(Backdrop.cathedral(1_500_000_000L), router.render().backdrop());
+    }
+
+    @Test
+    void menuSitsOnAPanelBelowTheSkyWithOneHintBandAboveTheBottomEdge() {
+        var frame = router.render();
+        int items = menu().items().size();
+        int itemsTop = MenuScreen.itemsTop(items);
+
+        assertTrue(frame.plates().stream().anyMatch(plate -> plate.y < itemsTop && plate.y + plate.height > itemsTop + items));
+        assertTrue(frame.plates().stream().anyMatch(plate -> plate.y == MenuScreen.HINT_ROW));
+        assertTrue(MenuScreen.HINT_ROW < TextFrame.ROWS - 1);
+        assertTrue(frame.rowText(MenuScreen.HINT_ROW).contains(" Enter  선택"));
+        assertTrue(frame.rowText(itemsTop).contains(menu().items().get(0).label()));
+        assertTrue(frame.rowText(itemsTop).contains("►"));
+    }
+
+    @Test
+    void wrongKeyHintReplacesTheHintBand() {
+        tap("A");
+
+        var hint = router.render().rowText(MenuScreen.HINT_ROW);
+
+        assertTrue(hint.contains("사용할 수 있는 키"));
+        assertFalse(hint.contains("선택"));
+    }
+
+    @Test
+    void selectionMarkerStaysWhileTimePasses() {
+        int row = MenuScreen.itemsTop(menu().items().size());
+
+        router.update(1_234_000_000L);
+
+        assertTrue(router.render().rowText(row).contains("►"));
+    }
+
+    @Test
+    void keyNamesInTheHintSitOnSeparateKeycaps() {
+        var frame = router.render();
+        String hint = frame.rowText(MenuScreen.HINT_ROW);
+        int enter = hint.indexOf("Enter");
+        int arrow = hint.indexOf('↑');
+        var base = frame.styleAt(0, 0).background();
+
+        // 키 이름과 양옆 한 칸은 키캡 바탕, 키캡 사이와 설명은 기본 바탕이다. (↑ 앞의 글자는 모두 한 칸 폭)
+        assertTrue(!frame.styleAt(arrow, MenuScreen.HINT_ROW).background().equals(base));
+        assertTrue(!frame.styleAt(arrow - 1, MenuScreen.HINT_ROW).background().equals(base));
+        assertEquals(base, frame.styleAt(arrow - 2, MenuScreen.HINT_ROW).background());
+        String row = frame.rowText(MenuScreen.HINT_ROW);
+        int enterCol = TextFrame.displayWidth(row.substring(0, enter));
+        assertTrue(!frame.styleAt(enterCol, MenuScreen.HINT_ROW).background().equals(base));
+        assertTrue(!frame.styleAt(enterCol + 5, MenuScreen.HINT_ROW).background().equals(base));
+        assertEquals(base, frame.styleAt(enterCol + 6, MenuScreen.HINT_ROW).background());
     }
 }

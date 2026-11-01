@@ -10,6 +10,7 @@ import team.tetris.application.model.GameMode;
 import team.tetris.application.model.Difficulty;
 import team.tetris.application.model.ScoreEntry;
 import team.tetris.application.port.StorageException;
+import team.tetris.ui.DisplayNames;
 import team.tetris.ui.ScreenRouter;
 import team.tetris.ui.input.KeyNames;
 import team.tetris.ui.render.TextFrame;
@@ -118,7 +119,7 @@ public final class ScoreboardScreen implements Screen {
         ColorPalette palette = router.palette();
         TextFrame frame = TextFrame.blank(palette.base());
         frame.putCentered(1, "스코어보드", palette.accentStyle());
-        frame.putCentered(2, (mode == GameMode.NORMAL ? "일반" : "아이템") + " / " + difficulty.name(),
+        frame.putCentered(2, (mode == GameMode.NORMAL ? "일반" : "아이템") + " / " + DisplayNames.of(difficulty),
                 palette.accentStyle());
         frame.put(RANK_COL, LIST_TOP - 2, "순위", palette.dimStyle());
         frame.put(NAME_COL, LIST_TOP - 2, "이름", palette.dimStyle());

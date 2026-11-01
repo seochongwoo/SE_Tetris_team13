@@ -28,6 +28,7 @@ import team.tetris.core.item.ItemContext;
 import team.tetris.core.item.LineClearItem;
 import team.tetris.core.item.WeightBlock;
 import team.tetris.core.rule.PieceSource;
+import team.tetris.ui.DisplayNames;
 import team.tetris.ui.TestApplication;
 import team.tetris.ui.input.InputMapper;
 import team.tetris.ui.render.palette.BlockGlyphs;
@@ -50,10 +51,25 @@ class TextRendererTest {
         for (GameCommand command : new GameCommand[]{GameCommand.MOVE_LEFT, GameCommand.PAUSE,
                 GameCommand.RESUME, GameCommand.HARD_DROP, GameCommand.QUIT_GAME}) {
             var frame = renderer.render(game.snapshot());
-            assertEquals(label + " / " + difficulty.name(), panelText(frame, 1).strip());
+            assertEquals(label + " / " + DisplayNames.of(difficulty), panelText(frame, 1).strip());
             assertTrue(panelText(frame, 11).startsWith("SCORE"));
             game.handle(command);
         }
+    }
+
+    @Test
+    void boardCellsAreTilesWithTheBlocksColorAndPattern() {
+        session.handle(GameCommand.HARD_DROP);
+        TextFrame frame = renderer.render(session.snapshot());
+
+        BlockTile empty = frame.tileAt(TextRenderer.columnOf(0), TextRenderer.rowOf(0));
+        assertEquals(BlockTile.Kind.EMPTY, empty.kind());
+        BlockTile placed = frame.tileAt(TextRenderer.columnOf(4), TextRenderer.rowOf(19));
+        assertEquals(palette.blockTile(TetrominoType.T), placed);
+        assertEquals(BlockTile.Pattern.DIAMOND, placed.pattern());
+        // 글자 무늬도 그대로 남아 있어 텍스트로도 블록을 확인할 수 있다.
+        assertEquals('<', frame.codePointAt(TextRenderer.columnOf(4), TextRenderer.rowOf(19)));
+        assertEquals('>', frame.codePointAt(TextRenderer.columnOf(4) + 1, TextRenderer.rowOf(19)));
     }
 
     @Test

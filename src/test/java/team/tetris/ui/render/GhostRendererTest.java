@@ -113,7 +113,9 @@ class GhostRendererTest {
                 assertEquals(BlockGlyphs.of(TetrominoType.J), glyphAt(frame, target));
                 assertEquals(palette.removalPreviewStyle(TetrominoType.J), frame.styleAt(col, row));
                 assertEquals(frame.styleAt(col, row), frame.styleAt(col + 1, row));
-                assertEquals(new java.awt.Color(63, 63, 63), frame.styleAt(col, row).background());
+                var bg = palette.background();
+                assertEquals(new java.awt.Color((bg.getRed() * 3 + 255) / 4, (bg.getGreen() * 3 + 255) / 4,
+                        (bg.getBlue() * 3 + 255) / 4), frame.styleAt(col, row).background());
                 assertEquals(palette.blockStyle(TetrominoType.Z), frame.styleAt(col, row + 1));
             }
             // 지금 위치에 이미 착지했어도 고정 전에 삭제 범위를 보여준다.

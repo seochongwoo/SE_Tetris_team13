@@ -22,6 +22,7 @@ import team.tetris.application.port.StorageException;
 import team.tetris.core.TetrominoType;
 import team.tetris.storage.memory.InMemorySettingsRepository;
 import team.tetris.storage.memory.InMemoryScoreRepository;
+import team.tetris.ui.DisplayNames;
 import team.tetris.ui.ScreenRouter;
 import team.tetris.ui.TestApplication;
 
@@ -81,7 +82,7 @@ class ScoreboardScreenTest {
                 assertEquals(1, screen.entries().size());
                 assertEquals(mode, screen.entries().getFirst().mode());
                 assertEquals(difficulty, screen.entries().getFirst().difficulty());
-                assertTrue(router.render().text().contains(difficulty.name()));
+                assertTrue(router.render().text().contains(DisplayNames.of(difficulty)));
                 assertTrue(router.render().text().contains(mode == GameMode.NORMAL ? "일반" : "아이템"));
             }
             tap("DOWN");
@@ -104,7 +105,7 @@ class ScoreboardScreenTest {
         var screen = (ScoreboardScreen) router.current();
         UUID id = screen.highlightedRecordId().orElseThrow();
         assertEquals(id, screen.entries().getFirst().recordId());
-        assertTrue(router.render().text().contains("아이템 / EASY"));
+        assertTrue(router.render().text().contains("아이템 / 쉬움"));
         tap("RIGHT");
         assertTrue(screen.entries().isEmpty());
         tap("LEFT");
@@ -227,7 +228,7 @@ class ScoreboardScreenTest {
         assertEquals(result.gameId(), entry.gameId());
         assertEquals(entry.recordId(), screen.highlightedRecordId().orElseThrow());
         assertFalse(screenRouter.render().text().contains("기록을 불러오지 못했습니다"));
-        assertTrue(screenRouter.render().text().contains("아이템 / EASY"));
+        assertTrue(screenRouter.render().text().contains("아이템 / 쉬움"));
         assertEquals(1, repository.writes);
         assertEquals(1, repository.backing.load().registrations().size());
     }

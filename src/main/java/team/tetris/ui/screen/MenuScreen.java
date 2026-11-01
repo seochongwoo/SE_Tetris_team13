@@ -1,12 +1,15 @@
 package team.tetris.ui.screen;
 
+import java.awt.Color;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import team.tetris.core.TetrominoType;
 import team.tetris.ui.ScreenRouter;
 import team.tetris.ui.input.KeyNames;
+import team.tetris.ui.render.Backdrop;
 import team.tetris.ui.render.TextFrame;
+import team.tetris.ui.render.TextStyle;
 import team.tetris.ui.render.palette.ColorPalette;
 
 /**
@@ -35,13 +38,27 @@ public final class MenuScreen implements Screen {
     private static final TetrominoType[] TITLE_COLORS = {
         TetrominoType.Z, TetrominoType.L, TetrominoType.O, TetrominoType.S, TetrominoType.I, TetrominoType.T
     };
-    private static final int TITLE_TOP = 2;
-    private static final int ITEMS_TOP = 11;
+    /** 로고 맨 윗줄. 부제는 로고 바로 아래(7행 위)에 두어 대성당 첨탑과 떨어뜨린다. */
+    private static final int TITLE_TOP = 1;
+    /** 메뉴 패널: 왼쪽의 대성당을 가리지 않도록 오른쪽 하늘 영역에 둔다(격자 칸). */
+    static final int PANEL_LEFT = 25;
+    static final int PANEL_WIDTH = 18;
+    private static final int PANEL_TOP = 9;
+    /** 배경의 대성당이 서는 땅의 행. 패널은 이 위에서 끝난다. */
+    private static final int GROUND_ROW = 21;
+    /** 맨 아래 안내 줄. 창 아래 가장자리에 붙지 않게 한 줄 띄운다. */
+    static final int HINT_ROW = TextFrame.ROWS - 2;
+    /** 아래쪽 안내: 짝수 번째는 키캡으로 그릴 키 이름, 홀수 번째는 설명. */
+    static final List<String> HINT_PARTS = List.of("↑", "", "↓", "이동 ·", "Enter", "선택");
+    private static final Color HINT = new Color(208, 208, 208);
+    /** 키캡 바탕색. 도트 화면에서는 윗변이 밝고 아랫변이 어두운 키캡으로 그려진다. */
+    private static final Color KEYCAP = new Color(196, 198, 214);
 
     private final ScreenRouter router;
     private final List<MenuItem> items;
     private int cursor;
     private boolean showKeyHint;
+    private long clockNanos;
 
     public MenuScreen(ScreenRouter router, List<MenuItem> items) {
         this.router = Objects.requireNonNull(router, "router");
@@ -77,32 +94,75 @@ public final class MenuScreen implements Screen {
         cursor = Math.floorMod(cursor + delta, items.size());
     }
 
+    /** 배경 구름이 흘러가도록 시간을 쌓는다. */
+    @Override
+    public void update(long elapsedNanos) {
+        clockNanos += elapsedNanos;
+    }
+
     @Override
     public TextFrame render() {
         ColorPalette palette = router.palette();
         TextFrame frame = TextFrame.blank(palette.base());
+        frame.setBackdrop(Backdrop.cathedral(clockNanos));
         drawTitle(frame, palette);
-        frame.putCentered(TITLE_TOP + 6, "SE Tetris · Team 13", palette.dimStyle());
+        TextStyle light = new TextStyle(HINT, palette.background(), false);
+        frame.putCentered(TITLE_TOP + 5, "SE Tetris · Team 13", light);
 
+        // 대성당은 왼쪽, 메뉴는 오른쪽 하늘의 패널 위에 둔다. 항목은 두 줄 간격.
+        int itemsTop = itemsTop(items.size());
+        int panelRight = PANEL_LEFT + PANEL_WIDTH;
+        frame.addPlate(PANEL_LEFT, itemsTop - 1, PANEL_WIDTH, items.size() * 2 + 1);
+        frame.addPlate(1, HINT_ROW, TextFrame.COLUMNS - 2, 1);
         for (int i = 0; i < items.size(); i++) {
-            int row = ITEMS_TOP + i * 2;
+            int row = itemsTop + i * 2;
             String label = items.get(i).label();
             if (i == cursor) {
-                String text = " ► " + label + "   ";
-                int width = TextFrame.displayWidth(text);
-                frame.put((TextFrame.COLUMNS - width) / 2, row, text, palette.highlightStyle());
+                frame.fill(PANEL_LEFT + 1, row, PANEL_WIDTH - 2, 1, palette.highlightStyle());
+                frame.put(PANEL_LEFT + 2, row, "►", palette.highlightStyle());
+                frame.putCentered(PANEL_LEFT + 1, panelRight - 1, row, label, palette.highlightStyle());
             } else {
-                frame.putCentered(row, label, palette.base());
+                frame.putCentered(PANEL_LEFT + 1, panelRight - 1, row, label, palette.base());
             }
         }
 
-        router.notice().ifPresent(notice ->
-                frame.putCentered(TextFrame.ROWS - 4, notice, palette.warningStyle()));
+        router.notice().ifPresent(notice -> {
+            int width = TextFrame.displayWidth(notice) + 2;
+            frame.addPlate((TextFrame.COLUMNS - width) / 2, HINT_ROW - 1, width, 1);
+            frame.putCentered(HINT_ROW - 1, notice, palette.warningStyle());
+        });
+        // 안내는 아래쪽 띠 한 줄. 다른 키를 누르면 같은 자리에 사용할 수 있는 키를 경고색으로 보여준다.
         if (showKeyHint) {
-            frame.putCentered(TextFrame.ROWS - 3, "사용할 수 있는 키: ↑ ↓ Enter", palette.warningStyle());
+            frame.putCentered(HINT_ROW, "사용할 수 있는 키: ↑ ↓ Enter", palette.warningStyle());
+        } else {
+            drawKeyHint(frame, light, new TextStyle(palette.background(), KEYCAP, true));
         }
-        frame.putCentered(TextFrame.ROWS - 2, "↑↓ 이동   Enter 선택", palette.dimStyle());
         return frame;
+    }
+
+    /** 키 이름은 양옆에 한 칸씩 띄운 키캡으로, 설명은 그 사이에 둔다. 전체를 가운데 정렬한다. */
+    private static void drawKeyHint(TextFrame frame, TextStyle text, TextStyle keycap) {
+        StringBuilder plain = new StringBuilder();
+        for (int i = 0; i < HINT_PARTS.size(); i++) {
+            String part = HINT_PARTS.get(i);
+            if (!part.isEmpty()) {
+                plain.append(i % 2 == 0 ? " " + part + " " : part).append(' ');
+            }
+        }
+        int col = (TextFrame.COLUMNS - TextFrame.displayWidth(plain.toString().strip())) / 2;
+        for (int i = 0; i < HINT_PARTS.size(); i++) {
+            String part = HINT_PARTS.get(i);
+            if (part.isEmpty()) {
+                continue;
+            }
+            col = frame.put(col, HINT_ROW, i % 2 == 0 ? " " + part + " " : part, i % 2 == 0 ? keycap : text) + 1;
+        }
+    }
+
+    /** 메뉴 항목 첫 줄. 항목이 적으면 패널 안에서 세로 가운데로 내린다. */
+    static int itemsTop(int itemCount) {
+        int panelRows = GROUND_ROW - PANEL_TOP;
+        return PANEL_TOP + 1 + Math.max(0, (panelRows - (itemCount * 2 + 1)) / 2);
     }
 
     private static void drawTitle(TextFrame frame, ColorPalette palette) {

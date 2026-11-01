@@ -34,6 +34,7 @@ import team.tetris.core.rule.PieceSource;
 import team.tetris.storage.memory.InMemoryScoreRepository;
 import team.tetris.ui.ScreenRouter;
 import team.tetris.ui.TestApplication;
+import team.tetris.ui.render.Backdrop;
 
 class GameScreenTest {
 
@@ -572,5 +573,18 @@ class GameScreenTest {
         brokenRouter.startGame();
 
         assertTrue(brokenRouter.render().text().contains("기본값으로 진행합니다"));
+    }
+
+    @Test
+    void gameBackdropDriftsAroundTheBoardButNotInsideIt() {
+        GameScreen game = start();
+        game.update(2_000_000_000L);
+
+        Backdrop backdrop = game.render().backdrop();
+
+        assertEquals(Backdrop.Scene.DRIFT, backdrop.scene());
+        assertEquals(2_000_000_000L, backdrop.timeNanos());
+        assertEquals(game.session().snapshot().level(), backdrop.level());
+        assertEquals(GameScreen.BOARD_AREA, backdrop.hole());
     }
 }
