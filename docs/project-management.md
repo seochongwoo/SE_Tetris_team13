@@ -73,7 +73,7 @@
 
 ## 7. 릴리즈
 
-1. `build.gradle`의 `version`을 올립니다. (1차 `1.0.0`, 2차 `2.0.0`)
+1. `build.gradle`의 `version`을 올립니다. (1차 `1.0.0`, 2차 `2.0.0`, 화면 개선 `2.1.0`) 기능이 추가되고 저장 형식이 호환되면 가운데 자리, 요구사항 차수가 바뀌면 앞자리를 올립니다.
 2. `.\gradlew.bat clean build packageZip`으로 테스트와 배포 zip을 만듭니다. 라인 커버리지가 70% 미만이면 `build`에서 실패합니다.
 3. 압축을 푼 `SETetris.exe`를 더블클릭해 실행을 확인합니다.
 4. GitHub Releases에 `v<버전>` 태그로 zip을 올립니다.

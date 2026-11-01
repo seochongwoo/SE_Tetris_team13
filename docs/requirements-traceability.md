@@ -51,7 +51,7 @@
 | N1-05 | 단위 테스트, 라인 커버리지 50~70% 이상 (p17) | JUnit 5, JaCoCo. 70% 미만이면 build 실패 (`jacocoTestCoverageVerification`) | 전체 575개 | ✅ 94.8% |
 | N1-06 | 비기능 요구사항 검증 테스트 1개 이상 (p17) | `test/performance` | `ResponsivenessTest` | ✅ |
 | N1-07 | 변경 시마다 테스트를 쉽게 실행하는 체계 (p17) | `gradlew build`(테스트·커버리지 검사 포함), GitHub Actions(`.github/workflows/ci.yml`) | - | ✅ |
-| N1-08 | 배포 패키지를 쉽게 만드는 체계, 아이콘 포함 실행 파일, 명령어 없이 실행 (p18) | `gradlew packageZip` (jpackage, JRE 포함 `SETetris.exe`). 2026-10-23 v2.0.0 생성·실행 확인 | - | ✅ v1.0.0, v2.0.0 (GitHub Releases) |
+| N1-08 | 배포 패키지를 쉽게 만드는 체계, 아이콘 포함 실행 파일, 명령어 없이 실행 (p18) | `gradlew packageZip` (jpackage, JRE 포함 `SETetris.exe`). 2026-10-23 v2.0.0, 2026-11-01 v2.1.0 생성·실행 확인 | - | ✅ v1.0.0, v2.0.0, v2.1.0 (GitHub Releases) |
 
 ## 2. 2차 요구사항
 
