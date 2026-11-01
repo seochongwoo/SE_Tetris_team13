@@ -168,7 +168,7 @@ public final class TextFramePanel extends JComponent {
             }
             fonts[i] = new Font[] {plain, plain.deriveFont(Font.BOLD)};
             for (Font font : fonts[i]) {
-                Rectangle ink = inkOf(samples[i], font);
+                Rectangle ink = inkOf(samples[i], font, i == 1);
                 // 잉크 위쪽은 기준선 위 -ink.y, 높이는 ink.height. 남는 공간을 위아래로 나눈다.
                 baselines.put(font, Math.round((cellHeight - ink.height) / 2f) - ink.y);
             }
@@ -185,7 +185,7 @@ public final class TextFramePanel extends JComponent {
     private Font koreanFont(Font plain, int size) {
         int fitted = size;
         while (fitted > MIN_FONT_SIZE
-                && inkOf(KOREAN_EXTENT_SAMPLE, plain.deriveFont(Font.BOLD, (float) fitted)).height > cellHeight - 2) {
+                && inkOf(KOREAN_EXTENT_SAMPLE, plain.deriveFont(Font.BOLD, (float) fitted), true).height > cellHeight - 2) {
             fitted--;
         }
         Font sized = plain.deriveFont((float) fitted);
@@ -194,18 +194,39 @@ public final class TextFramePanel extends JComponent {
         return stretch == 1f ? sized : sized.deriveFont(AffineTransform.getScaleInstance(stretch, 1));
     }
 
-    private Rectangle inkOf(String text, Font font) {
-        return new TextLayout(text, font, getFontMetrics(font).getFontRenderContext()).getPixelBounds(null, 0, 0);
+    /**
+     * 글자가 실제로 칠하는 범위. outline이면(한글처럼 외곽선을 채워 그리는 글꼴) 외곽선 범위까지 포함한다.
+     * 영문은 일반 문자 그리기로 그리므로 픽셀 범위만 쓴다. 외곽선 범위는 정수로 반올림되어 1px씩 커지므로,
+     * 영문에 합치면 기준선이 내려가 괄호·g·y가 줄 바닥에 닿는다.
+     */
+    private Rectangle inkOf(String text, Font font, boolean outline) {
+        TextLayout layout = new TextLayout(text, font, getFontMetrics(font).getFontRenderContext());
+        Rectangle pixels = layout.getPixelBounds(null, 0, 0);
+        return outline ? pixels.union(layout.getOutline(null).getBounds()) : pixels;
     }
 
     /** codePoint를 그릴 수 있는 첫 글꼴. */
     private Font fontFor(int codePoint, boolean bold) {
+        // 영문 글꼴(또는 대체 고정폭 글꼴)이 한글을 가지고 있어도, 크기와 기준선을 맞춘 한글 글꼴을 먼저 쓴다.
+        // Consolas가 없는 PC에서는 Java 기본 고정폭 글꼴이 한글을 그려 줄 밖으로 넘쳤다.
+        if (Character.UnicodeScript.of(codePoint) == Character.UnicodeScript.HANGUL
+                && fonts[1][0].canDisplay(codePoint)) {
+            return fonts[1][bold ? 1 : 0];
+        }
         for (Font[] family : fonts) {
             if (family[0].canDisplay(codePoint)) {
                 return family[bold ? 1 : 0];
             }
         }
         return fonts[fonts.length - 1][bold ? 1 : 0];
+    }
+
+    /**
+     * 설치된 글꼴 목록을 바꾼다(테스트용). Consolas나 맑은 고딕이 없는 PC를 흉내 낼 때 쓰고, null이면 실제
+     * 목록을 다시 읽는다. 이미 만든 패널에는 영향이 없다.
+     */
+    static synchronized void overrideInstalledFamilies(Set<String> families) {
+        installedFamilies = families;
     }
 
     private static synchronized String family(List<String> candidates) {

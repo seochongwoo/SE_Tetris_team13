@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.GraphicsEnvironment;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.util.HashSet;
@@ -303,6 +304,23 @@ class TextFramePanelTest {
         assertEquals(2, PixelMenuPainter.scaleFor(15));
         assertEquals(2, PixelMenuPainter.scaleFor(20));
         assertEquals(3, PixelMenuPainter.scaleFor(26));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"''", "Consolas;Cascadia Mono", "Consolas;Cascadia Mono;Malgun Gothic;맑은 고딕"})
+    void koreanTextFitsEvenWhenPreferredFontsAreMissing(String missing) {
+        // Consolas가 없으면 Java 기본 고정폭 글꼴이 한글까지 그릴 수 있다. 그래도 크기를 맞춘 글꼴로 그려야 한다.
+        Set<String> installed = new HashSet<>(Set.of(
+                GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames()));
+        installed.removeAll(Set.of(missing.split(";")));
+        TextFramePanel.overrideInstalledFamilies(Set.copyOf(installed));
+        try {
+            for (ScreenSize size : ScreenSize.values()) {
+                koreanTextAndBracketsStayInsideTheSelectionBar(size);
+            }
+        } finally {
+            TextFramePanel.overrideInstalledFamilies(null);
+        }
     }
 
     @ParameterizedTest
