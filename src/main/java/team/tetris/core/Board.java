@@ -8,6 +8,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import team.tetris.core.result.ClearResult;
 import team.tetris.core.result.ClearedRow;
+import team.tetris.core.result.PushResult;
 
 /**
  * 고정 크기 격자와 그 위의 충돌 판정 / 배치 / 라인 클리어를 담당한다.
@@ -179,6 +180,51 @@ public final class Board {
         }
         grid = newGrid;
         return new ClearResult(cleared);
+    }
+
+    /**
+     * rows를 보드 맨 아래에 위에서 아래 순서로 붙이고, 기존 칸은 그 줄 수만큼 위로 밀어 올린다
+     * (대전의 공격 줄). 위로 밀려 보드 밖으로 나간 줄은 보드에서 버려지고 결과에 담긴다. 넘침에 따른
+     * 판정(패배 여부)은 호출한 쪽이 정한다. 줄마다 빈칸이 하나 이상 있어야 한다.
+     */
+    public PushResult pushUp(List<List<Cell>> rows) {
+        for (List<Cell> row : rows) {
+            if (row.size() != width) {
+                throw new IllegalArgumentException("Row must have " + width + " cells: " + row.size());
+            }
+            boolean hasGap = false;
+            for (Cell cell : row) {
+                hasGap |= java.util.Objects.requireNonNull(cell, "cell").isEmpty();
+            }
+            // 꽉 찬 줄이 들어오면 다음 고정 때 받은 쪽이 저절로 지워 점수와 줄 수를 얻는다.
+            if (!hasGap) {
+                throw new IllegalArgumentException("Row must have at least one empty cell");
+            }
+        }
+        int count = rows.size();
+        if (count == 0) {
+            return PushResult.NONE;
+        }
+        // 기존 보드의 위쪽 줄부터, 보드보다 많이 넣었다면 넣은 줄 중 보드에 남지 못한 줄까지 나간다.
+        List<List<Cell>> pushedOut = new ArrayList<>();
+        for (int row = 0; row < Math.min(count, height); row++) {
+            pushedOut.add(List.of(grid[row]));
+        }
+        if (count > height) {
+            pushedOut.addAll(rows.subList(0, count - height));
+        }
+        Cell[][] newGrid = new Cell[height][];
+        for (int row = 0; row < height; row++) {
+            int source = row + count;
+            if (source < height) {
+                newGrid[row] = grid[source];
+            } else {
+                List<Cell> line = rows.get(source - height);
+                newGrid[row] = line.toArray(new Cell[0]);
+            }
+        }
+        grid = newGrid;
+        return new PushResult(pushedOut);
     }
 
     /**

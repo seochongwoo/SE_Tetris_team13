@@ -1,7 +1,9 @@
 package team.tetris.core;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -11,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import team.tetris.core.item.Item;
 import team.tetris.core.result.ClearResult;
 import team.tetris.core.result.ClearedRow;
+import team.tetris.core.result.PushResult;
 
 class BoardTest {
 
@@ -301,5 +304,106 @@ class BoardTest {
         assertThrows(IllegalArgumentException.class, () -> board.cellAt(new Position(4, 0)));
         assertThrows(IllegalArgumentException.class, () -> board.cellAt(new Position(0, 4)));
         assertThrows(IllegalArgumentException.class, () -> board.removeCell(new Position(-1, 0)));
+    }
+
+    private static final Cell ATTACK = Cell.occupiedBy(AttackBlock.INSTANCE);
+
+    private static List<Cell> attackLine(int width, int gap) {
+        List<Cell> line = new java.util.ArrayList<>(Collections.nCopies(width, ATTACK));
+        line.set(gap, Cell.EMPTY);
+        return line;
+    }
+
+    @Test
+    void pushUpAddsLinesAtTheBottomInOrderAndLiftsExistingCells() {
+        Board board = new Board(3, 4);
+        board.place(TemporaryBlock.INSTANCE, 0, new Position(1, 3));
+
+        PushResult result = board.pushUp(List.of(attackLine(3, 0), attackLine(3, 2)));
+
+        assertFalse(result.overflowed());
+        assertEquals(2, result.addedLines());
+        Cell[][] grid = board.snapshot();
+        assertEquals(Cell.occupiedBy(TemporaryBlock.INSTANCE), grid[1][1]);
+        assertEquals(attackLine(3, 0), List.of(grid[2]));
+        assertEquals(attackLine(3, 2), List.of(grid[3]));
+        for (Cell cell : grid[0]) {
+            assertTrue(cell.isEmpty());
+        }
+    }
+
+    @Test
+    void pushUpReportsOverflowAndReturnsTheRowsThatLeftTheTop() {
+        Board board = new Board(3, 3);
+        board.place(TemporaryBlock.INSTANCE, 0, new Position(2, 0));
+        List<Cell> topRow = List.of(board.snapshot()[0]);
+
+        PushResult result = board.pushUp(List.of(attackLine(3, 1)));
+
+        assertTrue(result.overflowed());
+        assertEquals(List.of(topRow), result.pushedOutRows());
+        assertEquals(attackLine(3, 1), List.of(board.snapshot()[2]));
+    }
+
+    @Test
+    void pushUpWithEmptyTopRowsDoesNotOverflow() {
+        Board board = new Board(3, 3);
+        board.place(TemporaryBlock.INSTANCE, 0, new Position(0, 1));
+
+        PushResult result = board.pushUp(List.of(attackLine(3, 1)));
+
+        assertFalse(result.overflowed());
+        assertTrue(result.pushedOutRows().getFirst().stream().allMatch(Cell::isEmpty));
+        assertEquals(Cell.occupiedBy(TemporaryBlock.INSTANCE), board.snapshot()[0][0]);
+    }
+
+    @Test
+    void pushUpWithMoreLinesThanTheBoardOverflowsOnlyIfDiscardedLinesHaveCells() {
+        Board board = new Board(2, 2);
+        board.place(TemporaryBlock.INSTANCE, 0, new Position(0, 1));
+        Cell[][] before = board.snapshot();
+
+        PushResult result = board.pushUp(List.of(attackLine(2, 0), attackLine(2, 1), attackLine(2, 0)));
+
+        assertTrue(result.overflowed());
+        // 기존 보드 두 줄이 먼저, 보드에 남지 못한 첫 공격 줄이 그 뒤에 온다.
+        assertEquals(List.of(List.of(before[0]), List.of(before[1]), attackLine(2, 0)), result.pushedOutRows());
+        assertEquals(attackLine(2, 1), List.of(board.snapshot()[0]));
+        assertEquals(attackLine(2, 0), List.of(board.snapshot()[1]));
+
+        Board empty = new Board(2, 2);
+        List<Cell> blank = List.of(Cell.EMPTY, Cell.EMPTY);
+        assertFalse(empty.pushUp(List.of(blank, attackLine(2, 1), attackLine(2, 0))).overflowed());
+    }
+
+    @Test
+    void pushUpWithNoLinesChangesNothing() {
+        Board board = new Board(3, 3);
+        board.place(TemporaryBlock.INSTANCE, 0, new Position(0, 0));
+
+        assertSame(PushResult.NONE, board.pushUp(List.of()));
+        assertFalse(PushResult.NONE.overflowed());
+        assertEquals(Cell.occupiedBy(TemporaryBlock.INSTANCE), board.snapshot()[0][0]);
+    }
+
+    @Test
+    void pushUpRejectsLinesOfTheWrongWidthOrWithMissingCells() {
+        Board board = new Board(3, 3);
+
+        assertThrows(IllegalArgumentException.class, () -> board.pushUp(List.of(attackLine(2, 0))));
+        assertThrows(NullPointerException.class,
+                () -> board.pushUp(List.of(java.util.Arrays.asList(ATTACK, null, ATTACK))));
+    }
+
+    @Test
+    void pushUpRejectsAFullLineAndLeavesTheBoardUnchanged() {
+        // 꽉 찬 줄은 다음 고정 때 저절로 지워져 받은 쪽이 점수를 얻게 된다.
+        Board board = new Board(3, 3);
+        board.place(TemporaryBlock.INSTANCE, 0, new Position(0, 2));
+        Cell[][] before = board.snapshot();
+
+        assertThrows(IllegalArgumentException.class,
+                () -> board.pushUp(List.of(attackLine(3, 1), List.of(ATTACK, ATTACK, ATTACK))));
+        assertArrayEquals(before, board.snapshot());
     }
 }

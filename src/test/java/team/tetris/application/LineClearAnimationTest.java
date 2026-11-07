@@ -11,6 +11,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import team.tetris.core.*;
 import team.tetris.core.item.LineClearItem;
 import team.tetris.core.result.ClearedRow;
+import team.tetris.core.rule.IncomingLines;
 import team.tetris.core.rule.PieceSource;
 
 class LineClearAnimationTest {
@@ -149,6 +150,61 @@ class LineClearAnimationTest {
         assertArrayEquals(cells, animation.boardBeforeClear(compacted));
         assertArrayEquals(board.snapshot(), compacted);
         assertThrows(UnsupportedOperationException.class, () -> animation.rows().clear());
+    }
+
+    @Test void restoresTheBoardBeforeTheClearWhenAttackLinesArrivedAfterIt() {
+        // 대전: 줄 삭제 뒤에 공격 줄 2줄이 아래에 붙었다. 연출 동안에는 삭제 직전 보드를 보여 준다.
+        Cell[][] cells = new Board(4, 6).snapshot();
+        cells[5] = new Cell[] {Cell.occupiedBy(TetrominoType.I), Cell.occupiedBy(TetrominoType.I),
+            Cell.occupiedBy(TetrominoType.I), Cell.occupiedBy(TetrominoType.I)};
+        cells[4][0] = Cell.occupiedBy(TetrominoType.O);
+        Board board = new Board(cells);
+        var clear = board.clearFullLines();
+        Cell attack = Cell.occupiedBy(AttackBlock.INSTANCE);
+        List<Cell> line = List.of(attack, attack, attack, Cell.EMPTY);
+        var push = board.pushUp(List.of(line, line));
+        assertFalse(push.overflowed());
+
+        var animation = new LineClearAnimation(clear.clearedRows(), List.of(), null, 0, push);
+
+        assertArrayEquals(cells, animation.boardBeforeClear(board.snapshot()));
+        assertEquals(2, animation.advancedBy(1).addedLines());
+        assertEquals(0, new LineClearAnimation(clear.clearedRows(), List.of(), null, 0, null).addedLines());
+    }
+
+    @Test void restoresBlocksPushedAboveTheBoardWhenAttackLinesOverflowAfterAClear() {
+        // 대전: 줄 삭제 뒤 공격 줄 2줄이 들어와 맨 위의 Z가 보드 밖으로 밀려 나가 게임이 끝난다.
+        // 삭제 연출 동안에는 Z가 그대로 보여야 한다.
+        Cell[][] board = new Board(10, 20).snapshot();
+        for (int x = 0; x < 10; x++) {
+            if (x < 3 || x > 6) board[19][x] = Cell.occupiedBy(TetrominoType.O);
+        }
+        board[0][9] = Cell.occupiedBy(TetrominoType.Z);
+        Cell attack = Cell.occupiedBy(AttackBlock.INSTANCE);
+        List<Cell> line = new ArrayList<>(java.util.Collections.nCopies(10, attack));
+        line.set(0, Cell.EMPTY);
+        List<List<Cell>> pending = new ArrayList<>(List.of(line, line));
+        IncomingLines incoming = () -> {
+            List<List<Cell>> taken = List.copyOf(pending);
+            pending.clear();
+            return taken;
+        };
+        PieceSource source = new PieceSource() {
+            public Piece next() { return Piece.of(TetrominoType.T); }
+            public Piece peek() { return Piece.of(TetrominoType.T); }
+        };
+        var session = new SinglePlayerSession(new PlayerEngine(board,
+                new ActivePiece(Piece.of(TetrominoType.I), 0, new Position(3, 18)), source, incoming));
+
+        session.handle(GameCommand.HARD_DROP);
+
+        GameSnapshot snapshot = session.snapshot();
+        assertEquals(EnginePhase.GAME_OVER, snapshot.engine().phase());
+        assertEquals(2, snapshot.lineClearAnimation().addedLines());
+        Cell[][] expected = new Cell[20][];
+        for (int y = 0; y < 20; y++) expected[y] = board[y].clone();
+        for (int x = 3; x <= 6; x++) expected[19][x] = Cell.occupiedBy(TetrominoType.I);
+        assertArrayEquals(expected, snapshot.lineClearAnimation().boardBeforeClear(snapshot.engine().board()));
     }
 
     @Test void rejectsEmptyRowsAndTimeOutsideTheAnimation() {

@@ -4,6 +4,7 @@ import java.awt.Color;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
+import team.tetris.core.AttackBlock;
 import team.tetris.core.Shape;
 import team.tetris.core.TetrominoType;
 import team.tetris.core.item.Item;
@@ -45,6 +46,11 @@ public record ColorPalette(
     static final Color BACKGROUND = new Color(12, 14, 24);
     /** 두 팔레트 공통 선택 막대 색: 로고와 어울리는 따뜻한 노랑. 글자는 배경색으로 반전한다. */
     static final Color HIGHLIGHT = new Color(230, 185, 58);
+    /**
+     * 두 팔레트 공통 공격 칸 색: 중간 회색. 글자색(흰색에 가까움)을 쓰면 줄 삭제 점멸과 헷갈리고,
+     * 빈 칸보다는 확실히 밝다. 무채색이라 색각 이상과 관계없이 블록 색과 구분된다.
+     */
+    static final Color ATTACK = new Color(140, 140, 148);
 
     public static ColorPalette of(boolean colorBlindMode) {
         return colorBlindMode ? colorBlindFriendly() : standard();
@@ -151,6 +157,7 @@ public record ColorPalette(
     }
 
     private Color colorOf(Shape shape) {
+        if (shape == AttackBlock.INSTANCE) return ATTACK;
         return shape instanceof TetrominoType type ? block(type) : text;
     }
 

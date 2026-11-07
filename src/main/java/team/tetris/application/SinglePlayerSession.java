@@ -194,7 +194,7 @@ public final class SinglePlayerSession implements GameSession {
         if (lines > 0 || !animatedCells.isEmpty()) {
             lineClearAnimation = new LineClearAnimation(
                     lines > 0 ? step.clearResult().clearedRows() : List.of(), animatedCells,
-                    step.lockResult() == null ? view.engine().activePiece() : null, 0);
+                    step.lockResult() == null ? view.engine().activePiece() : null, 0, step.pushResult());
             accumulatedNanos = 0;
             // 다음 스폰이 실패했어도 삭제 연출을 마친 뒤 게임 종료를 알린다.
             status = GameStatus.RUNNING;
@@ -211,9 +211,7 @@ public final class SinglePlayerSession implements GameSession {
             lineClearAnimation = null;
             if (view.engine().phase() == EnginePhase.GAME_OVER) finish(GameStatus.GAME_OVER);
         } else {
-            lineClearAnimation = new LineClearAnimation(lineClearAnimation.rows(),
-                    lineClearAnimation.removedCells(), lineClearAnimation.activePiece(),
-                    lineClearAnimation.elapsedNanos() + elapsedNanos);
+            lineClearAnimation = lineClearAnimation.advancedBy(elapsedNanos);
         }
         // 연출을 넘긴 시간도 버려 새 블록에 온전한 낙하 간격을 준다.
         refreshView(view.engine());

@@ -51,12 +51,13 @@ final class DebugStateLog {
         if (step != null) {
             out.append("drop=").append(step.dropResult()).append(" lock=").append(step.lockResult())
                     .append(" clearRows=").append(step.clearResult() == null ? "[]" : step.clearResult().clearedRows()
-                            .stream().map(row -> row.rowIndex()).toList()).append('\n');
+                            .stream().map(row -> row.rowIndex()).toList())
+                    .append(" attackLines=").append(step.addedLines()).append('\n');
             out.append("items=").append(step.itemActivations().stream().map(item -> item.item().getClass().getSimpleName()
                     + "(" + item.item().symbol() + ")@" + item.position()).toList()).append('\n');
         }
         Cell[][] board = engine.board();
-        out.append("board (fixed cells; active piece above; #=temporary):\n");
+        out.append("board (fixed cells; active piece above; #=temporary, ==attack):\n");
         for (int y = 0; y < board.length; y++) {
             out.append(String.format(java.util.Locale.ROOT, "%02d|", y));
             for (Cell cell : board[y]) {
@@ -78,6 +79,8 @@ final class DebugStateLog {
 
     private static String shape(Shape shape) {
         if (shape == TemporaryBlock.INSTANCE) return "#";
+        // 보드 격자가 한 칸 한 글자로 맞도록 공격 칸도 한 글자로 쓴다.
+        if (shape == AttackBlock.INSTANCE) return "=";
         if (shape == SoloBlock.SHAPE) return "B";
         return shape.toString();
     }
