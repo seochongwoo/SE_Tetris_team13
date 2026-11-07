@@ -194,7 +194,7 @@ public final class SinglePlayerSession implements GameSession {
         if (lines > 0 || !animatedCells.isEmpty()) {
             lineClearAnimation = new LineClearAnimation(
                     lines > 0 ? step.clearResult().clearedRows() : List.of(), animatedCells,
-                    step.lockResult() == null ? view.engine().activePiece() : null, 0, step.addedLines());
+                    step.lockResult() == null ? view.engine().activePiece() : null, 0, step.pushResult());
             accumulatedNanos = 0;
             // 다음 스폰이 실패했어도 삭제 연출을 마친 뒤 게임 종료를 알린다.
             status = GameStatus.RUNNING;

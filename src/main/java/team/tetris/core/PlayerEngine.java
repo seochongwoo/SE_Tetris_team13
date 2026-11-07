@@ -13,6 +13,7 @@ import team.tetris.core.result.DropResult;
 import team.tetris.core.result.EngineStep;
 import team.tetris.core.result.ItemActivation;
 import team.tetris.core.result.LockResult;
+import team.tetris.core.result.PushResult;
 import team.tetris.core.result.RemovedCell;
 import team.tetris.core.rule.PieceGenerator;
 import team.tetris.core.rule.DropRule;
@@ -230,15 +231,15 @@ public final class PlayerEngine implements TetrisEnginePort {
             source.onLinesCleared(clearResult.lineCount());
         }
         // 공격 줄은 줄 삭제가 끝난 뒤, 다음 블록이 나오기 전에 넣는다 (R3-08).
-        List<List<Cell>> lines = incoming.take();
-        if (board.pushUp(lines)) {
+        PushResult pushResult = board.pushUp(Objects.requireNonNull(incoming.take(), "incoming lines"));
+        if (pushResult.overflowed()) {
             activePiece = null;
             phase = EnginePhase.GAME_OVER;
         } else {
             spawnNext();
         }
         return new EngineStep(snapshot(), dropResult, lockResult, clearResult, activations, context.removedCells,
-                lines.size());
+                pushResult);
     }
 
     /**

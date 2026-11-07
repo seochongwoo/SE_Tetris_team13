@@ -11,6 +11,7 @@ import java.util.Set;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.Test;
+import team.tetris.core.AttackBlock;
 import team.tetris.core.TetrominoType;
 
 class ColorPaletteTest {
@@ -54,5 +55,20 @@ class ColorPaletteTest {
         assertEquals(palette.dim(), palette.dimStyle().foreground());
         assertEquals(palette.border(), palette.borderStyle().foreground());
         assertEquals(palette.accent(), palette.accentStyle().foreground());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void attackCellsAreGreyAndDifferFromBlocksTextAndEmptyCells(boolean colorBlind) {
+        // 흰색에 가까운 글자색이면 줄 삭제 점멸과 헷갈린다.
+        ColorPalette palette = ColorPalette.of(colorBlind);
+        Color attack = palette.blockTile(AttackBlock.INSTANCE).color();
+
+        assertEquals(attack.getRed(), attack.getGreen());
+        assertFalse(attack.equals(palette.text()) || attack.equals(palette.dim()));
+        for (TetrominoType type : TetrominoType.values()) {
+            assertFalse(attack.equals(palette.block(type)));
+        }
+        assertEquals(BlockGlyphs.ATTACK, BlockGlyphs.of(AttackBlock.INSTANCE));
     }
 }

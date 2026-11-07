@@ -18,24 +18,28 @@ import team.tetris.core.EngineSnapshot;
  * @param clearResult     이번에 라인이 지워졌다면 그 정보 (아니면 null)
  * @param itemActivations 이번 고정으로 발동한 아이템들 (고정 칸 순서)
  * @param removedCells    아이템이나 낙하 규칙이 지운 칸들 (줄 압축 전 좌표)
- * @param addedLines      줄 삭제 뒤 보드 아래에 들어온 공격 줄 수 (대전에서만 0보다 큼)
+ * @param pushResult      줄 삭제 뒤 보드 아래에 들어온 공격 줄과 그 때문에 위로 밀려 나간 줄
+ *                        (대전에서만 비어 있지 않음)
  */
 public record EngineStep(
         EngineSnapshot snapshot, DropResult dropResult, LockResult lockResult, ClearResult clearResult,
-        List<ItemActivation> itemActivations, List<RemovedCell> removedCells, int addedLines) {
+        List<ItemActivation> itemActivations, List<RemovedCell> removedCells, PushResult pushResult) {
 
     public EngineStep {
         itemActivations = itemActivations == null ? List.of() : List.copyOf(itemActivations);
         removedCells = List.copyOf(removedCells);
-        if (addedLines < 0) {
-            throw new IllegalArgumentException("addedLines must not be negative: " + addedLines);
-        }
+        pushResult = pushResult == null ? PushResult.NONE : pushResult;
     }
 
     /** 공격 줄이 들어오지 않은 결과. */
     public EngineStep(EngineSnapshot snapshot, DropResult dropResult, LockResult lockResult, ClearResult clearResult,
                       List<ItemActivation> itemActivations, List<RemovedCell> removedCells) {
-        this(snapshot, dropResult, lockResult, clearResult, itemActivations, removedCells, 0);
+        this(snapshot, dropResult, lockResult, clearResult, itemActivations, removedCells, PushResult.NONE);
+    }
+
+    /** 이번에 보드 아래로 들어온 공격 줄 수 (1인 게임은 항상 0). */
+    public int addedLines() {
+        return pushResult.addedLines();
     }
 
     /** 개별 칸 삭제가 없는 결과. */

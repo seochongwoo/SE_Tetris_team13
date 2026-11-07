@@ -2,7 +2,6 @@ package team.tetris.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayDeque;
@@ -203,10 +202,40 @@ class PlayerEngineAttackLinesTest {
     }
 
     @Test
-    void negativeAddedLinesAreRejected() {
+    void anOverflowingStepCarriesTheRowsPushedAboveTheBoard() {
+        // 폭 5, 높이 6에서 맨 위에 T 칸이 있다. 공격 줄 1줄이 들어오면 그 줄이 밀려 나간다.
+        Cell[][] cells = new Cell[6][5];
+        for (Cell[] row : cells) {
+            java.util.Arrays.fill(row, EMPTY);
+        }
+        cells[0][4] = Cell.occupiedBy(TetrominoType.T);
+        List<Cell> topRow = List.of(cells[0].clone());
+        ActivePiece start = new ActivePiece(TetrominoType.O, 0, new Position(0, 0));
+        QueuedLines incoming = new QueuedLines(List.of(attackLine(5, 2)));
+        PlayerEngine engine = new PlayerEngine(cells, start, always(TetrominoType.O), incoming);
+
+        EngineStep step = engine.apply(GameAction.HARD_DROP);
+
+        assertEquals(EnginePhase.GAME_OVER, step.snapshot().phase());
+        assertEquals(List.of(topRow), step.pushResult().pushedOutRows());
+        assertTrue(step.pushResult().overflowed());
+    }
+
+    @Test
+    void aSupplierReturningNullIsRejected() {
+        PlayerEngine engine = new PlayerEngine(4, 6, always(TetrominoType.O), () -> null);
+
+        org.junit.jupiter.api.Assertions.assertThrows(NullPointerException.class,
+                () -> engine.apply(GameAction.HARD_DROP));
+    }
+
+    @Test
+    void stepsWithoutAttackLinesHaveAnEmptyPushResult() {
         PlayerEngine engine = new PlayerEngine(4, 6, always(TetrominoType.O));
 
-        assertThrows(IllegalArgumentException.class,
-                () -> new EngineStep(engine.snapshot(), null, null, null, List.of(), List.of(), -1));
+        EngineStep step = new EngineStep(engine.snapshot(), null, null, null, List.of(), List.of(), null);
+
+        assertEquals(0, step.addedLines());
+        assertTrue(step.pushResult().pushedOutRows().isEmpty());
     }
 }
