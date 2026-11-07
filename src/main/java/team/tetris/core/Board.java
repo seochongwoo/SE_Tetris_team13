@@ -182,6 +182,52 @@ public final class Board {
     }
 
     /**
+     * rows를 보드 맨 아래에 위에서 아래 순서로 붙이고, 기존 칸은 그 줄 수만큼 위로 밀어 올린다
+     * (대전의 공격 줄). 위로 밀려 보드 밖으로 나간 칸이 하나라도 있으면 true를 반환한다. 나간 칸은
+     * 버려지며, 그 판정(패배 여부)은 호출한 쪽이 정한다.
+     */
+    public boolean pushUp(List<List<Cell>> rows) {
+        for (List<Cell> row : rows) {
+            if (row.size() != width) {
+                throw new IllegalArgumentException("Row must have " + width + " cells: " + row.size());
+            }
+            for (Cell cell : row) {
+                java.util.Objects.requireNonNull(cell, "cell");
+            }
+        }
+        int count = rows.size();
+        if (count == 0) {
+            return false;
+        }
+        boolean overflow = false;
+        for (int row = 0; row < Math.min(count, height); row++) {
+            for (Cell cell : grid[row]) {
+                overflow |= !cell.isEmpty();
+            }
+        }
+        Cell[][] newGrid = new Cell[height][];
+        for (int row = 0; row < height; row++) {
+            int source = row + count;
+            if (source < height) {
+                newGrid[row] = grid[source];
+            } else {
+                List<Cell> line = rows.get(source - height);
+                newGrid[row] = line.toArray(new Cell[0]);
+            }
+        }
+        if (count > height) {
+            // 보드보다 많은 줄이 들어오면 위쪽 줄도 보드 밖으로 밀려 나간다.
+            for (List<Cell> line : rows.subList(0, count - height)) {
+                for (Cell cell : line) {
+                    overflow |= !cell.isEmpty();
+                }
+            }
+        }
+        grid = newGrid;
+        return overflow;
+    }
+
+    /**
      * 현재 보드 상태의 읽기 전용 스냅샷(깊은 복사)을 반환한다. 반환된 배열을 수정해도 Board
      * 내부 상태에는 영향이 없다.
      */

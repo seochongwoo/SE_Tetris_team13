@@ -302,4 +302,78 @@ class BoardTest {
         assertThrows(IllegalArgumentException.class, () -> board.cellAt(new Position(0, 4)));
         assertThrows(IllegalArgumentException.class, () -> board.removeCell(new Position(-1, 0)));
     }
+
+    private static final Cell ATTACK = Cell.occupiedBy(AttackBlock.INSTANCE);
+
+    private static List<Cell> attackLine(int width, int gap) {
+        List<Cell> line = new java.util.ArrayList<>(Collections.nCopies(width, ATTACK));
+        line.set(gap, Cell.EMPTY);
+        return line;
+    }
+
+    @Test
+    void pushUpAddsLinesAtTheBottomInOrderAndLiftsExistingCells() {
+        Board board = new Board(3, 4);
+        board.place(TemporaryBlock.INSTANCE, 0, new Position(1, 3));
+
+        boolean overflow = board.pushUp(List.of(attackLine(3, 0), attackLine(3, 2)));
+
+        assertFalse(overflow);
+        Cell[][] grid = board.snapshot();
+        assertEquals(Cell.occupiedBy(TemporaryBlock.INSTANCE), grid[1][1]);
+        assertEquals(attackLine(3, 0), List.of(grid[2]));
+        assertEquals(attackLine(3, 2), List.of(grid[3]));
+        for (Cell cell : grid[0]) {
+            assertTrue(cell.isEmpty());
+        }
+    }
+
+    @Test
+    void pushUpReportsOverflowWhenAFilledCellLeavesTheTop() {
+        Board board = new Board(3, 3);
+        board.place(TemporaryBlock.INSTANCE, 0, new Position(2, 0));
+
+        assertTrue(board.pushUp(List.of(attackLine(3, 1))));
+        assertEquals(attackLine(3, 1), List.of(board.snapshot()[2]));
+    }
+
+    @Test
+    void pushUpWithEmptyTopRowsDoesNotOverflow() {
+        Board board = new Board(3, 3);
+        board.place(TemporaryBlock.INSTANCE, 0, new Position(0, 1));
+
+        assertFalse(board.pushUp(List.of(attackLine(3, 1))));
+        assertEquals(Cell.occupiedBy(TemporaryBlock.INSTANCE), board.snapshot()[0][0]);
+    }
+
+    @Test
+    void pushUpWithMoreLinesThanTheBoardOverflowsOnlyIfDiscardedLinesHaveCells() {
+        Board board = new Board(2, 2);
+
+        assertTrue(board.pushUp(List.of(attackLine(2, 0), attackLine(2, 1), attackLine(2, 0))));
+        assertEquals(attackLine(2, 1), List.of(board.snapshot()[0]));
+        assertEquals(attackLine(2, 0), List.of(board.snapshot()[1]));
+
+        Board empty = new Board(2, 2);
+        List<Cell> blank = List.of(Cell.EMPTY, Cell.EMPTY);
+        assertFalse(empty.pushUp(List.of(blank, attackLine(2, 1), attackLine(2, 0))));
+    }
+
+    @Test
+    void pushUpWithNoLinesChangesNothing() {
+        Board board = new Board(3, 3);
+        board.place(TemporaryBlock.INSTANCE, 0, new Position(0, 0));
+
+        assertFalse(board.pushUp(List.of()));
+        assertEquals(Cell.occupiedBy(TemporaryBlock.INSTANCE), board.snapshot()[0][0]);
+    }
+
+    @Test
+    void pushUpRejectsLinesOfTheWrongWidthOrWithMissingCells() {
+        Board board = new Board(3, 3);
+
+        assertThrows(IllegalArgumentException.class, () -> board.pushUp(List.of(attackLine(2, 0))));
+        assertThrows(NullPointerException.class,
+                () -> board.pushUp(List.of(java.util.Arrays.asList(ATTACK, null, ATTACK))));
+    }
 }

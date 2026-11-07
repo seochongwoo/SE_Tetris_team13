@@ -1,25 +1,43 @@
 package team.tetris.application;
 
+import java.util.Arrays;
 import java.util.List;
 import team.tetris.core.ActivePiece;
 import team.tetris.core.Cell;
 import team.tetris.core.result.ClearedRow;
 import team.tetris.core.result.RemovedCell;
 
-/** 줄·아이템 삭제 연출의 불변 상태. 낙하 중 삭제라면 연출 직전 활성 블록도 표시한다. */
+/**
+ * 줄·아이템 삭제 연출의 불변 상태. 낙하 중 삭제라면 연출 직전 활성 블록도 표시한다.
+ *
+ * <p>addedLines는 줄 삭제 뒤에 보드 아래로 들어온 공격 줄 수(대전)다. 연출 동안에는 삭제 직전 보드를
+ * 보여 주고, 공격 줄은 연출이 끝난 뒤 나타난다.
+ */
 public record LineClearAnimation(List<ClearedRow> rows, List<RemovedCell> removedCells,
-                                 ActivePiece activePiece, long elapsedNanos) {
+                                 ActivePiece activePiece, long elapsedNanos, int addedLines) {
     /** 전체 연출의 앞 20%는 흰색 점멸, 나머지는 가운데부터 양쪽으로 삭제한다. */
     public static final long FLASH_NANOS = 60_000_000L;
     public static final long DURATION_NANOS = 300_000_000L;
 
     public LineClearAnimation {
+        if (addedLines < 0) throw new IllegalArgumentException("addedLines must not be negative");
         rows = List.copyOf(rows);
         removedCells = List.copyOf(removedCells);
         if (rows.isEmpty() && removedCells.isEmpty()) throw new IllegalArgumentException("Deleted cells are required");
         if (elapsedNanos < 0 || elapsedNanos >= DURATION_NANOS) {
             throw new IllegalArgumentException("Animation time must be within its duration");
         }
+    }
+
+    /** 공격 줄이 들어오지 않은 연출. */
+    public LineClearAnimation(List<ClearedRow> rows, List<RemovedCell> removedCells,
+                              ActivePiece activePiece, long elapsedNanos) {
+        this(rows, removedCells, activePiece, elapsedNanos, 0);
+    }
+
+    /** 시간만 흐른 같은 연출. */
+    public LineClearAnimation advancedBy(long nanos) {
+        return new LineClearAnimation(rows, removedCells, activePiece, elapsedNanos + nanos, addedLines);
     }
 
     /** 줄 전체만 지우는 연출. */
@@ -31,8 +49,11 @@ public record LineClearAnimation(List<ClearedRow> rows, List<RemovedCell> remove
         return elapsedNanos < FLASH_NANOS;
     }
 
-    /** 줄 압축을 되돌리고 아이템으로 지운 칸도 복원한다. 입력과 반환 배열은 공유하지 않는다. */
-    public Cell[][] boardBeforeClear(Cell[][] compacted) {
+    /**
+     * 공격 줄 추가와 줄 압축을 되돌리고 아이템으로 지운 칸도 복원한다. 입력과 반환 배열은 공유하지 않는다.
+     */
+    public Cell[][] boardBeforeClear(Cell[][] current) {
+        Cell[][] compacted = withoutAddedLines(current);
         Cell[][] restored = new Cell[compacted.length][];
         for (ClearedRow row : rows) {
             restored[row.rowIndex()] = row.cells().toArray(Cell[]::new);
@@ -45,5 +66,21 @@ public record LineClearAnimation(List<ClearedRow> rows, List<RemovedCell> remove
             restored[removed.position().y()][removed.position().x()] = removed.cell();
         }
         return restored;
+    }
+
+    /** 아래에 붙은 공격 줄을 빼고 나머지를 원래 높이로 내린다. 넘침이 없었다면 위쪽은 빈 줄이었다. */
+    private Cell[][] withoutAddedLines(Cell[][] current) {
+        if (addedLines == 0) return current;
+        int height = current.length;
+        Cell[][] lowered = new Cell[height][];
+        for (int row = 0; row < height; row++) {
+            if (row < addedLines) {
+                lowered[row] = new Cell[current[0].length];
+                Arrays.fill(lowered[row], Cell.EMPTY);
+            } else {
+                lowered[row] = current[row - addedLines];
+            }
+        }
+        return lowered;
     }
 }

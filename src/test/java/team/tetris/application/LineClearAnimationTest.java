@@ -151,6 +151,26 @@ class LineClearAnimationTest {
         assertThrows(UnsupportedOperationException.class, () -> animation.rows().clear());
     }
 
+    @Test void restoresTheBoardBeforeTheClearWhenAttackLinesArrivedAfterIt() {
+        // 대전: 줄 삭제 뒤에 공격 줄 2줄이 아래에 붙었다. 연출 동안에는 삭제 직전 보드를 보여 준다.
+        Cell[][] cells = new Board(4, 6).snapshot();
+        cells[5] = new Cell[] {Cell.occupiedBy(TetrominoType.I), Cell.occupiedBy(TetrominoType.I),
+            Cell.occupiedBy(TetrominoType.I), Cell.occupiedBy(TetrominoType.I)};
+        cells[4][0] = Cell.occupiedBy(TetrominoType.O);
+        Board board = new Board(cells);
+        var clear = board.clearFullLines();
+        Cell attack = Cell.occupiedBy(AttackBlock.INSTANCE);
+        List<Cell> line = List.of(attack, attack, attack, Cell.EMPTY);
+        assertFalse(board.pushUp(List.of(line, line)));
+
+        var animation = new LineClearAnimation(clear.clearedRows(), List.of(), null, 0, 2);
+
+        assertArrayEquals(cells, animation.boardBeforeClear(board.snapshot()));
+        assertEquals(2, animation.advancedBy(1).addedLines());
+        assertThrows(IllegalArgumentException.class,
+                () -> new LineClearAnimation(clear.clearedRows(), List.of(), null, 0, -1));
+    }
+
     @Test void rejectsEmptyRowsAndTimeOutsideTheAnimation() {
         assertThrows(IllegalArgumentException.class, () -> new LineClearAnimation(List.of(), 0));
         var rows = List.of(new ClearedRow(0, List.of(Cell.EMPTY)));

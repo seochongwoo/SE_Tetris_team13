@@ -1,5 +1,6 @@
 package team.tetris.ui.render.palette;
 
+import team.tetris.core.AttackBlock;
 import team.tetris.core.Shape;
 import team.tetris.core.TemporaryBlock;
 import team.tetris.core.TetrominoType;
@@ -25,11 +26,15 @@ public final class BlockGlyphs {
     /** 디버그 보드 채우기용 임시 블록. */
     public static final String TEMPORARY = "▒▒";
 
+    /** 대전에서 상대의 공격으로 들어온 줄의 칸. */
+    public static final String ATTACK = "▓▓";
+
     private BlockGlyphs() {
     }
 
     public static String of(Shape shape) {
         if (shape == TemporaryBlock.INSTANCE) return TEMPORARY;
+        if (shape == AttackBlock.INSTANCE) return ATTACK;
         if (!(shape instanceof TetrominoType type)) {
             return SPECIAL;
         }
@@ -47,6 +52,8 @@ public final class BlockGlyphs {
     /** 타일로 그릴 때의 무늬. 글자 무늬({@link #of(Shape)})와 같은 뜻을 그림으로 옮긴 것이다. */
     public static Pattern patternOf(Shape shape) {
         if (shape == TemporaryBlock.INSTANCE) return Pattern.CHECKER;
+        // 공격 칸은 무늬 없는 회색 타일로 그려 블록 무늬와 구분한다.
+        if (shape == AttackBlock.INSTANCE) return Pattern.NONE;
         if (!(shape instanceof TetrominoType type)) {
             return Pattern.CROSS;
         }

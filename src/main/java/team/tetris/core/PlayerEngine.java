@@ -16,6 +16,7 @@ import team.tetris.core.result.LockResult;
 import team.tetris.core.result.RemovedCell;
 import team.tetris.core.rule.PieceGenerator;
 import team.tetris.core.rule.DropRule;
+import team.tetris.core.rule.IncomingLines;
 import team.tetris.core.rule.PieceSource;
 import team.tetris.core.rule.PlainPieceSource;
 import team.tetris.core.rule.RotationResult;
@@ -33,12 +34,15 @@ import team.tetris.core.rule.RotationSystem;
  * 규칙은 application(ScorePolicy)의 책임이다.
  *
  * <p>블록이 고정되면 다음 순서로 처리한다: 보드에 기록 → 아이템이 실린 칸마다 아이템 효과 →
- * 꽉 찬 줄과 아이템이 지정한 줄을 한 번에 삭제 → 공급자에 지운 줄 수 알림 → 다음 블록 스폰.
+ * 꽉 찬 줄과 아이템이 지정한 줄을 한 번에 삭제 → 공급자에 지운 줄 수 알림 → 들어온 공격 줄을 보드
+ * 아래에 추가 → 넘침 판정 → 다음 블록 스폰. 공격 줄에 밀려 칸이 보드 위로 나가거나 다음 블록을 놓을
+ * 수 없으면 GAME_OVER가 된다 (3차 안건 ⑩).
  */
 public final class PlayerEngine implements TetrisEnginePort {
 
     private final Board board;
     private final PieceSource source;
+    private final IncomingLines incoming;
     private final RotationSystem rotationSystem = new RotationSystem();
 
     private ActivePiece activePiece;
@@ -46,8 +50,14 @@ public final class PlayerEngine implements TetrisEnginePort {
     private EnginePhase phase = EnginePhase.READY;
 
     public PlayerEngine(int width, int height, PieceSource source) {
+        this(width, height, source, IncomingLines.NONE);
+    }
+
+    /** 고정할 때마다 incoming에서 공격 줄을 받아 보드 아래에 넣는 엔진 (대전). */
+    public PlayerEngine(int width, int height, PieceSource source, IncomingLines incoming) {
         this.board = new Board(width, height);
         this.source = Objects.requireNonNull(source, "source");
+        this.incoming = Objects.requireNonNull(incoming, "incoming");
         spawnNext();
     }
 
@@ -58,8 +68,14 @@ public final class PlayerEngine implements TetrisEnginePort {
 
     /** 검증된 초기 배치로 시작한다. source의 첫 블록은 다음 미리보기가 된다. */
     public PlayerEngine(Cell[][] cells, ActivePiece initialPiece, PieceSource source) {
+        this(cells, initialPiece, source, IncomingLines.NONE);
+    }
+
+    /** 검증된 초기 배치로 시작하고, 고정할 때마다 incoming의 공격 줄을 받는다. */
+    public PlayerEngine(Cell[][] cells, ActivePiece initialPiece, PieceSource source, IncomingLines incoming) {
         this.board = new Board(cells);
         this.source = Objects.requireNonNull(source, "source");
+        this.incoming = Objects.requireNonNull(incoming, "incoming");
         this.activePiece = Objects.requireNonNull(initialPiece, "initialPiece");
         if (!board.canPlace(initialPiece.shape(), initialPiece.rotation(), initialPiece.origin())) {
             throw new IllegalArgumentException("Initial piece overlaps the board or its boundary");
@@ -213,8 +229,16 @@ public final class PlayerEngine implements TetrisEnginePort {
         if (!clearResult.isEmpty()) {
             source.onLinesCleared(clearResult.lineCount());
         }
-        spawnNext();
-        return new EngineStep(snapshot(), dropResult, lockResult, clearResult, activations, context.removedCells);
+        // 공격 줄은 줄 삭제가 끝난 뒤, 다음 블록이 나오기 전에 넣는다 (R3-08).
+        List<List<Cell>> lines = incoming.take();
+        if (board.pushUp(lines)) {
+            activePiece = null;
+            phase = EnginePhase.GAME_OVER;
+        } else {
+            spawnNext();
+        }
+        return new EngineStep(snapshot(), dropResult, lockResult, clearResult, activations, context.removedCells,
+                lines.size());
     }
 
     /**
