@@ -103,7 +103,12 @@ class LocalBattleSessionTest {
     }
 
     private static BiFunction<BattlePlayer, IncomingLines, TetrisEnginePort> engines(Cell[][] one, Cell[][] two) {
-        return (player, incoming) -> new PlayerEngine(player == ONE ? one : two, oAtTop(),
+        return engines(one, oAtTop(), two, oAtTop());
+    }
+
+    private static BiFunction<BattlePlayer, IncomingLines, TetrisEnginePort> engines(
+            Cell[][] one, ActivePiece startOne, Cell[][] two, ActivePiece startTwo) {
+        return (player, incoming) -> new PlayerEngine(player == ONE ? one : two, player == ONE ? startOne : startTwo,
                 new PlainPieceSource(new PieceGenerator() {
                     @Override
                     public TetrominoType next() {
@@ -201,8 +206,9 @@ class LocalBattleSessionTest {
         battle.handle(TWO, GameCommand.HARD_DROP);
 
         assertEquals(ONE, battle.result().orElseThrow().winner());
-        // 끝난 화면에는 멈춘 연출 대신 확정된 보드를 보여 준다.
+        // 끝난 화면에는 멈춘 연출 대신 확정된 보드를 보여 주고, 진 쪽은 GAME_OVER로 알린다.
         assertNull(battle.snapshot().of(TWO).lineClearAnimation());
+        assertEquals(GameStatus.GAME_OVER, battle.snapshot().of(TWO).status());
         assertEquals(1, battle.snapshot().of(TWO).clearedLines());
     }
 
@@ -225,6 +231,41 @@ class LocalBattleSessionTest {
 
         assertTrue(battle.snapshot().pendingFor(TWO).isEmpty());
         assertTrue(hasAttackCells(battle.snapshot().of(TWO)));
+    }
+
+    @Test
+    void attacksMadeInAFrameReachTheOpponentOnlyAfterBothBoardsMoved() {
+        // 두 O가 바닥 바로 위(6·7행)에 있어 다음 중력에 둘 다 고정된다. 공격하는 쪽이 1P든 2P든, 같은 프레임에
+        // 고정한 상대는 그 공격을 바로 받지 않고 대기열에 남긴다 (먼저 진행하는 1P만 유리하지 않게).
+        ActivePiece onFloor = new ActivePiece(TetrominoType.O, 0, new Position(3, 6));
+        for (BattlePlayer attacker : BattlePlayer.values()) {
+            Cell[][] attacking = twoLineClear();
+            LocalBattleSession battle = new LocalBattleSession(WIDTH,
+                    attacker == ONE ? engines(attacking, onFloor, empty(), onFloor)
+                            : engines(empty(), onFloor, attacking, onFloor),
+                    new ScorePolicy(), ONE_SECOND, GameMode.NORMAL, Difficulty.NORMAL);
+
+            battle.update(SECOND);
+
+            BattlePlayer receiver = attacker.opponent();
+            assertEquals(2, battle.snapshot().of(attacker).clearedLines(), attacker::toString);
+            assertEquals(2, battle.snapshot().pendingFor(receiver).size(), attacker::toString);
+            assertFalse(hasAttackCells(battle.snapshot().of(receiver)), attacker::toString);
+        }
+    }
+
+    @Test
+    void attacksFromTheFrameThatEndsTheBattleAreNotQueued() {
+        // 같은 프레임에 1P는 2줄을 지워 공격하고 2P는 쌓을 수 없게 된다. 결과가 나온 프레임의 공격은 넣지 않는다.
+        ActivePiece onFloor = new ActivePiece(TetrominoType.O, 0, new Position(3, 6));
+        LocalBattleSession battle = new LocalBattleSession(WIDTH, engines(twoLineClear(), onFloor, blockedTop(), oAtTop()),
+                new ScorePolicy(), ONE_SECOND, GameMode.NORMAL, Difficulty.NORMAL);
+
+        battle.update(SECOND);
+
+        assertEquals(ONE, battle.result().orElseThrow().winner());
+        assertEquals(2, battle.snapshot().of(ONE).clearedLines());
+        assertTrue(battle.snapshot().pendingFor(TWO).isEmpty());
     }
 
     @Test

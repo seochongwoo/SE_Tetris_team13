@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.function.BiFunction;
 import team.tetris.application.GameCommand;
 import team.tetris.application.GameSnapshot;
+import team.tetris.application.GameStatus;
 import team.tetris.application.ScoreRule;
 import team.tetris.application.SinglePlayerSession;
 import team.tetris.application.SpeedRule;
@@ -29,6 +30,8 @@ import team.tetris.core.rule.IncomingLines;
  *   <li>승패는 논리적 패배 순간에 확정한다. 1인 게임처럼 줄 삭제 연출이 끝날 때까지 기다리지 않는다.</li>
  *   <li>한 프레임({@link #update} 한 번)에 둘 다 쌓을 수 없게 되면 무승부 (안건 ⑬). 조작({@link #handle})은
  *       그 플레이어 보드만 바꾸므로 조작으로 진 경우는 그 자리에서 확정한다.</li>
+ *   <li>한 프레임 안에서는 1P를 먼저 진행하지만, 그 프레임에 생긴 공격은 두 보드를 모두 진행한 뒤에
+ *       넣는다. 그래서 같은 프레임의 공격을 1P만 먼저 받거나 2P만 먼저 받는 일이 없다.</li>
  *   <li>결과가 나오면 두 세션을 더 진행하지 않아 이후 점수·공격이 생기지 않는다 (안건 ㉓). 진행 중이던
  *       줄 삭제 연출은 화면에서 지운다.</li>
  *   <li>한 명이 정지하면 둘 다 정지하고, 나가면 나간 사람이 진다 (안건 ⑱).</li>
@@ -44,6 +47,8 @@ public final class LocalBattleSession implements BattleSession {
     private final Difficulty difficulty;
     private BattleStatus status = BattleStatus.RUNNING;
     private BattleResult result;
+    /** {@link #update} 도중에 생긴 공격. 두 보드를 모두 진행한 뒤 넣는다. 그 밖에는 null. */
+    private Map<BattlePlayer, List<List<Cell>>> frameAttacks;
 
     /**
      * @param width   두 보드의 폭 (공격 줄 검사용)
@@ -116,12 +121,20 @@ public final class LocalBattleSession implements BattleSession {
         if (status != BattleStatus.RUNNING) {
             return;
         }
-        for (SinglePlayerSession session : sessions.values()) {
-            session.update(elapsedNanos);
+        Map<BattlePlayer, List<List<Cell>>> attacks = new EnumMap<>(BattlePlayer.class);
+        frameAttacks = attacks;
+        try {
+            for (SinglePlayerSession session : sessions.values()) {
+                session.update(elapsedNanos);
+            }
+        } finally {
+            frameAttacks = null;
         }
         boolean oneLost = toppedOut(BattlePlayer.ONE);
         boolean twoLost = toppedOut(BattlePlayer.TWO);
-        if (oneLost && twoLost) {
+        if (!oneLost && !twoLost) {
+            attacks.forEach((receiver, lines) -> incoming.get(receiver).add(lines));
+        } else if (oneLost && twoLost) {
             finish(null, BattleEnd.BOTH_TOPPED_OUT);
         } else if (oneLost || twoLost) {
             finish(oneLost ? BattlePlayer.TWO : BattlePlayer.ONE, BattleEnd.TOPPED_OUT);
@@ -134,8 +147,15 @@ public final class LocalBattleSession implements BattleSession {
             return;
         }
         List<List<Cell>> lines = AttackRule.linesFor(step.lockResult(), step.clearResult());
-        if (!lines.isEmpty()) {
-            incoming.get(attacker.opponent()).add(lines);
+        if (lines.isEmpty()) {
+            return;
+        }
+        BattlePlayer receiver = attacker.opponent();
+        if (frameAttacks == null) {
+            incoming.get(receiver).add(lines);
+        } else {
+            // 한 프레임에 여러 번 지웠으면 생긴 순서대로 이어 붙인다. 10줄 제한은 대기열이 적용한다.
+            frameAttacks.computeIfAbsent(receiver, ignored -> new java.util.ArrayList<>()).addAll(lines);
         }
     }
 
@@ -160,14 +180,21 @@ public final class LocalBattleSession implements BattleSession {
                 status, result, mode, difficulty);
     }
 
-    /** 끝난 뒤에는 멈춘 줄 삭제 연출 대신 확정된 보드를 보여 준다. */
+    /**
+     * 끝난 뒤에는 멈춘 줄 삭제 연출 대신 확정된 보드를 보여 준다. 연출 때문에 1인 세션이 아직 진행 중으로
+     * 알리고 있어도, 쌓을 수 없게 된 플레이어는 GAME_OVER로 보여 준다.
+     */
     private GameSnapshot view(BattlePlayer player) {
         GameSnapshot view = sessions.get(player).snapshot();
-        if (result == null || view.lineClearAnimation() == null) {
+        if (result == null) {
+            return view;
+        }
+        GameStatus shown = toppedOut(player) ? GameStatus.GAME_OVER : view.status();
+        if (view.lineClearAnimation() == null && shown == view.status()) {
             return view;
         }
         return new GameSnapshot(view.engine(), view.score(), view.level(), view.clearedLines(),
-                view.gravityIntervalNanos(), view.status(), view.doubleScoreClears(), null,
+                view.gravityIntervalNanos(), shown, view.doubleScoreClears(), null,
                 view.mode(), view.difficulty());
     }
 
