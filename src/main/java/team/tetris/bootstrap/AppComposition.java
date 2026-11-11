@@ -149,12 +149,16 @@ public final class AppComposition implements ApplicationContext {
         for (BattlePlayer player : BattlePlayer.values()) {
             readers.put(player, sequence.newReader());
         }
-        long itemSeed = ThreadLocalRandom.current().nextLong();
+        // 시드를 플레이어마다 따로 뽑는다. 붙은 시드(s, s+1)는 Random의 첫 값들이 서로 비슷해 아이템이 덜 독립적이다.
+        var itemSeeds = new java.util.EnumMap<BattlePlayer, Long>(BattlePlayer.class);
+        for (BattlePlayer player : BattlePlayer.values()) {
+            itemSeeds.put(player, ThreadLocalRandom.current().nextLong());
+        }
         var session = new LocalBattleSession(BOARD_WIDTH, (player, incoming) -> {
             PieceSource pieces = new PlainPieceSource(readers.get(player));
             if (mode == GameMode.ITEM) {
                 // 아이템은 플레이어마다 자기가 지운 줄 수에 따라 따로 나온다.
-                pieces = new ItemPieceSource(pieces, itemKinds, new Random(itemSeed + player.ordinal()));
+                pieces = new ItemPieceSource(pieces, itemKinds, new Random(itemSeeds.get(player)));
             }
             return new PlayerEngine(BOARD_WIDTH, BOARD_HEIGHT, pieces, incoming);
         }, scoring, Objects.requireNonNull(speeds.apply(difficulty), "speed"), mode, difficulty);
