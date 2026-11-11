@@ -10,6 +10,9 @@ import java.util.function.Function;
 import team.tetris.application.model.Difficulty;
 import team.tetris.application.model.GameMode;
 import team.tetris.application.*;
+import team.tetris.application.battle.BattlePlayer;
+import team.tetris.application.battle.LocalBattleSession;
+import team.tetris.application.battle.StartedBattle;
 import team.tetris.application.debug.DebugSetup;
 import team.tetris.application.debug.DebugPieceGenerator;
 import team.tetris.application.debug.DebugSession;
@@ -25,6 +28,7 @@ import team.tetris.core.rule.ItemPieceSource;
 import team.tetris.core.rule.PieceGenerator;
 import team.tetris.core.rule.PieceSource;
 import team.tetris.core.rule.PlainPieceSource;
+import team.tetris.core.rule.SharedPieceSequence;
 import team.tetris.core.rule.WeightedRandomGenerator;
 import team.tetris.storage.BinaryScoreRepository;
 import team.tetris.storage.PropertiesSettingsRepository;
@@ -32,6 +36,8 @@ import team.tetris.storage.ConsoleFileDebugLog;
 
 /** 저장소·서비스·정책·엔진 조립. 게임 규칙과 정렬은 각 구성 요소에 위임. */
 public final class AppComposition implements ApplicationContext {
+    private static final int BOARD_WIDTH = 10;
+    private static final int BOARD_HEIGHT = 20;
     private final SettingsService settings;
     private final ScoreboardService scores;
     private final EndGameCoordinator endings;
@@ -127,9 +133,32 @@ public final class AppComposition implements ApplicationContext {
         if (mode == GameMode.ITEM) {
             pieces = new ItemPieceSource(pieces, itemKinds, new Random(ThreadLocalRandom.current().nextLong()));
         }
-        var engine = new PlayerEngine(10, 20, pieces);
+        var engine = new PlayerEngine(BOARD_WIDTH, BOARD_HEIGHT, pieces);
         var session = new SinglePlayerSession(engine, scoring, speed, mode, difficulty);
         return new StartedGame(session, loaded);
+    }
+
+    @Override
+    public StartedBattle newLocalBattle(GameMode mode) {
+        Objects.requireNonNull(mode, "mode");
+        var loaded = settings.loadOrDefault();
+        var difficulty = loaded.value().difficulty();
+        // 두 플레이어가 같은 생성기의 순서를 나눠 읽어 기본 블록이 같은 순서로 나온다 (안건 ⑰).
+        var sequence = new SharedPieceSequence(Objects.requireNonNull(generators.apply(difficulty), "generator"));
+        var readers = new java.util.EnumMap<BattlePlayer, PieceGenerator>(BattlePlayer.class);
+        for (BattlePlayer player : BattlePlayer.values()) {
+            readers.put(player, sequence.newReader());
+        }
+        long itemSeed = ThreadLocalRandom.current().nextLong();
+        var session = new LocalBattleSession(BOARD_WIDTH, (player, incoming) -> {
+            PieceSource pieces = new PlainPieceSource(readers.get(player));
+            if (mode == GameMode.ITEM) {
+                // 아이템은 플레이어마다 자기가 지운 줄 수에 따라 따로 나온다.
+                pieces = new ItemPieceSource(pieces, itemKinds, new Random(itemSeed + player.ordinal()));
+            }
+            return new PlayerEngine(BOARD_WIDTH, BOARD_HEIGHT, pieces, incoming);
+        }, scoring, Objects.requireNonNull(speeds.apply(difficulty), "speed"), mode, difficulty);
+        return new StartedBattle(session, loaded);
     }
 
     @Override public boolean debugEnabled() { return debug; }

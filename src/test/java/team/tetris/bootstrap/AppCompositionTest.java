@@ -290,4 +290,40 @@ class AppCompositionTest {
 
         assertEquals(List.of(Difficulty.NORMAL, Difficulty.HARD), requested);
     }
+
+    @Test
+    void aLocalBattleGivesBothPlayersTheSameOrderAndDifficultyAndRecordsNoScore() throws Exception {
+        // 안건 ⑯: 설정의 난이도를 두 명에게 똑같이. 안건 ⑰: 기본 블록은 같은 순서로.
+        List<Difficulty> requested = new ArrayList<>();
+        var app = new AppComposition(directory,
+                difficulty -> { requested.add(difficulty); return new team.tetris.core.rule.SevenBagGenerator(42L); },
+                new ScorePolicy(), SpeedPolicy::new, List.of());
+        app.settings().update(new Settings(Settings.ScreenSize.MEDIUM, Settings.defaults().keyBindings(), false,
+                Difficulty.HARD));
+
+        var battle = app.newLocalBattle(GameMode.NORMAL).session();
+
+        List<team.tetris.core.Shape> one = new ArrayList<>();
+        List<team.tetris.core.Shape> two = new ArrayList<>();
+        var snapshot = battle.snapshot();
+        one.add(snapshot.one().engine().activePiece().shape());
+        two.add(snapshot.two().engine().activePiece().shape());
+        // 1P가 먼저 블록 다섯 개를 놓은 뒤 2P가 놓아도 같은 순서가 나온다.
+        for (var player : team.tetris.application.battle.BattlePlayer.values()) {
+            for (int i = 0; i < 5; i++) {
+                battle.handle(player, GameCommand.HARD_DROP);
+                var piece = battle.snapshot().of(player).engine().activePiece();
+                (player == team.tetris.application.battle.BattlePlayer.ONE ? one : two).add(piece.shape());
+            }
+        }
+
+        assertEquals(one, two);
+        assertEquals(List.of(Difficulty.HARD), requested);
+        assertEquals(Difficulty.HARD, battle.snapshot().one().difficulty());
+        assertEquals(Difficulty.HARD, battle.snapshot().two().difficulty());
+        battle.handle(team.tetris.application.battle.BattlePlayer.TWO, GameCommand.QUIT_GAME);
+        assertTrue(battle.result().isPresent());
+        assertTrue(app.scores().list().isEmpty());
+        assertNotNull(app.newLocalBattle(GameMode.ITEM).session().snapshot());
+    }
 }
