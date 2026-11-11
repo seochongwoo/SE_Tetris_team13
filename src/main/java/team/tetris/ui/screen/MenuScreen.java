@@ -56,12 +56,20 @@ public final class MenuScreen implements Screen {
 
     private final ScreenRouter router;
     private final List<MenuItem> items;
+    /** Esc로 돌아갈 곳. 시작 메뉴처럼 돌아갈 곳이 없으면 null. */
+    private final Runnable back;
     private int cursor;
     private boolean showKeyHint;
     private long clockNanos;
 
     public MenuScreen(ScreenRouter router, List<MenuItem> items) {
+        this(router, items, null);
+    }
+
+    /** 하위 메뉴: back이 있으면 Esc로 돌아간다. */
+    public MenuScreen(ScreenRouter router, List<MenuItem> items, Runnable back) {
         this.router = Objects.requireNonNull(router, "router");
+        this.back = back;
         this.items = List.copyOf(items);
         if (this.items.isEmpty()) {
             throw new IllegalArgumentException("Menu requires at least one item");
@@ -84,6 +92,13 @@ public final class MenuScreen implements Screen {
             case KeyNames.ENTER -> {
                 showKeyHint = false;
                 items.get(cursor).action().run();
+            }
+            case KeyNames.ESCAPE -> {
+                if (back != null) {
+                    back.run();
+                } else {
+                    showKeyHint = true;
+                }
             }
             default -> showKeyHint = true;
         }
@@ -159,10 +174,13 @@ public final class MenuScreen implements Screen {
         }
     }
 
-    /** 메뉴 항목 첫 줄. 항목이 적으면 패널 안에서 세로 가운데로 내린다. */
+    /**
+     * 메뉴 항목 첫 줄. 항목이 적으면 패널 안에서 세로 가운데로 내리고, 패널보다 많으면(대전 모드를 더한 6개)
+     * 넘치는 만큼 위로 올려 땅을 덮지 않게 한다. 위쪽은 부제 아래 하늘이라 비어 있다.
+     */
     static int itemsTop(int itemCount) {
         int panelRows = GROUND_ROW - PANEL_TOP;
-        return PANEL_TOP + 1 + Math.max(0, (panelRows - (itemCount * 2 + 1)) / 2);
+        return PANEL_TOP + 1 + Math.floorDiv(panelRows - (itemCount * 2 + 1), 2);
     }
 
     private static void drawTitle(TextFrame frame, ColorPalette palette) {

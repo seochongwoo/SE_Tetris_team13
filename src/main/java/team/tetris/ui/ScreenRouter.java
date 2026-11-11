@@ -21,6 +21,7 @@ import team.tetris.application.model.Settings;
 import team.tetris.application.port.StorageException;
 import team.tetris.ui.render.TextFrame;
 import team.tetris.ui.render.palette.ColorPalette;
+import team.tetris.ui.screen.BattleScreen;
 import team.tetris.ui.screen.GameScreen;
 import team.tetris.ui.screen.MenuScreen;
 import team.tetris.ui.screen.MenuScreen.MenuItem;
@@ -105,6 +106,7 @@ public final class ScreenRouter {
         return List.of(
                 new MenuItem("게임 시작", this::startGame),
                 new MenuItem("아이템 모드", this::startItemGame),
+                new MenuItem("대전 모드", this::showBattleModes),
                 new MenuItem("설정", this::showSettings),
                 new MenuItem("스코어보드", this::showScoreboard),
                 new MenuItem("종료", this::exit));
@@ -119,6 +121,28 @@ public final class ScreenRouter {
     /** 아이템 모드 시작: 10줄을 지울 때마다 아이템이 실린 블록이 나온다. */
     public void startItemGame() {
         show(new GameScreen(this, application.newGame(GameMode.ITEM)));
+        debugSetupHistory.clear();
+    }
+
+    /** 대전 모드 선택: 일반 / 아이템 / 시간제한 (R3-02). 시간제한은 아직 고를 수 없다. */
+    public List<MenuItem> battleModeItems() {
+        return List.of(
+                new MenuItem("일반 대전", () -> startBattle(GameMode.NORMAL)),
+                new MenuItem("아이템 대전", () -> startBattle(GameMode.ITEM)),
+                new MenuItem(TIME_LIMIT_SOON, () -> { }),
+                new MenuItem("뒤로", this::showMenu));
+    }
+
+    /** 시간제한 대전 항목. 카드 20에서 시간 선택과 함께 연결한다. */
+    static final String TIME_LIMIT_SOON = "시간제한 (예정)";
+
+    public void showBattleModes() {
+        show(new MenuScreen(this, battleModeItems(), this::showMenu));
+    }
+
+    /** 한 컴퓨터에서 두 명이 하는 대전 시작. 결과는 스코어보드에 기록하지 않는다. */
+    public void startBattle(GameMode mode) {
+        show(new BattleScreen(this, application.newLocalBattle(mode)));
         debugSetupHistory.clear();
     }
 
