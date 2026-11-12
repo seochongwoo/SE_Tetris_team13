@@ -81,13 +81,11 @@ class P2pLobbyScreenTest {
         transport.incoming.add(new MatchEnvelope(0, 1, new Ready(revision, true)));
         router.update(1);
         assertEquals(P2pLobby.Stage.STARTED, lobby.stage());
-        assertTrue(router.render().text().contains("양쪽 준비 완료"));
-        var screen = (P2pLobbyScreen) router.current();
-        var started = screen.handoffStartedMatch().orElseThrow();
-        assertTrue(screen.handoffStartedMatch().isEmpty());
-        router.showMenu(); // 카드 24가 경기 화면으로 교체해도 기존 화면이 연결을 닫지 않는다.
+        assertInstanceOf(P2pMatchScreen.class, router.current());
+        assertTrue(router.render().text().contains("NEXT"));
         assertFalse(transport.closed);
-        started.connection().close();
+        assertTrue(lobby.takeStartedMatch().isEmpty());
+        router.showMenu();
         assertTrue(transport.closed);
     }
 

@@ -90,7 +90,10 @@ public final class P2pLobbyScreen implements Screen {
                 && ((value >= '0' && value <= '9') || value == '.')) input += value;
     }
 
-    @Override public void update(long elapsedNanos) { lobby.update(); }
+    @Override public void update(long elapsedNanos) {
+        lobby.update();
+        handoffStartedMatch().ifPresent(started -> router.startP2pMatch(lobby, started));
+    }
     /** 경기 화면으로 전환하기 직전에 호출. 연결 정리는 이후 경기 화면의 책임이다. */
     public java.util.Optional<P2pLobby.StartedMatch> handoffStartedMatch() {
         var started = lobby.takeStartedMatch();

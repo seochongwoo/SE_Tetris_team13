@@ -138,6 +138,16 @@ public final class ScreenRouter {
         debugSetupHistory.clear();
     }
 
+    public void startP2pMatch(team.tetris.application.network.P2pLobby lobby,
+                               team.tetris.application.network.P2pLobby.StartedMatch started) {
+        show(new team.tetris.ui.screen.P2pMatchScreen(this, lobby, application.newP2pMatch(started)));
+    }
+
+    public void returnToP2pLobby(team.tetris.application.network.P2pLobby lobby) {
+        lobby.returnAfterResult();
+        show(new P2pLobbyScreen(this, lobby));
+    }
+
     /** 일반 모드 시작. */
     public void startGame() {
         show(new GameScreen(this, application.newGame(GameMode.NORMAL)));
