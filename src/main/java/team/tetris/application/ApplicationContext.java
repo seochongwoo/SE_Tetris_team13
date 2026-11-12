@@ -16,6 +16,10 @@ public interface ApplicationContext {
         throw new UnsupportedOperationException("P2P is not available");
     }
 
+    default team.tetris.application.network.P2pMatch newP2pMatch(P2pLobby.StartedMatch started) {
+        throw new UnsupportedOperationException("P2P match is not available");
+    }
+
     default boolean debugEnabled() { return false; }
 
     default StartedGame newDebugGame(team.tetris.application.debug.DebugSetup setup, GameMode mode) {
