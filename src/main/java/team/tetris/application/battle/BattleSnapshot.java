@@ -16,10 +16,18 @@ import team.tetris.core.Cell;
  * @param pendingTwo 2P 보드에 들어가기를 기다리는 공격 줄
  * @param status     대전 전체 상태
  * @param result     끝났으면 결과, 진행 중이면 null
+ * @param timer      시간제한 대전의 시계, 시간제한이 없으면 null
  */
 public record BattleSnapshot(GameSnapshot one, GameSnapshot two, List<List<Cell>> pendingOne,
                              List<List<Cell>> pendingTwo, BattleStatus status, BattleResult result,
-                             GameMode mode, Difficulty difficulty) {
+                             GameMode mode, Difficulty difficulty, BattleTimer timer) {
+
+    /** 시간제한이 없는 대전. */
+    public BattleSnapshot(GameSnapshot one, GameSnapshot two, List<List<Cell>> pendingOne,
+                          List<List<Cell>> pendingTwo, BattleStatus status, BattleResult result,
+                          GameMode mode, Difficulty difficulty) {
+        this(one, two, pendingOne, pendingTwo, status, result, mode, difficulty, null);
+    }
 
     public BattleSnapshot {
         Objects.requireNonNull(one, "one");

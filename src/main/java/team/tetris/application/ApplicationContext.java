@@ -22,6 +22,11 @@ public interface ApplicationContext {
      * (안건 ⑯) 기본 블록은 같은 순서로 나온다(안건 ⑰). 결과는 스코어보드에 기록하지 않는다.
      */
     default team.tetris.application.battle.StartedBattle newLocalBattle(GameMode mode) {
+        return newLocalBattle(mode, null);
+    }
+
+    /** 시간제한 대전 (R3-05). timeLimit이 null이면 시간제한이 없다. */
+    default team.tetris.application.battle.StartedBattle newLocalBattle(GameMode mode, java.time.Duration timeLimit) {
         throw new UnsupportedOperationException("Local battle is not available");
     }
 
