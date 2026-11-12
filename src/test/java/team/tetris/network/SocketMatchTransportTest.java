@@ -67,7 +67,7 @@ class SocketMatchTransportTest {
 
     @Test
     void handshakeRejectsIncompatibleProtocolsOnBothEnds() throws Exception {
-        try (var server = new SocketMatchTransport(); var client = new SocketMatchTransport(2)) {
+        try (var server = new SocketMatchTransport(); var client = new SocketMatchTransport(PROTOCOL_VERSION + 1)) {
             client.connect("127.0.0.1", listen(server));
             await(() -> server.status().state() == MatchTransport.State.FAILED
                     && client.status().state() == MatchTransport.State.FAILED);
@@ -79,7 +79,7 @@ class SocketMatchTransportTest {
 
     @Test
     void refusesDataBeforeHelloAndSameRole() throws Exception {
-        for (MatchMessage message : List.of(new Ready(1, true), new Hello(1, Role.SERVER))) {
+        for (MatchMessage message : List.of(new Ready(1, true), new Hello(PROTOCOL_VERSION, Role.SERVER))) {
             try (var server = new SocketMatchTransport(); var peer = new Socket("127.0.0.1", listen(server))) {
                 new MessageCodec().write(new DataOutputStream(peer.getOutputStream()), new MatchEnvelope(0, 1, message));
                 await(() -> server.status().state() == MatchTransport.State.FAILED);
@@ -97,7 +97,7 @@ class SocketMatchTransportTest {
         try (var server = new SocketMatchTransport(); var peer = new Socket("127.0.0.1", listen(server))) {
             var codec = new MessageCodec();
             var out = new DataOutputStream(peer.getOutputStream());
-            codec.write(out, new MatchEnvelope(0, 1, new Hello(1, Role.CLIENT)));
+            codec.write(out, new MatchEnvelope(0, 1, new Hello(PROTOCOL_VERSION, Role.CLIENT)));
             codec.read(new DataInputStream(peer.getInputStream()));
             await(() -> server.status().state() == MatchTransport.State.CONNECTED);
             out.writeInt(Integer.MAX_VALUE); out.flush();
@@ -111,7 +111,7 @@ class SocketMatchTransportTest {
         try (var server = new SocketMatchTransport(); var peer = new Socket("127.0.0.1", listen(server))) {
             var codec = new MessageCodec();
             var out = new DataOutputStream(peer.getOutputStream());
-            codec.write(out, new MatchEnvelope(0, 1, new Hello(1, Role.CLIENT)));
+            codec.write(out, new MatchEnvelope(0, 1, new Hello(PROTOCOL_VERSION, Role.CLIENT)));
             codec.read(new DataInputStream(peer.getInputStream()));
             await(() -> server.status().state() == MatchTransport.State.CONNECTED);
             for (int sequence = 1; sequence <= 257; sequence++) {

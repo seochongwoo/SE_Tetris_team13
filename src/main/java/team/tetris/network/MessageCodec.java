@@ -33,11 +33,16 @@ public final class MessageCodec {
             }
             case Ready m -> { out.writeUTF("READY"); out.writeLong(m.revision()); out.writeBoolean(m.ready()); }
             case Start m -> { out.writeUTF("START"); out.writeLong(m.revision()); out.writeLong(m.pieceSeed()); }
-            case State m -> { out.writeUTF("STATE"); writePlayer(out, m.player()); out.writeLong(m.remainingNanos()); }
+            case State m -> { out.writeUTF("STATE"); writePlayer(out, m.player()); out.writeLong(m.remainingNanos()); out.writeLong(m.inputId()); }
+            case Painted m -> { out.writeUTF("PAINTED"); out.writeLong(m.inputId()); }
             case Attack m -> { out.writeUTF("ATTACK"); out.writeLong(m.eventId()); writeRows(out, m.rows()); }
             case Pause m -> { out.writeUTF("PAUSE"); out.writeUTF(m.owner().name()); out.writeBoolean(m.request()); }
             case Resume m -> { out.writeUTF("RESUME"); out.writeBoolean(m.request()); }
-            case Result m -> { out.writeUTF("RESULT"); out.writeUTF(m.outcome().name()); out.writeUTF(m.reason().name()); }
+            case Result m -> {
+                out.writeUTF("RESULT"); out.writeUTF(m.outcome().name()); out.writeUTF(m.reason().name());
+                out.writeBoolean(m.server() != null);
+                if (m.server() != null) { writePlayer(out, m.server()); writePlayer(out, m.client()); }
+            }
             case Leave ignored -> out.writeUTF("LEAVE");
             case Ping m -> { out.writeUTF("PING"); out.writeLong(m.id()); }
             case Pong m -> { out.writeUTF("PONG"); out.writeLong(m.id()); }
@@ -63,11 +68,16 @@ public final class MessageCodec {
                 case "LOBBY" -> new Lobby(in.readLong(), value(in, Mode.class), value(in, Difficulty.class), in.readInt());
                 case "READY" -> new Ready(in.readLong(), bool(in));
                 case "START" -> new Start(in.readLong(), in.readLong());
-                case "STATE" -> new State(readPlayer(in), in.readLong());
+                case "STATE" -> new State(readPlayer(in), in.readLong(), in.readLong());
+                case "PAINTED" -> new Painted(in.readLong());
                 case "ATTACK" -> new Attack(in.readLong(), readRows(in));
                 case "PAUSE" -> new Pause(value(in, Role.class), bool(in));
                 case "RESUME" -> new Resume(bool(in));
-                case "RESULT" -> new Result(value(in, Outcome.class), value(in, EndReason.class));
+                case "RESULT" -> {
+                    Outcome outcome = value(in, Outcome.class);
+                    EndReason reason = value(in, EndReason.class);
+                    yield bool(in) ? new Result(outcome, reason, readPlayer(in), readPlayer(in)) : new Result(outcome, reason);
+                }
                 case "LEAVE" -> new Leave();
                 case "PING" -> new Ping(in.readLong());
                 case "PONG" -> new Pong(in.readLong());

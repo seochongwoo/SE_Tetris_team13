@@ -82,6 +82,7 @@ public final class MatchProtocol {
                         ? Decision.WRONG_SENDER : Decision.ACCEPTED;
             case Attack attack -> !inMatch() ? Decision.WRONG_STATE
                     : attack.eventId() <= attacks.getOrDefault(sender, 0L) ? Decision.DUPLICATE : Decision.ACCEPTED;
+            case Painted ignored -> inMatch() ? Decision.ACCEPTED : Decision.WRONG_STATE;
             case Pause pause -> phase != Phase.PLAYING ? Decision.WRONG_STATE
                     : (pause.request() ? pause.owner() != sender : sender != Role.SERVER)
                         ? Decision.WRONG_SENDER : Decision.ACCEPTED;

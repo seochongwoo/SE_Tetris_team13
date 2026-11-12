@@ -43,8 +43,9 @@ class MessageCodecTest {
     void allMessageTypesRoundTripIncludingSixCellWeightAndItemAttributes() throws Exception {
         List<MatchMessage> messages = List.of(new Hello(1, Role.SERVER),
                 new Lobby(1, Mode.TIMED, Difficulty.HARD, 180), new Ready(1, true), new Start(1, Long.MIN_VALUE),
-                new State(player(), 100), new Attack(3, List.of(1, 5)), new Pause(Role.CLIENT, true),
-                new Resume(false), new Result(Outcome.DRAW, EndReason.TIME_LIMIT), new Leave(), new Ping(9), new Pong(9));
+                new State(player(), 100, 12), new Painted(12), new Attack(3, List.of(1, 5)), new Pause(Role.CLIENT, true),
+                new Resume(false), new Result(Outcome.DRAW, EndReason.TIME_LIMIT),
+                new Result(Outcome.SERVER_WINS, EndReason.TOP_OUT, player(), player()), new Leave(), new Ping(9), new Pong(9));
         for (MatchMessage message : messages) {
             var envelope = new MatchEnvelope(12, 37, message);
             assertEquals(envelope, decode(encode(envelope)));
@@ -119,5 +120,7 @@ class MessageCodecTest {
         assertThrows(IllegalArgumentException.class, () -> new Lobby(1, Mode.NORMAL, Difficulty.NORMAL, 60));
         assertThrows(IllegalArgumentException.class, () -> new Tile(ShapeCode.EMPTY, ItemCode.BOMB));
         assertThrows(IllegalArgumentException.class, () -> new MatchEnvelope(-1, 1, new Leave()));
+        assertThrows(IllegalArgumentException.class, () -> new Result(Outcome.DRAW, EndReason.TOP_OUT, player(), null));
+        assertThrows(IllegalArgumentException.class, () -> new Result(Outcome.DRAW, EndReason.TOP_OUT, null, player()));
     }
 }

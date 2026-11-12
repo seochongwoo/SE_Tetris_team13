@@ -28,7 +28,7 @@ public final class MatchConnection implements AutoCloseable {
 
     public Optional<MatchEnvelope> receive() {
         Optional<MatchEnvelope> next;
-        while ((next = transport.poll()).isPresent()) {
+        for (int polled = 0; polled < 256 && (next = transport.poll()).isPresent(); polled++) {
             if (protocol.accept(role == Role.SERVER ? Role.CLIENT : Role.SERVER, next.get())
                     == MatchProtocol.Decision.ACCEPTED) return next;
         }
