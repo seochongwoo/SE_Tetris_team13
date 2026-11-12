@@ -249,3 +249,56 @@ PING을 실제 writer가 쓰기 직전에 로컬 `System.nanoTime()`을 저장�
 로컬 Linux/Java 21: `./gradlew --offline --no-daemon build jacocoTestReport` 성공. 전체 **793개 테스트**(카드 25 신규 16개), 실패·오류·건너뜀 0개. 라인 커버리지 **95.72% (5,148 / 5,378)**, 70% 게이트 통과. 보고서: `build/reports/tests/test/index.html`, `build/reports/jacoco/test/html/index.html`.
 
 기존 CI의 `build jacocoTestReport` 실행 대상에 포함된다. 원격 CI·실제 Windows/LAN 리허설, GitHub 보드 갱신·상대방 리뷰·PR 머지는 이 로컬 작업에서 실행하지 않았다. 백로그의 공통 완료 규칙에 따라 카드 25는 진행 중으로 유지한다.
+
+## 10. 네트워크 자동화 테스트 (카드 26)
+
+N3-02의 접속 자동화와 N3-03의 저하 환경 대비를 카드 22~25 테스트로 검증한다. 카드 26은 실제 소켓 EOF와 application의 실패 처리·새 연결의 경기 시작 사이에 빠져 있던 통합 검증 6개를 추가한다. 아래 표의 클래스 링크는 실제 테스트 파일이며, 메서드명으로 개별 수용 조건을 찾을 수 있다.
+
+### 요구사항별 자동화 위치
+
+| 조건 / 요구사항 | 테스트와 확인 내용 |
+| --- | --- |
+| 접속 성공, 설정, 한쪽 준비만으로 시작 금지, 재대전 (N3-02, R3-21~25, R3-27) | [P2pLobbySocketTest](../src/test/java/team/tetris/network/P2pLobbySocketTest.java).`actualSocketConnectConfigureStartAndRematch`: localhost 세 모드, 두 번의 START, 준비 초기화. [P2pLobbyTest](../src/test/java/team/tetris/application/network/P2pLobbyTest.java).`configurationChangesClearBothReadyFlagsAndStaleReadyCannotStart`: 설정 변경과 준비 경합 |
+| 잘못된 IP와 접속 실패 (N3-02, R3-23, R3-31~32) | [P2pLobbyScreenTest](../src/test/java/team/tetris/ui/screen/P2pLobbyScreenTest.java).`clientInputValidationConnectionAndServerOnlyConfiguration`: 잘못된 IPv4 안내 후 수정·접속. [SocketMatchTransportTest](../src/test/java/team/tetris/network/SocketMatchTransportTest.java).`connectionFailuresAndInvalidLifecycleAreObservable`: localhost 연결 거부·포트 충돌. [P2pLobbyTest](../src/test/java/team/tetris/application/network/P2pLobbyTest.java).`failuresCancellationAndPeerLeaveCloseResources`: 실패 IP 미저장 |
+| 비호환 버전 (N3-02, H3-10) | [SocketMatchTransportTest](../src/test/java/team/tetris/network/SocketMatchTransportTest.java).`handshakeRejectsIncompatibleProtocolsOnBothEnds`: 양쪽 거부. [P2pLobbySocketTest](../src/test/java/team/tetris/network/P2pLobbySocketTest.java).`incompatiblePeerFailsWithoutSavingIp`: 로비 실패 안내·IP 미저장 |
+| 접속 중 끊김과 재접속 (N3-02~03, R3-29) | **신규** [P2pRecoverySocketTest](../src/test/java/team/tetris/network/P2pRecoverySocketTest.java).`peerDisconnectDuringHandshakeFailsWithoutSavingIpAndCanReconnect`: 서버/클라이언트 각각 HELLO 전 EOF, IP 미저장·작업 종료, 같은 포트 재접속 후 경기·결과 교환. CONNECTING/HANDSHAKING 화면의 실패·확인은 [P2pNetworkFailureScreenTest](../src/test/java/team/tetris/ui/screen/P2pNetworkFailureScreenTest.java).`connectionErrorsAlsoAutoReturnAndCanBeAcknowledgedEarly` |
+| 로비·경기 중 끊김과 재접속 (N3-02~03, R3-29) | **신규** [P2pRecoverySocketTest](../src/test/java/team/tetris/network/P2pRecoverySocketTest.java).`peerDisconnectInLobbyOrGameStopsSessionAndReconnectsOnSamePort`: 로비/경기 × 양쪽 역할 4개 사례. 실제 EOF → 실패 전달·작업/큐 정리 → 입력·시간·보드 정지, 통신 오류를 승패로 확정하지 않음 → 동일 포트에서 준비·점수·대기열·시간 초기화 후 새 경기, 점수 파일 미생성 |
+| 지연·회복·끊김의 경계 (N3-03, R3-28~30) | [PingTrackerTest](../src/test/java/team/tetris/network/PingTrackerTest.java): 가짜 단조 시계로 200ms/초과, 3초 직전/경계, 첫 pong 없음·잘못된 pong·중복·회복·재접속 초기화. [SocketMatchTransportTest](../src/test/java/team/tetris/network/SocketMatchTransportTest.java).`delayedPongShowsLagAndNextFastPongRecoversOnRealSocket`, `unresponsiveEstablishedPeerTimesOutCleansWorkersAndReconnectsOnSamePort`: 실제 소켓의 늦은 응답·부분 프레임 무응답과 자원 정리 |
+| 랙 표시·해제·오류 후 첫 화면 (N3-03, R3-28~29) | [P2pNetworkFailureScreenTest](../src/test/java/team/tetris/ui/screen/P2pNetworkFailureScreenTest.java).`lagRecoveryAndDisconnectReturnToChoiceInEveryConnectedPhase`: 가짜 통신으로 양쪽 역할 × 로비/경기/정지/결과 8개 사례. 랙 표시·회복·실패 사유·즉시 close·2초 경계 복귀·입력 차단 |
+| 세 모드 진행·연속 두 경기·양쪽 화면·미기록 (R3-04~05, R3-13, R3-26~27) | [P2pMatchSocketTest](../src/test/java/team/tetris/network/P2pMatchSocketTest.java).`realCompositionTwoGamesStatePauseResultAndNoScoreFile`: 실제 localhost와 AppComposition으로 세 모드 각각 두 경기, 상태·결과 일치·점수 파일 미생성. [P2pMatchTest](../src/test/java/team/tetris/application/network/P2pMatchTest.java).`bothScreensAttackTopOutAndSecondMatch`: 공격→대기→다음 블록 전 반영·재대전 초기화 |
+| 이전 경기·중복 메시지 차단 | [P2pMatchTest](../src/test/java/team/tetris/application/network/P2pMatchTest.java).`bothScreensAttackTopOutAndSecondMatch`, `duplicateAttackAndAttackInFlightDuringPause`; [MatchProtocolTest](../src/test/java/team/tetris/application/network/MatchProtocolTest.java).`rejectsWrongStateOldMatchAndDuplicateAttackEvenWithANewSequence`, `replayedEnvelopeCannotApplyTwiceAndRejectedMessagesDoNotPoisonSequence` |
+| 정지 동기화·서버 시간 (H3-05, H3-11) | [P2pMatchTest](../src/test/java/team/tetris/application/network/P2pMatchTest.java).`pauseOwnerAndServerClockAreAuthoritative`: 양쪽 보드·제한시간 정지, 요청자 재개 권한, 정지 중 기권. 실제 소켓의 왕복은 `P2pMatchSocketTest`에서 재사용 |
+| 종료 경합·지연된 결과 (H3-04, H3-11, R3-05, R3-27) | [P2pMatchTest](../src/test/java/team/tetris/application/network/P2pMatchTest.java).`simultaneousDefeatIsDrawAndTimedTieIsDraw`, `sameFrameDefeatBeatsTimeLimitAndNoAttackAfterResult`, `exactTimeoutUsesScoresAndFreezesFurtherInput`, `delayedResultRestoresBothViewsToServerDecisionSnapshot`, `resultLeavesNextLobbyMessageForLobbyAndConnectionFailureStopsPlay`: 동시 패배·시간 경계·패배 우선·확정 후 차단·지연 중 점수 복원·RESULT 뒤 LOBBY 보존 |
+
+### 재현 및 CI
+
+전체 검증과 70% 라인 커버리지 게이트:
+
+```sh
+./gradlew --offline --no-daemon clean build jacocoTestReport
+```
+
+네트워크 관련 테스트만 빠르게 재현할 때(전체 커버리지 게이트 증거로 사용하지 않음):
+
+```sh
+./gradlew --offline --no-daemon test --rerun-tasks \
+  --tests 'team.tetris.network.*' \
+  --tests 'team.tetris.application.network.*' \
+  --tests 'team.tetris.ui.screen.P2p*'
+```
+
+의존성이 없는 최초 실행에서는 `--offline`을 빼고 다운로드한다. Windows에서는 `gradlew.bat`를 사용한다. 실제 소켓은 `127.0.0.1`과 OS가 할당한 임시 포트를 쓰며 외부 서버·DNS·LAN 장비가 필요 없다. 소켓 연결과 작업 종료는 제한 시간 내 조건 대기로 확인한다. 가짜 통신은 메시지 보류/재전달·오류 상태로, 가짜 시계는 정확한 숫자 경계로 지연·끊김을 재현한다. 지연을 재현하려고 모든 테스트를 실제 3초씩 기다리게 하지 않는다.
+
+[Windows Java CI](../.github/workflows/ci.yml)는 Windows와 Java 21에서 전체 `clean build jacocoTestReport`를 실행한다. 테스트 클래스는 기존 `test` source set에 있어 별도 테스트 복사나 CI 전용 구현이 없다. 보고서는 성공·실패 모두 `test-and-coverage-reports` 아티팩트로 14일 보관한다.
+
+- JUnit XML: `build/test-results/test/`
+- 테스트 HTML: `build/reports/tests/test/index.html`
+- JaCoCo HTML/XML: `build/reports/jacoco/test/`
+
+### 검증 기록과 완료 조건
+
+2026-11-12 로컬 Linux/Java 21에서 `./gradlew --offline --no-daemon clean build jacocoTestReport` 성공. 전체 **799개 테스트**(신규 6개), 실패·오류·건너뜀 0개. 라인 커버리지 **95.89% (5,157 / 5,378)**, 70% 게이트 통과. 새 테스트 6개만 실행한 검증도 통과했다.
+
+변경은 테스트 추가·검증 문서의 두 로컬 커밋으로 나눠 관리한다. 사용자의 **푸시하지 않음** 지시에 따라 푸시·원격 CI는 실행하지 않았다. 원격 통과는 추후 **해당 변경 커밋의** Windows CI 작업 성공 및 테스트 보고서로 확인하며, 기존 main의 성공 결과로 대신하지 않는다. 카드 26은 원격 CI·상대방 GitHub Review·PR 머지 전까지 진행 중이다.
+
+이 자동화는 **실제 LAN 입력→화면 지연 200ms(N3-01)를 증명하지 않는다.** 카드 24의 실제 PC 두 대 측정과 카드 28의 배포 빌드·방화벽·저하 네트워크 리허설은 별도 완료 조건이다. N3-03의 자동화 준비만 여기서 검증하며 실제 환경 리허설까지 끝났다고 표시하지 않는다.

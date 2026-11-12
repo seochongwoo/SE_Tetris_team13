@@ -510,7 +510,7 @@ zip을 풀고 `SETetris\SETetris.exe`를 실행합니다. `runtime\`·`app\` 폴
 
 ### CI와 화면 검증
 
-[Windows Java CI](../.github/workflows/ci.yml)는 push·pull request·수동 실행 시 Windows와 Java 21에서 빌드·테스트·커버리지를 생성합니다. 생성된 보고서는 `test-and-coverage-reports` 아티팩트로 14일 보관합니다. 원격 성공 여부는 해당 커밋의 Actions 결과로 확인합니다.
+[Windows Java CI](../.github/workflows/ci.yml)는 push·pull request·수동 실행 시 Windows와 Java 21에서 빌드·테스트·커버리지를 생성합니다. 생성된 보고서는 `test-and-coverage-reports` 아티팩트로 14일 보관합니다. 원격 성공 여부는 해당 커밋의 Actions 결과로 확인합니다. 네트워크 자동화의 요구사항별 테스트 위치와 재현 명령은 [P2P 통신 계약 10장](network-protocol.md#10-네트워크-자동화-테스트-카드-26)에 있습니다.
 
 CI에는 화면을 여는 `run`이나 `packageZip` 실행이 포함되지 않습니다. 화면 로직 테스트가 통과해도 실제 Swing 화면·키 입력·Windows 실행파일 검증이 끝난 것은 아닙니다. `ResponsivenessTest`는 빠른 반복 입력, 키 누르기 유지, 업데이트와 문자 프레임 생성의 평균 4ms 미만을 검사하지만, 실제 Swing 그리기와 최소 사양 PC의 성능을 검증하지는 않습니다.
 
