@@ -94,7 +94,7 @@ Tile은 shape 문자열 다음 item 문자열이다. shape는 `EMPTY/I/O/T/S/Z/J
 
 PING을 실제 writer가 쓰기 직전에 로컬 `System.nanoTime()`을 저장하고 같은 id의 PONG 수신 때 차이를 잰다. 최대 네 개의 미응답 id만 보관하며, 모르는 id·만료 id·중복 PONG은 측정값을 바꾸지 않는다. 상대 시계는 사용하지 않는다. `roundTripNanos()`는 첫 응답 전 empty, 이후 최근 유효 RTT다.
 
-이 RTT는 **입력→상대 화면 표시 200ms(N3-01)의 증거가 아니다**. 렌더링 확인 응답과 실제 PC 두 대를 사용하는 [확정된 측정 절차](open-questions.md#n3-01-측정-절차-2026-11-07-확정)는 카드 24·28에서 수행한다. 200ms 초과 랙 표시/회복과 3초 무응답 종료는 카드 25 범위다.
+이 RTT는 **입력→상대 화면 표시 200ms(N3-01)의 증거가 아니다**. 렌더링 확인 응답과 실제 PC 두 대를 사용하는 [확정된 측정 절차](open-questions.md#n3-01-측정-절차-2026-11-07-확정)는 카드 24·28에서 수행한다. 200ms 초과 랙 표시/회복과 3초 무응답 종료는 카드 25에서 구현했으며 상세 기준은 9장에 기록한다.
 
 | 검증 대상 | 자동화 증거 |
 | --- | --- |
@@ -117,7 +117,7 @@ PING을 실제 writer가 쓰기 직전에 로컬 `System.nanoTime()`을 저장�
 - 시작 메뉴의 **P2P 대전** → ↑↓로 서버/클라이언트 선택 → Enter. 서버는 활성 인터페이스의 IPv4를 모두 표시한다. 가상·VPN 어댑터도 포함하며 주소가 5개를 넘으면 ↑↓로 페이지를 바꾼다. loopback은 LAN 목록과 구분해 `127.0.0.1` 테스트 안내로 표시한다. 조회 실패·LAN 주소 없음도 화면에 표시한다.
 - TCP 포트는 **21313** 하나다. 서버 화면에 나온 주소 중 상대 PC와 같은 LAN의 주소를 클라이언트에 입력한다. 주소는 IPv4 숫자와 점으로 입력하며 DNS 조회 없이 검증한다. 앞뒤 공백·각 octet의 선행 0은 정규화한다. 잘못된 형식, 0.x.x.x, multicast/예약 대역은 접속 전에 거부한다.
 - 클라이언트는 ↑↓로 최근 IP를 입력란에 불러와 편집하거나 Enter로 접속한다. Backspace는 한 글자, Delete는 전체를 지운다. 같은 PC에서 프로세스 두 개로 확인할 때는 `127.0.0.1`을 사용한다.
-- 대기 중 / 접속 중 / 연결 확인 중 / 연결됨 / 접속 실패와 사유를 표시한다. 실패 후 Enter 또는 Esc로 역할 선택으로 돌아간다. 대기·접속·로비에서 Esc는 연결을 닫고 역할 선택으로, 역할 선택에서 Esc는 시작 메뉴로 돌아간다. 창 종료·다른 화면으로 이동도 연결을 정리한다. 재접속은 새 transport를 만든다.
+- 대기 중 / 접속 중 / 연결 확인 중 / 연결됨 / 접속 실패와 사유를 표시한다. 실패 사유를 2초 표시한 뒤 역할 선택으로 자동 복귀하며, Enter 또는 Esc로 바로 돌아갈 수도 있다(카드 25). 대기·접속·로비에서 Esc는 연결을 닫고 역할 선택으로, 역할 선택에서 Esc는 시작 메뉴로 돌아간다. 창 종료·다른 화면으로 이동도 연결을 정리한다. 재접속은 새 transport를 만든다.
 - 소켓 연결과 송수신은 카드 22 작업 스레드가 수행한다. `ScreenRouter.update → P2pLobbyScreen.update → P2pLobby.update → MatchConnection.receive`만 실행 스레드에서 상태를 반영한다.
 
 ### 설정과 준비
@@ -165,7 +165,7 @@ PING을 실제 writer가 쓰기 직전에 로컬 `System.nanoTime()`을 저장�
 - 어느 쪽이든 정지 요청 가능. 서버가 정지를 확정하고 정지 요청자만 재개한다. 재개를 수신한 프레임은 이전 정지 중 경과 시간을 버린다. 정지 중 입력·중력·시간은 진행하지 않는다. 줄 삭제 연출 중 입력은 순서대로 보관하고 연출 후 적용하며 정지·기권·결과 때 비운다.
 - 기권은 `LEAVE`→서버 `RESULT` 교환을 마치며 소켓을 바로 닫지 않는다. 결과 확정 후 입력·점수·공격을 적용하지 않는다. `RESULT` 수신 즉시 메시지 소비를 멈춰 뒤따른 `LOBBY`를 경기 화면이 삼키지 않게 한다.
 - 결과를 **2초 표시**한 뒤 같은 `P2pLobby.returnAfterResult()`로 돌아간다. 서버가 새 revision을 보내고 양쪽 준비를 초기화한다. 다시 양쪽 Enter를 눌러야 새 matchId로 새 엔진·타이머·점수·대기열·아이템 효과를 생성한다. 연결과 송신 순번은 유지한다. 경기 화면은 `EndGameCoordinator`와 점수 저장소를 호출하지 않는다.
-- 연결 실패는 경기 진행을 멈추고 사유 및 Enter로 P2P 첫 화면 복귀를 안내한다. RTT 랙 배지·3초 무응답·자동 복귀 정책은 카드 25 범위다.
+- 연결 실패는 경기 진행을 멈추고 연결 자원을 정리한다. 사유를 2초 표시한 뒤 P2P 첫 화면으로 자동 복귀하며 Enter/Esc로 바로 복귀할 수도 있다. RTT 랙 표시·3초 무응답 정책은 카드 25에서 구현했다(9장).
 
 ### 화면과 조작
 
@@ -204,4 +204,48 @@ PING을 실제 writer가 쓰기 직전에 로컬 `System.nanoTime()`을 저장�
 
 로컬 Linux/Java 21: `./gradlew --offline --no-daemon build jacocoTestReport` 성공, **777개 테스트**, 실패·오류·건너뜀 0개. 라인 커버리지 **95.42% (5,083 / 5,327)**, 70% 게이트 통과. 보고서: `build/reports/tests/test/index.html`, `build/reports/jacoco/test/html/index.html`.
 
-카드 24는 진행 중이다. 실제 두 PC LAN 실측, 카드 20·21 후속 작업과 최종 통합, 원격 CI·GitHub 담당자/보드 갱신·상대방 리뷰·PR 머지는 실행하지 않았다. 카드 25의 랙/끊김 정책도 별도 작업이다.
+카드 24는 진행 중이다. 실제 두 PC LAN 실측, 카드 20·21 후속 작업과 최종 통합, 원격 CI·GitHub 담당자/보드 갱신·상대방 리뷰·PR 머지는 실행하지 않았다. 카드 25의 랙/끊김 구현과 검증은 9장에 기록한다.
+
+
+## 9. 네트워크 문제 처리 (카드 25)
+
+2026-11-12 로컬 구현, 이슈 #52. 안건 ㉑과 R3-28~30을 적용하며 메시지 형식과 프로토콜 v2는 유지한다.
+
+### 측정과 회복 기준
+
+| 항목 | 동작 |
+| --- | --- |
+| 측정 시계 | 로컬 단조 시계 `System.nanoTime()`. writer가 ping을 실제 쓰기 직전에 기록한 시각부터 동일 id의 pong 수신까지 RTT 측정 |
+| ping 주기 | 핸드셰이크 완료 직후 첫 ping, 이후 1초마다 전송. 로비·경기·일시정지·결과 연출 중 계속 실행 |
+| 감시 주기 | 별도 heartbeat 작업이 50ms마다 무응답 및 다음 ping 시점을 확인. 화면은 다음 UI update/render에 반영. 스케줄링 지연이 있으므로 3초는 판정 기준이며 정확한 실시간 실행 보장은 아님 |
+| 랙 표시 | 최근 유효 RTT가 **200ms 초과**이거나 아직 응답하지 않은 ping의 대기가 **200ms 초과**. 첫 pong을 못 받았어도 랙을 표시 |
+| 회복 | 새 유효 pong의 RTT가 **200ms 이하**이고 200ms 초과 대기 ping이 없으면 해제. 회복 응답보다 오래된 미응답 id는 폐기 |
+| 무응답 종료 | **3초 이상 유효 pong 없음**. 첫 pong 전에는 핸드셰이크 완료 시점, 이후에는 마지막 유효 pong 수신 시점이 기준. 다른 게임 메시지나 상대 ping만으로 양방향 응답 확인을 대체하지 않음 |
+| 잘못된 응답 | 모르는 id·중복·폐기된 pong은 RTT와 마지막 응답 시각을 갱신하지 않음 |
+| 명백한 연결 실패 | EOF, 읽기/쓰기 오류, 큐 초과, 핸드셰이크 실패는 3초를 기다리지 않고 즉시 실패. 접속/핸드셰이크 제한은 기존 3초, 서버의 접속 전 대기는 제한 없음 |
+
+상수는 application의 `NetworkPolicy`에서 관리한다. `PingTracker`는 유효 응답과 대기 ping을 추적하고, `SocketMatchTransport`는 무응답 시 `FAILED`와 한국어 사유를 게시한다. `MatchTransport.lagging()`으로 UI가 통신 구현에 의존하지 않고 상태를 읽는다. RTT 기준은 입력→화면 200ms(N3-01) 검증을 대신하지 않는다.
+
+### 화면과 자원 수명
+
+- 로비와 경기 화면 상단에 **네트워크 지연 (랙)**을 표시한다. 회복하면 해제하며 일시정지·승패 표시와 함께 볼 수 있다. 랙 표시만으로 게임을 자동 정지하거나 결과를 변경하지 않는다.
+- 실패 시 경기 입력·중력·제한시간 진행을 중단하고 보관한 입력을 비운다. 결과 표시 중에도 연결 상태를 확인하되 다음 경기의 LOBBY 메시지를 소비하지 않는다.
+- 소켓 어댑터는 socket/listener를 닫고 송수신 큐를 비우며 reader/writer/heartbeat 작업을 취소한다. 세션도 실패 시 연결을 닫으므로 수동 확인이나 오류 화면의 2초를 기다리지 않는다. UI 스레드는 작업 종료를 동기적으로 기다리지 않는다.
+- 오류를 처음 관찰한 update 이후 **2초** 표시한 뒤 P2P 역할 선택으로 자동 복귀한다. Enter/Esc로 즉시 복귀 가능. 오류 발견 프레임의 긴 경과 시간 때문에 메시지가 생략되지 않으며 화면 전환 때 누른 키/반복 입력을 정리한다.
+- 로비 실패는 로비를 초기화하고, 경기 실패는 새 로비를 만든다. 재접속은 새 transport를 사용하며 이전 소켓·프로토콜·준비 상태를 재사용하지 않는다. 네트워크 오류를 승리/패배나 스코어보드 기록으로 확정하지 않는다.
+
+### 검증 증거
+
+| 요구사항 / 경계 | 자동화 증거 |
+| --- | --- |
+| R3-28, R3-30: 정확히 200ms/초과, 첫 pong 전 랙, 늦은 pong 뒤 빠른 pong 회복, 오래된 대기 제거 | `PingTrackerTest.lagBoundaryIncludesUnansweredPingAndFastResponseRecovers`, `newPongRetiresOlderPendingRequestsAndReconnectClearsMeasurements` |
+| R3-29~30: 첫 응답 전/최근 응답 후 정확히 3초, 잘못된/중복 pong으로 연장 불가 | `PingTrackerTest.noFirstPongTimesOutAtThreeSecondsAndUnsolicitedOrDuplicatePongCannotKeepAlive`, `lagBoundaryIncludesUnansweredPingAndFastResponseRecovers` |
+| 가짜 통신: 양쪽 역할 × 로비/경기/일시정지/결과 화면에서 랙 표시·해제, 오류 사유·연결 정리·정확한 2초 자동 복귀, 실패 후 입력·보드·시간 고정 | `P2pNetworkFailureScreenTest.lagRecoveryAndDisconnectReturnToChoiceInEveryConnectedPhase` |
+| 접속/핸드셰이크 오류와 수동 확인, 기존 메뉴 동작 | `P2pNetworkFailureScreenTest.connectionErrorsAlsoAutoReturnAndCanBeAcknowledgedEarly`, `P2pLobbyScreenTest` |
+| localhost: 응답 없음·부분 프레임에서 3초 종료, EOF·모든 작업 종료·큐 정리, 같은 포트 재접속·송수신·ping | `SocketMatchTransportTest.unresponsiveEstablishedPeerTimesOutCleansWorkersAndReconnectsOnSamePort` |
+| localhost: 응답 전 랙 → 느린 RTT → 다음 빠른 응답으로 회복 | `SocketMatchTransportTest.delayedPongShowsLagAndNextFastPongRecoversOnRealSocket` |
+| 접속 대기/핸드셰이크 취소 시 reader 종료와 포트 재사용, peer 종료 감지 | `SocketMatchTransportTest.closeDuringHandshakeReleasesReaderAndAllowsRebinding`, `closeCancelsAcceptAndAllowsRebindingAndDisconnectedPeerFails` |
+
+로컬 Linux/Java 21: `./gradlew --offline --no-daemon build jacocoTestReport` 성공. 전체 **793개 테스트**(카드 25 신규 16개), 실패·오류·건너뜀 0개. 라인 커버리지 **95.72% (5,148 / 5,378)**, 70% 게이트 통과. 보고서: `build/reports/tests/test/index.html`, `build/reports/jacoco/test/html/index.html`.
+
+기존 CI의 `build jacocoTestReport` 실행 대상에 포함된다. 원격 CI·실제 Windows/LAN 리허설, GitHub 보드 갱신·상대방 리뷰·PR 머지는 이 로컬 작업에서 실행하지 않았다. 백로그의 공통 완료 규칙에 따라 카드 25는 진행 중으로 유지한다.
