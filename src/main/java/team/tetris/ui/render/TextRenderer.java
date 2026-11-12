@@ -1,35 +1,18 @@
 package team.tetris.ui.render;
 
 import java.util.List;
-import java.util.BitSet;
-import java.util.Map;
-import java.util.TreeMap;
 import team.tetris.application.GameCommand;
 import team.tetris.application.GameSnapshot;
-import team.tetris.application.LineClearAnimation;
 import team.tetris.application.model.GameMode;
-import team.tetris.core.ActivePiece;
-import team.tetris.core.Cell;
-import team.tetris.core.EngineSnapshot;
-import team.tetris.core.EnginePhase;
-import team.tetris.core.Piece;
-import team.tetris.core.Position;
-import team.tetris.core.Shape;
-import team.tetris.core.item.Item;
-import team.tetris.core.item.WeightBlock;
-import team.tetris.core.rule.HardDropPreview;
 import team.tetris.ui.DisplayNames;
 import team.tetris.ui.input.InputMapper;
 import team.tetris.ui.input.KeyNames;
-import team.tetris.ui.render.palette.BlockGlyphs;
 import team.tetris.ui.render.palette.ColorPalette;
 
 /**
- * 게임 화면을 텍스트 격자로 그린다. 왼쪽에 테두리를 두른 보드(블록 한 칸 = 두 글자),
- * 오른쪽에 모드·난이도, 다음 블록, 점수·레벨·지운 줄 수, 조작 키 안내를 둔다.
- *
- * <p>보드에는 고정된 칸만 들어 있으므로, 낙하 중인 블록은 각 칸의 보드 좌표를 구해 따로 겹쳐
- * 그린다. 아이템이 실린 칸은 아이템 문자를 반전 색으로 그려 일반 무늬와 구분한다.
+ * 1인 게임 화면을 텍스트 격자로 그린다. 왼쪽에 테두리를 두른 보드(블록 한 칸 = 두 글자),
+ * 오른쪽에 모드·난이도, 다음 블록, 점수·레벨·지운 줄 수, 조작 키 안내를 둔다. 보드와 다음 블록 상자는
+ * {@link BoardPainter}가 그린다.
  */
 public final class TextRenderer implements Renderer {
 
@@ -37,15 +20,13 @@ public final class TextRenderer implements Renderer {
     public static final int BOARD_LEFT = 1;
     public static final int BOARD_TOP = 1;
     /** 블록 한 칸이 차지하는 글자 수. */
-    public static final int CELL_WIDTH = 2;
+    public static final int CELL_WIDTH = BoardPainter.CELL_WIDTH;
     /** 오른쪽 정보 영역이 시작하는 열. */
     public static final int PANEL_LEFT = 25;
     private static final int MODE_ROW = BOARD_TOP;
     static final int NEXT_TITLE_ROW = MODE_ROW + 2;
 
-    private static final int NEXT_BOX_WIDTH = 10;
-    private static final int NEXT_BOX_HEIGHT = 6;
-    private static final int STATS_TOP = NEXT_TITLE_ROW + NEXT_BOX_HEIGHT + 2;
+    private static final int STATS_TOP = NEXT_TITLE_ROW + BoardPainter.NEXT_BOX_HEIGHT + 2;
     private static final int HELP_TOP = STATS_TOP + 6;
 
     private record Help(String label, List<GameCommand> commands) {
@@ -62,6 +43,7 @@ public final class TextRenderer implements Renderer {
     private final ColorPalette palette;
     private final InputMapper keys;
     private final boolean showLanding;
+    private final BoardPainter board;
 
     public TextRenderer(ColorPalette palette, InputMapper keys) {
         this(palette, keys, false);
@@ -72,6 +54,7 @@ public final class TextRenderer implements Renderer {
         this.palette = palette;
         this.keys = keys;
         this.showLanding = showLanding;
+        this.board = new BoardPainter(palette, BOARD_LEFT, BOARD_TOP);
     }
 
     /** 보드 칸 x가 화면에서 시작하는 열. */
@@ -87,134 +70,11 @@ public final class TextRenderer implements Renderer {
     @Override
     public TextFrame render(GameSnapshot snapshot) {
         TextFrame frame = TextFrame.blank(palette.base());
-        EngineSnapshot engine = snapshot.engine();
-        Cell[][] board = engine.board();
-        var animation = snapshot.lineClearAnimation();
-        if (animation != null) board = animation.boardBeforeClear(board);
-        drawBoard(frame, board);
-        if (animation != null) {
-            drawActivePiece(frame, animation.activePiece(), board[0].length, board.length);
-            drawClearingRows(frame, animation, board[0].length);
-        } else {
-            if (showLanding && (engine.phase() == EnginePhase.RUNNING || engine.phase() == EnginePhase.PAUSED)) {
-                var preview = HardDropPreview.project(board, engine.activePiece());
-                drawRemovalPreview(frame, board, preview);
-                drawLanding(frame, board, engine.activePiece(), preview);
-            }
-            drawActivePiece(frame, engine.activePiece(), board[0].length, board.length);
-        }
-        drawNext(frame, engine.nextPiece());
+        board.drawPlayfield(frame, snapshot, showLanding);
+        board.drawNext(frame, snapshot.engine().nextPiece(), PANEL_LEFT, NEXT_TITLE_ROW);
         drawStats(frame, snapshot);
         drawHelp(frame);
         return frame;
-    }
-
-    /** 삭제 대상만 점멸하고, 각 행의 삭제 범위 중앙부터 지운다. 대상 밖 칸은 그대로 둔다. */
-    private void drawClearingRows(TextFrame frame, LineClearAnimation animation, int width) {
-        Map<Integer, BitSet> targets = new TreeMap<>();
-        for (var row : animation.rows()) {
-            targets.computeIfAbsent(row.rowIndex(), ignored -> new BitSet(width)).set(0, width);
-        }
-        for (var removed : animation.removedCells()) {
-            targets.computeIfAbsent(removed.position().y(), ignored -> new BitSet(width)).set(removed.position().x());
-        }
-        for (var target : targets.entrySet()) {
-            int y = target.getKey();
-            BitSet columns = target.getValue();
-            int left = columns.nextSetBit(0);
-            int right = columns.length() - 1;
-            int rings = (right - left + 2) / 2;
-            long wipeNanos = animation.elapsedNanos() - LineClearAnimation.FLASH_NANOS;
-            int removedRings = 1 + (int) (wipeNanos * rings
-                    / (LineClearAnimation.DURATION_NANOS - LineClearAnimation.FLASH_NANOS));
-            for (int x = left; x >= 0; x = columns.nextSetBit(x + 1)) {
-                if (animation.flashing()) {
-                    frame.put(columnOf(x), rowOf(y), "  ", palette.lineClearStyle());
-                } else if (Math.abs(2 * x - left - right) / 2 < removedRings) {
-                    frame.putTile(columnOf(x), rowOf(y), BlockGlyphs.EMPTY, palette.dimStyle(), palette.emptyTile());
-                }
-            }
-        }
-    }
-
-    private void drawBoard(TextFrame frame, Cell[][] board) {
-        int height = board.length;
-        int width = board[0].length;
-        frame.box(BOARD_LEFT, BOARD_TOP, width * CELL_WIDTH + 2, height + 2, palette.borderStyle(), palette.base());
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                Cell cell = board[y][x];
-                if (cell.isEmpty()) {
-                    frame.putTile(columnOf(x), rowOf(y), BlockGlyphs.EMPTY, palette.dimStyle(), palette.emptyTile());
-                } else {
-                    drawCell(frame, columnOf(x), rowOf(y), cell.occupiedBy(), cell.item());
-                }
-            }
-        }
-    }
-
-    private void drawActivePiece(TextFrame frame, ActivePiece piece, int width, int height) {
-        if (piece == null) {
-            return;
-        }
-        Position[] cells = piece.cells();
-        for (int i = 0; i < cells.length; i++) {
-            int x = cells[i].x();
-            int y = cells[i].y();
-            if (x >= 0 && x < width && y >= 0 && y < height) {
-                drawCell(frame, columnOf(x), rowOf(y), piece.shape(), piece.itemAt(i));
-            }
-        }
-    }
-
-    private void drawRemovalPreview(TextFrame frame, Cell[][] board, HardDropPreview preview) {
-        for (Position position : preview.removedCells()) {
-            Cell cell = board[position.y()][position.x()];
-            String glyph = cell.item() == null ? BlockGlyphs.of(cell.occupiedBy()) : BlockGlyphs.of(cell.item());
-            frame.putTile(columnOf(position.x()), rowOf(position.y()), glyph,
-                    palette.removalPreviewStyle(cell.occupiedBy()), palette.previewTile(cell.occupiedBy(), cell.item()));
-        }
-    }
-
-    private void drawLanding(TextFrame frame, Cell[][] board, ActivePiece piece, HardDropPreview preview) {
-        ActivePiece landing = preview.landing();
-        if (landing == null || landing.origin().equals(piece.origin())) return;
-        for (Position cell : landing.cells()) {
-            if (cell.x() >= 0 && cell.x() < board[0].length && cell.y() >= 0 && cell.y() < board.length) {
-                // 무게추 착지 위치에 있는 기존 블록의 삭제 강조를 그림자로 덮지 않는다.
-                if (preview.removedCells().contains(cell)) continue;
-                frame.putTile(columnOf(cell.x()), rowOf(cell.y()), BlockGlyphs.GHOST, palette.blockStyle(piece.shape()),
-                        palette.ghostTile(piece.shape()));
-            }
-        }
-    }
-
-    private void drawNext(TextFrame frame, Piece next) {
-        frame.put(PANEL_LEFT, NEXT_TITLE_ROW, "NEXT", palette.accentStyle());
-        int boxTop = NEXT_TITLE_ROW + 1;
-        frame.box(PANEL_LEFT, boxTop, NEXT_BOX_WIDTH, NEXT_BOX_HEIGHT, palette.borderStyle(), palette.base());
-        if (next == null) {
-            return;
-        }
-        Position[] cells = next.shape().cellsAt(0);
-        int minX = Integer.MAX_VALUE;
-        int maxX = Integer.MIN_VALUE;
-        int minY = Integer.MAX_VALUE;
-        int maxY = Integer.MIN_VALUE;
-        for (Position cell : cells) {
-            minX = Math.min(minX, cell.x());
-            maxX = Math.max(maxX, cell.x());
-            minY = Math.min(minY, cell.y());
-            maxY = Math.max(maxY, cell.y());
-        }
-        int innerWidth = NEXT_BOX_WIDTH - 2;
-        int innerHeight = NEXT_BOX_HEIGHT - 2;
-        int startCol = PANEL_LEFT + 1 + (innerWidth - (maxX - minX + 1) * CELL_WIDTH) / 2;
-        int startRow = boxTop + 1 + (innerHeight - (maxY - minY + 1)) / 2;
-        for (int i = 0; i < cells.length; i++) {
-            drawCell(frame, startCol + (cells[i].x() - minX) * CELL_WIDTH, startRow + (cells[i].y() - minY),
-                    next.shape(), next.itemAt(i));
-        }
     }
 
     private void drawStats(TextFrame frame, GameSnapshot snapshot) {
@@ -248,14 +108,6 @@ public final class TextRenderer implements Renderer {
             int col = frame.put(PANEL_LEFT, row, keyText.toString(), palette.accentStyle());
             frame.put(col + 1, row, help.label(), palette.dimStyle());
             row++;
-        }
-    }
-
-    private void drawCell(TextFrame frame, int col, int row, Shape shape, Item item) {
-        if (item != null && !(item instanceof WeightBlock)) {
-            frame.putTile(col, row, BlockGlyphs.of(item), palette.itemStyle(shape), palette.itemTile(shape, item));
-        } else {
-            frame.putTile(col, row, BlockGlyphs.of(shape), palette.blockStyle(shape), palette.blockTile(shape));
         }
     }
 }

@@ -22,6 +22,7 @@ import team.tetris.application.port.StorageException;
 import team.tetris.ui.render.TextFrame;
 import team.tetris.ui.render.palette.ColorPalette;
 import team.tetris.ui.screen.GameScreen;
+import team.tetris.ui.screen.BattleScreen;
 import team.tetris.ui.screen.MenuScreen;
 import team.tetris.ui.screen.MenuScreen.MenuItem;
 import team.tetris.ui.screen.NameEntryScreen;
@@ -107,6 +108,7 @@ public final class ScreenRouter {
                 new MenuItem("게임 시작", this::startGame),
                 new MenuItem("아이템 모드", this::startItemGame),
                 new MenuItem("P2P 대전", this::showP2pLobby),
+                new MenuItem("대전 모드", this::showBattleModes),
                 new MenuItem("설정", this::showSettings),
                 new MenuItem("스코어보드", this::showScoreboard),
                 new MenuItem("종료", this::exit));
@@ -114,6 +116,26 @@ public final class ScreenRouter {
 
     public void showP2pLobby() {
         show(new P2pLobbyScreen(this, application.newP2pLobby()));
+    }
+
+    /** 카드 19의 로컬 대전 선택. 시간제한 항목은 카드 20에서 연결한다. */
+    public List<MenuItem> battleModeItems() {
+        return List.of(
+                new MenuItem("일반 대전", () -> startBattle(GameMode.NORMAL)),
+                new MenuItem("아이템 대전", () -> startBattle(GameMode.ITEM)),
+                new MenuItem(TIME_LIMIT_SOON, () -> { }),
+                new MenuItem("뒤로", this::showMenu));
+    }
+
+    static final String TIME_LIMIT_SOON = "시간제한 (예정)";
+
+    public void showBattleModes() {
+        show(new MenuScreen(this, battleModeItems(), this::showMenu));
+    }
+
+    public void startBattle(GameMode mode) {
+        show(new BattleScreen(this, application.newLocalBattle(mode)));
+        debugSetupHistory.clear();
     }
 
     /** 일반 모드 시작. */

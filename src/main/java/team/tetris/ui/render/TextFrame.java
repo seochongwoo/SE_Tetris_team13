@@ -28,6 +28,11 @@ public final class TextFrame {
     private final BlockTile[][] tiles;
     private final boolean[][] shaded;
     private Backdrop backdrop;
+    private Runnable afterPaint = () -> {};
+
+    /** 이 프레임을 실제 paint한 뒤 실행. 프레임 생성/소켓 수신은 표시 완료가 아니다. */
+    public void afterPaint(Runnable action) { afterPaint = Objects.requireNonNull(action); }
+    public void painted() { afterPaint.run(); }
     private final List<Rectangle> plates = new ArrayList<>();
 
     public TextFrame(int columns, int rows, TextStyle base) {
