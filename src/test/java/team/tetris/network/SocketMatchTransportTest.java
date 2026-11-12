@@ -19,6 +19,88 @@ import team.tetris.application.port.MatchTransport;
 
 @Timeout(10)
 class SocketMatchTransportTest {
+    @Test
+    void unresponsiveEstablishedPeerTimesOutCleansWorkersAndReconnectsOnSamePort() throws Exception {
+        int port;
+        try (var server = new SocketMatchTransport()) {
+            port = listen(server);
+            try (var peer = new Socket("127.0.0.1", port)) {
+                peer.setSoTimeout(5_000);
+                var codec = new MessageCodec();
+                var in = new DataInputStream(peer.getInputStream());
+                var out = new DataOutputStream(peer.getOutputStream());
+                codec.write(out, new MatchEnvelope(0, 1, new Hello(PROTOCOL_VERSION, Role.CLIENT)));
+                codec.read(in);
+                await(() -> server.status().state() == MatchTransport.State.CONNECTED);
+                assertInstanceOf(Ping.class, codec.read(in).message());
+                // TCP는 열려 있지만 ping에 답하지 않는 peer. 임의 pong은 연결을 연장하지 않는다.
+                codec.write(out, new MatchEnvelope(0, 999, new Pong(999)));
+                out.writeInt(100); out.writeByte(1); out.flush(); // 프레임 중간에서 멈춰도 감시 작업은 살아 있다.
+                await(server::lagging);
+                assertTrue(server.roundTripNanos().isEmpty());
+                await(() -> server.status().state() == MatchTransport.State.FAILED);
+                assertEquals(NetworkPolicy.NO_RESPONSE, server.status().detail());
+                await(server::workersTerminated);
+                assertTrue(server.poll().isEmpty());
+                assertFalse(server.lagging());
+                // 남은 ping을 소비한 뒤 EOF: 실제 소켓도 닫혔다.
+                while (in.read() != -1) { }
+            }
+        }
+        try (var server = new SocketMatchTransport(); var client = new SocketMatchTransport()) {
+            server.listen(port);
+            await(() -> server.status().localPort() == port);
+            client.connect("127.0.0.1", port);
+            await(() -> server.status().state() == MatchTransport.State.CONNECTED
+                    && client.status().state() == MatchTransport.State.CONNECTED);
+            var message = new MatchEnvelope(0, 1, new Ready(1, true));
+            client.send(message);
+            assertEquals(message, receive(server));
+            await(() -> server.roundTripNanos().isPresent());
+            client.close(); server.close();
+            await(() -> server.workersTerminated() && client.workersTerminated());
+        }
+    }
+
+    @Test
+    void delayedPongShowsLagAndNextFastPongRecoversOnRealSocket() throws Exception {
+        try (var server = new SocketMatchTransport(); var peer = new Socket("127.0.0.1", listen(server))) {
+            peer.setSoTimeout(5_000);
+            var codec = new MessageCodec();
+            var in = new DataInputStream(peer.getInputStream());
+            var out = new DataOutputStream(peer.getOutputStream());
+            codec.write(out, new MatchEnvelope(0, 1, new Hello(PROTOCOL_VERSION, Role.CLIENT)));
+            codec.read(in);
+            var first = assertInstanceOf(Ping.class, codec.read(in).message());
+            await(server::lagging); // PONG이 오기 전에도 200ms 초과를 표시한다.
+            codec.write(out, new MatchEnvelope(0, first.id(), new Pong(first.id())));
+            await(() -> server.roundTripNanos().isPresent());
+            assertTrue(server.roundTripNanos().orElseThrow() > NetworkPolicy.LAG_NANOS);
+            assertTrue(server.lagging());
+            var next = assertInstanceOf(Ping.class, codec.read(in).message());
+            codec.write(out, new MatchEnvelope(0, next.id(), new Pong(next.id())));
+            await(() -> !server.lagging());
+            assertTrue(server.roundTripNanos().orElseThrow() <= NetworkPolicy.LAG_NANOS);
+            assertEquals(MatchTransport.State.CONNECTED, server.status().state());
+        }
+    }
+
+    @Test
+    void closeDuringHandshakeReleasesReaderAndAllowsRebinding() throws Exception {
+        try (var server = new SocketMatchTransport(); var peer = new Socket("127.0.0.1", listen(server))) {
+            await(() -> server.status().state() == MatchTransport.State.HANDSHAKING);
+            int port = server.status().localPort();
+            server.close();
+            await(server::workersTerminated);
+            try (var rebound = new SocketMatchTransport()) {
+                rebound.listen(port);
+                await(() -> rebound.status().localPort() == port);
+                rebound.close();
+                await(rebound::workersTerminated);
+            }
+        }
+    }
+
     private static void await(BooleanSupplier condition) throws InterruptedException {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
         while (!condition.getAsBoolean()) {
@@ -128,6 +210,7 @@ class SocketMatchTransportTest {
         int port;
         try (var server = new SocketMatchTransport()) {
             port = listen(server); server.close(); server.close();
+            await(server::workersTerminated);
             assertEquals(MatchTransport.State.CLOSED, server.status().state());
             assertThrows(IllegalStateException.class, () -> server.listen(0));
         }
