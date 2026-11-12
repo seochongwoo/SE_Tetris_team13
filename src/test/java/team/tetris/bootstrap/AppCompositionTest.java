@@ -325,5 +325,9 @@ class AppCompositionTest {
         assertTrue(battle.result().isPresent());
         assertTrue(app.scores().list().isEmpty());
         assertNotNull(app.newLocalBattle(GameMode.ITEM).session().snapshot());
+        // 시간제한 대전: 정한 시간이 세션까지 전달되고, 시간제한이 없으면 시계도 없다.
+        var timed = app.newLocalBattle(GameMode.NORMAL, java.time.Duration.ofMinutes(3)).session().snapshot();
+        assertEquals(java.time.Duration.ofMinutes(3).toNanos(), timed.timer().limitNanos());
+        assertNull(app.newLocalBattle(GameMode.NORMAL).session().snapshot().timer());
     }
 }
