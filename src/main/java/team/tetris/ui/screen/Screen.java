@@ -12,6 +12,9 @@ public interface Screen {
     default void onEnter() {
     }
 
+    /** 화면 전환 또는 앱 종료 시 자원을 정리한다. */
+    default void onLeave() {}
+
     /** 키가 눌렸다. key는 {@code KeyNames}의 식별자 (예: LEFT, ENTER, P). */
     void onKeyPressed(String key);
 

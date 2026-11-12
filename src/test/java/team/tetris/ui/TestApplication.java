@@ -42,6 +42,7 @@ public final class TestApplication implements ApplicationContext {
     private final EndGameCoordinator endings;
     private Supplier<PieceGenerator> generators = () -> new SevenBagGenerator(42L);
     private List<ItemKind> itemKinds = List.of();
+    private Supplier<team.tetris.application.network.P2pLobby> lobbies;
     private int exits;
     private Settings applied;
 
@@ -96,6 +97,15 @@ public final class TestApplication implements ApplicationContext {
 
     public ScreenRouter router() {
         return new ScreenRouter(this, settings.loadOrDefault(), () -> exits++, next -> applied = next);
+    }
+
+    public TestApplication withP2pLobbies(Supplier<team.tetris.application.network.P2pLobby> lobbies) {
+        this.lobbies = lobbies;
+        return this;
+    }
+
+    @Override public team.tetris.application.network.P2pLobby newP2pLobby() {
+        return lobbies.get();
     }
 
     public int exits() {
