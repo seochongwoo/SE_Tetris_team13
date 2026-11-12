@@ -165,7 +165,8 @@ public final class BattleScreen implements Screen {
     }
 
     private void pressInResult(String key) {
-        if (resultNanos < RESULT_INPUT_DELAY_NANOS || !repeats.press(key, clockNanos, false)) {
+        // 대기 중에도 누른 키를 기록해, 대기가 끝난 뒤 OS 자동 반복을 새 입력으로 받지 않는다.
+        if (!repeats.press(key, clockNanos, false) || resultNanos < RESULT_INPUT_DELAY_NANOS) {
             return;
         }
         if (isSelectKey(key)) {

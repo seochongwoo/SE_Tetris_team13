@@ -10,6 +10,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import team.tetris.application.battle.BattleEnd;
 import team.tetris.application.battle.BattlePlayer;
 import team.tetris.application.battle.BattleSnapshot;
@@ -248,6 +250,29 @@ class BattleScreenTest {
         assertNotSame(first, battle().session());
         assertTrue(battle().session().result().isEmpty());
         assertEquals(GameMode.NORMAL, snapshot().mode());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"ENTER", "SPACE"})
+    void holdingSelectDuringResultDelayRequiresReleaseBeforeRematch(String key) {
+        // 리뷰 지적: 대기 중에 누른 키가 기록되지 않아, 대기 뒤 OS 자동 반복이 바로 재경기를 시작했다.
+        router.startBattle(GameMode.NORMAL);
+        tap("P");
+        tap(KeyNames.DOWN);
+        tap(KeyNames.ENTER); // 1P 기권
+        BattleScreen resultScreen = battle();
+        assertTrue(resultScreen.session().result().isPresent());
+
+        router.keyPressed(key);
+        router.update(BattleScreen.RESULT_INPUT_DELAY_NANOS);
+        router.keyPressed(key); // OS 자동 반복
+        router.update(FRAME);
+        assertSame(resultScreen, router.current());
+
+        router.keyReleased(key);
+        tap(key);
+        assertNotSame(resultScreen, router.current());
+        assertTrue(battle().session().result().isEmpty());
     }
 
     @Test
