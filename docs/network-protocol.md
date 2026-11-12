@@ -14,7 +14,7 @@
 
 ## 2. 호환성과 프레임 형식
 
-카드 22의 호환성 정책은 **동일한 프로토콜 버전 허용**이다. 앱 빌드 문자열은 비교하지 않는다. 현재 `MatchMessage.PROTOCOL_VERSION = 1`이며 메시지 필드·의미·상태 계약을 비호환으로 바꾸면 이 번호를 올린다. 양쪽은 접속 직후 `HELLO(version, role)`를 전송한다. 상대가 반대 역할이며 버전이 같아야 `CONNECTED`가 된다. HELLO 이전의 게임 메시지, 재차 HELLO, 버전/역할 불일치는 연결 실패다.
+카드 22의 호환성 정책은 **동일한 프로토콜 버전 허용**이다. 앱 빌드 문자열은 비교하지 않는다. 현재 `MatchMessage.PROTOCOL_VERSION = 2` (카드 24에서 화면 표시 확인 계측과 최종 화면 동기화 추가)이며 메시지 필드·의미·상태 계약을 비호환으로 바꾸면 이 번호를 올린다. 양쪽은 접속 직후 `HELLO(version, role)`를 전송한다. 상대가 반대 역할이며 버전이 같아야 `CONNECTED`가 된다. HELLO 이전의 게임 메시지, 재차 HELLO, 버전/역할 불일치는 연결 실패다.
 
 Java 객체 직렬화 대신 다음 순서의 binary frame을 사용한다. 구현은 `MessageCodec`이다.
 
@@ -35,11 +35,12 @@ Java 객체 직렬화 대신 다음 순서의 binary frame을 사용한다. 구�
 | LOBBY | revision int64, mode 문자열, difficulty 문자열, timeLimitSeconds int32 | 서버 / LOBBY·RESULT. 새 revision은 이전보다 커야 하며 양쪽 준비를 해제. RESULT에서는 로비로 복귀 |
 | READY | revision int64, ready boolean | 양쪽 / LOBBY. 현재 설정 revision에 대한 준비 또는 해제 |
 | START | revision int64, pieceSeed int64 | 서버 / LOBBY. 현재 설정에 양쪽 준비 완료, 이전보다 큰 matchId 필요. PLAYING으로 전환 |
-| STATE | player (아래 형식), remainingNanos int64 | 양쪽 / PLAYING·PAUSED. 송신자 자신의 화면·논리적 패배. 서버는 남은 시간 0 이상(시간제한 외 모드는 0), 클라이언트는 -1 |
+| STATE | player (아래 형식), remainingNanos int64, inputId int64 | 양쪽 / PLAYING·PAUSED. 송신자 자신의 화면·논리적 패배. 서버는 남은 시간 0 이상(시간제한 외 모드는 0), 클라이언트는 -1 |
+| PAINTED | inputId int64 | 양쪽 / PLAYING·PAUSED. 해당 입력을 포함한 프레임의 실제 paint 완료 후 확인. 디버그 표본만 양수 ID 사용 |
 | ATTACK | eventId int64, rows (int32 배열) | 양쪽 / PLAYING·PAUSED. eventId는 경기·송신자별 증가. 줄 모양만 전송 |
 | PAUSE | owner 문자열, request boolean | request=true: 양쪽 중 본인이 owner인 정지 요청 / PLAYING. false: 서버 확정, PAUSED로 전환하고 재개 권한자를 기록 |
 | RESUME | request boolean | request=true: PAUSED에서 정지 owner만 요청. false: 서버 확정, PLAYING으로 전환 |
-| RESULT | outcome 문자열, reason 문자열 | 서버 / PLAYING·PAUSED. RESULT로 전환. 이후 상태·공격·정지·재개 메시지 적용 금지 |
+| RESULT | outcome 문자열, reason 문자열, hasFinalViews boolean, true이면 server player와 client player | 서버 / PLAYING·PAUSED. RESULT로 전환. 이후 상태·공격·정지·재개 메시지 적용 금지 |
 | LEAVE | 없음 | 양쪽 / 로비 및 경기·결과. 송신자가 나감을 통지하고 해당 준비를 해제. 경기 중/정지 중 상대 승리 확정은 카드 24의 서버가 RESULT로 보냄 |
 | PING | id int64 | 양쪽 / CONNECTED 수명 전체, matchId=0. 어댑터가 1초마다 전송 |
 | PONG | id int64 | 상대 PING의 id를 그대로 응답, matchId=0. 어댑터에서 소비 |
@@ -70,7 +71,7 @@ Tile은 shape 문자열 다음 item 문자열이다. shape는 `EMPTY/I/O/T/S/Z/J
 
 ## 4. 경기 번호·순서·중복
 
-- LOBBY/READY 및 transport 제어 메시지는 matchId=0. START는 이전 경기보다 큰 양수. STATE/ATTACK/PAUSE/RESUME/RESULT는 현재 경기 번호. LEAVE는 로비에서 0, 그 밖에는 현재 경기 번호다.
+- LOBBY/READY 및 transport 제어 메시지는 matchId=0. START는 이전 경기보다 큰 양수. STATE/ATTACK/PAUSE/RESUME/RESULT/PAINTED는 현재 경기 번호. LEAVE는 로비에서 0, 그 밖에는 현재 경기 번호다.
 - sequence는 **application 메시지의 송신자별 연결 전체 순번**이다. 1에서 시작하고 재대전에도 리셋하지 않는다. 로컬 발신 전과 원격 수신 후 동일한 `MatchProtocol.accept(sender, envelope)`를 호출한다. sender는 연결 역할에서 결정하며 payload로 임의 지정하지 않는다.
 - HELLO/PING/PONG은 어댑터 전용이다. HELLO의 sequence는 1, heartbeat는 id를 sequence에도 사용한다. application의 순번 검사와 별개이며 `poll()`로 나오지 않는다.
 - 이미 승인한 sequence 이하의 메시지 및 현재 경기에서 이미 승인한 eventId 이하의 ATTACK은 `DUPLICATE`. 다른 경기 메시지는 `STALE_MATCH`. 틀린 상태/권한/설정은 각각 `WRONG_STATE` / `WRONG_SENDER` / `STALE_CONFIGURATION`이다. 거부 시 게임과 검사기 상태는 바뀌지 않는다.
@@ -138,7 +139,7 @@ PING을 실제 writer가 쓰기 직전에 로컬 `System.nanoTime()`을 저장�
 - UI를 경기 화면으로 교체할 때는 `P2pLobbyScreen.handoffStartedMatch()`로 인출한다. 이 호출 후 기존 화면의 `onLeave`는 연결을 닫지 않으며 경기 화면이 종료·실패 시 정리할 책임을 이어받는다. 인출하지 않고 나가면 로비가 연결을 닫는다.
 - START 뒤에 도착한 경기 메시지를 로비가 미리 소비하지 않는다. 카드 24의 경기 세션이 같은 연결에서 이어 읽는다.
 - 결과를 확정·표시한 뒤 양쪽에서 `returnAfterResult()`를 호출한다. 프로토콜 RESULT 상태에서만 허용한다. 서버는 revision을 올려 같은 설정을 다시 보내고 양쪽 준비를 초기화한다. 클라이언트는 그 LOBBY를 받을 때까지 준비할 수 없다. matchId와 송신 순번은 초기화하지 않는다.
-- **현재 UI는 양쪽 준비 완료 표시까지 구현됐다.** 실제 두 보드의 게임 진행·결과 화면·자동 로비 복귀 연결은 카드 24에서 구현한다. 이 카드의 재대전 테스트는 결과 메시지를 주입해 로비 복귀 계약을 확인하며 실제 엔진 경기 검증을 대신하지 않는다.
+- **카드 23 시점에는 UI가 양쪽 준비 완료 표시까지 구현됐다.** 카드 24의 현재 게임 진행·결과·자동 복귀 연결은 8장에 기록한다. 이 카드의 재대전 테스트는 결과 메시지를 주입해 로비 복귀 계약을 확인하며 실제 엔진 경기 검증을 대신하지 않는다.
 
 ### 검증 증거
 
@@ -152,3 +153,55 @@ PING을 실제 writer가 쓰기 직전에 로컬 `System.nanoTime()`을 저장�
 | 실제 localhost 세 모드의 접속→설정→양쪽 준비→START→결과 주입→두 번째 START, 비호환 거부 | `P2pLobbySocketTest` |
 
 로컬 Linux/Java 21에서 `./gradlew --offline --no-daemon build jacocoTestReport` 성공: 전체 **737개**(신규 38개), 실패·오류·건너뜀 0개, 라인 커버리지 **95.60%** (4,459 / 4,664). 테스트·커버리지 보고서 경로는 6장과 같다. 실제 Windows Swing 조작·방화벽·두 PC LAN 성능과 원격 CI·상대방 리뷰·PR 머지는 이 로컬 검증에 포함되지 않는다.
+
+## 8. P2P 대전 진행 (카드 24)
+
+### 실행·상태·종료 계약
+
+- `AppComposition.newP2pMatch`가 로비에서 받은 설정·시드로 **자기 엔진 하나**와 `SinglePlayerSession`, `AttackQueue`를 만든다. 기본 블록 생성기는 같은 시드와 난이도를 사용하며 아이템 난수·삭제 줄 수·효과는 각자 독립이다. 아이템 공급과 공격 계산은 로컬 대전과 같은 `ItemPieceSource`, `AttackRule`, `AttackQueue`를 쓴다.
+- EDT의 `P2pMatch.update`/`handle`이 수신한 메시지를 검증하고 자기 엔진을 진행한다. 수신 스레드는 엔진에 접근하지 않는다. 매 프레임과 입력 직후 `STATE`를 보내며 상대는 `PlayerStates`의 화면 DTO만 그린다. 엔진 레벨 0은 표시 레벨 1로 변환한다. 삭제 연출의 복원·지워지는 칸을 투영하되 논리적 패배와 결과에는 연출을 제거한다.
+- 블록 고정으로 생긴 `ATTACK`은 고유 eventId로 즉시 전송한다. 수신 공격은 대기열에만 넣으며 자기 블록 고정 후 다음 생성 전에 적용한다. 최대 10줄·행 순서·아이템 제거는 기존 규칙을 사용한다. 정지 전에 전송 중이던 공격은 정지 상태에서도 대기열에 보관한다.
+- 서버 프레임이 남은 시간을 감소시키며 클라이언트는 서버 값을 표시한다. 프레임 경과는 남은 시간까지 잘라 적용한다. 서버가 이번 프레임에 받은 원격 상태와 로컬 진행 결과로 판정하며, 같은 프레임의 양쪽 패배는 무승부, 패배와 시간 만료가 겹치면 패배가 우선한다. 시간 만료 점수는 그 서버 판정 시점까지 받은 최신 클라이언트 점수와 서버 점수이다. 두 PC의 동기화되지 않은 시계로 사건 순서를 추정하지 않는다. 결과는 서버만 확정한다. `RESULT`에 판정에 사용한 양쪽 `PlayerState`를 함께 넣어 결과 화면을 고정한다. 결과 수신 지연 중 클라이언트에서 추가된 점수·보드는 최종 화면에 반영하지 않으며, 양쪽 화면의 점수와 판정 근거를 일치시킨다. 최초 상대 `STATE` 수신 전 기권처럼 상대 화면을 아직 모르는 경우에만 양쪽 최종 화면을 생략한다.
+- 어느 쪽이든 정지 요청 가능. 서버가 정지를 확정하고 정지 요청자만 재개한다. 재개를 수신한 프레임은 이전 정지 중 경과 시간을 버린다. 정지 중 입력·중력·시간은 진행하지 않는다. 줄 삭제 연출 중 입력은 순서대로 보관하고 연출 후 적용하며 정지·기권·결과 때 비운다.
+- 기권은 `LEAVE`→서버 `RESULT` 교환을 마치며 소켓을 바로 닫지 않는다. 결과 확정 후 입력·점수·공격을 적용하지 않는다. `RESULT` 수신 즉시 메시지 소비를 멈춰 뒤따른 `LOBBY`를 경기 화면이 삼키지 않게 한다.
+- 결과를 **2초 표시**한 뒤 같은 `P2pLobby.returnAfterResult()`로 돌아간다. 서버가 새 revision을 보내고 양쪽 준비를 초기화한다. 다시 양쪽 Enter를 눌러야 새 matchId로 새 엔진·타이머·점수·대기열·아이템 효과를 생성한다. 연결과 송신 순번은 유지한다. 경기 화면은 `EndGameCoordinator`와 점수 저장소를 호출하지 않는다.
+- 연결 실패는 경기 진행을 멈추고 사유 및 Enter로 P2P 첫 화면 복귀를 안내한다. RTT 랙 배지·3초 무응답·자동 복귀 정책은 카드 25 범위다.
+
+### 화면과 조작
+
+양쪽 10×20 보드, NEXT, 점수·레벨·삭제 줄·2배 잔여 횟수, 최대 10줄 대기 공격을 88×28 격자로 표시한다. 내 보드는 왼쪽, 상대는 오른쪽이다. 공격 칸은 회색과 전용 가로줄 무늬를 사용한다. 기존 개인 키 설정·반복 입력을 사용하고 하단에 정지·재개·기권 키를 표시한다. 포커스 상실은 정지 요청을 보낸다. 화면 전환 시 Swing 창을 다시 맞추며 기존 크기 3단계와 모니터 크기 제한을 유지한다.
+
+카드 19의 기존 `feat/battle-screen` 커밋 `2269a1803e61a46bd7633533d3de47fe91394b8b`에서 로컬 대전 화면·키·렌더러 및 관련 테스트를 통합했다. P2P 항목은 아이템 모드 바로 아래에 유지하고 로컬 대전을 그다음에 배치한다. `BoardPainter`의 블록·아이템 표시를 단일/로컬/P2P에서 공유하고 창 크기 전환도 함께 처리한다. 카드 18 키 설정과 카드 20 로컬 시간제한 선택은 아직 미구현이며 카드 20·21 후속 작업과 최종 통합은 남아 있다. 원래 브랜치의 리뷰·머지 완료를 대신하지 않는다.
+
+### N3-01 계측과 실제 LAN 실행 절차
+
+프로토콜 v2의 `STATE.inputId`는 일반 실행에서는 0이다. `--debug` 실행에서 적용되어 화면이 바뀐 입력에 증가하는 ID를 붙인다. `TextFramePanel.paintComponent`가 해당 프레임을 그린 후 캡처된 ID로 로컬 표본을 기록하고 상대 표본에 `PAINTED`를 보낸다. 원래 입력 PC가 자기 단조 시계로 확인 수신까지의 시간을 계산한다. 프레임 생성이나 소켓 수신만으로 표시 성공을 기록하지 않는다. 반복 paint/확인 응답은 같은 표본을 중복 기록하지 않는다.
+
+1. 같은 LAN의 실제 PC 두 대에 같은 빌드를 준비한다. 각 PC에서 새로운 데이터 디렉터리로 `--debug --data-dir <측정폴더>` 실행. 이전 실행 로그를 섞지 않는다. 예: `./gradlew run --args="--debug --data-dir /tmp/tetris-lan-A"` (다른 PC는 별도 경로).
+2. P2P 메뉴에서 서버·클라이언트를 연결하고 모드·시간을 선택한 뒤 양쪽 Enter. 이동(좌/우 합계), 회전, 하드드롭 **각 50회 × 양방향 = 300회** 수행. 보드가 끝나면 재대전해 누적한다. 한 입력의 변화가 그려진 뒤 다음 입력을 한다. 벽에서 막힌 입력처럼 화면이 바뀌지 않는 조작은 유효 표본에 포함되지 않는다.
+3. 각 PC의 `<측정폴더>/debug/debug.log`를 보관한다. `P2P_LATENCY,모드,역할,경기번호,입력ID,명령,LOCAL 또는 REMOTE_ACK,나노초`가 유효 표본이다. 프레임이 다른 입력에 덮이거나 종료 전에 확인받지 못한 표본은 화면을 나갈 때 `LOCAL_MISSING`/`REMOTE_MISSING,-1`로 남긴다. 누락을 0ms나 성공으로 취급하지 않는다.
+4. `python3 tools/p2p_latency_report.py A-debug.log B-debug.log`로 모드·역할·조작별 로컬/원격 확인 표본 수·누락·최대·p95·평균·200ms 초과 횟수를 출력한다. `SOFT_DROP` 등 추가 조작은 별도 행이며 필수 3종의 표본 수를 대신하지 않는다. 양방향 50개씩 실제 유효 표본이 있는지 확인하고 누락은 원인 기록 후 보충한다. 도구는 PASS를 자동 선언하지 않는다.
+5. 휴대폰 240fps 촬영으로 키 입력과 두 화면을 함께 담아 일부 표본을 대조한다. `paintComponent` 완료는 OS 합성·모니터 표시 완료와 같지 않으므로 촬영으로 그 차이를 확인한다. 촬영 프레임 1개는 약 4.17ms이며 시작·종료 판독 및 표시 차이에 따른 오차를 함께 기록한다. 단순히 고정 오차값을 가정해 통과시키지 않는다.
+6. 빌드/커밋, PC 두 대의 OS·CPU·RAM·화면 주사율, 유선/Wi-Fi·라우터, 모드·방향·측정 시각, 300개 표본, 최대·p95·평균·초과·누락 수, 촬영 증거·오차를 기록한다. 최대값과 측정 불확실성을 고려해 200ms 이하임을 확인할 수 있을 때만 N3-01 통과. 초과·불확실하면 원인 개선 후 재측정한다.
+
+**현재 실측 상태: 미실행.** 2026-11-12 사용자 확인 결과 두 번째 PC 접근 수단이 없다. localhost 소켓 및 가짜 시계 검증은 N3-01 충족 증거가 아니다.
+
+### 자동화 증거와 남은 완료 조건
+
+| 요구사항 / 경계 | 자동화 증거 |
+| --- | --- |
+| 세 모드 공격→대기→다음 생성 전 반영, 두 화면·승패 일치, 결과 후 차단, 두 번째 경기 초기화·이전 경기 차단 | `P2pMatchTest.bothScreensAttackTopOutAndSecondMatch` |
+| 서버 시간·양쪽 정지·재개 권한·정지 중 기권, 전송 중/중복 공격 | `P2pMatchTest.pauseOwnerAndServerClockAreAuthoritative`, `duplicateAttackAndAttackInFlightDuringPause` |
+| 정확한 시간 경계·최종 점수, 시간제한 양쪽 승리/무승부, 같은 프레임 동시 패배·만료보다 패배 우선 | `P2pMatchTest.exactTimeoutUsesScoresAndFreezesFurtherInput`, `simultaneousDefeatIsDrawAndTimedTieIsDraw`, `sameFrameDefeatBeatsTimeLimitAndNoAttackAfterResult` |
+| RESULT 바로 뒤 LOBBY 보존, 실패 후 진행 중단 | `P2pMatchTest.resultLeavesNextLobbyMessageForLobbyAndConnectionFailureStopsPlay` |
+| 결과 전달 지연 중 클라이언트 진행 후에도 양쪽 최종 보드·점수를 서버 판정 시점으로 일치 | `P2pMatchTest.delayedResultRestoresBothViewsToServerDecisionSnapshot`, `P2pMatchSocketTest` |
+| 모든 모양·아이템·무게추 DTO, L 아이템 공격·속성 제거·삭제 연출·상대 아이템 효과 독립 | `PlayerStatesTest`, 기존 `AttackRuleTest`, `ItemPieceSourceTest`, `TeamItemsInEngineTest` |
+| 실제 localhost 소켓·실제 AppComposition으로 세 모드 두 경기, 양방향 화면·정지·결과·점수 파일 미생성 | `P2pMatchSocketTest` |
+| 준비→양쪽 화면→결과→로비→두 번째 경기, 키 입력·포커스·3단계 paint·연결 유지·종료 정리 | `P2pMatchScreenTest`, `P2pLobbyScreenTest` |
+| 실제 paint 이후 확인·동일 시계 계산·중복 억제·누락 표본 | `InputLatencyTest`, `MessageCodecTest` (v2 메시지 왕복) |
+| 카드 19 로컬 화면 통합·동시 입력·모드 선택·메뉴 전환·공통 블록 렌더링 | `BattleScreenTest`, `BattleRendererTest`, `BattleKeysTest`, 기존 단일 게임 렌더링 테스트 |
+| 프로토콜 비호환 거부, 공격 전용 무늬 구분 | `SocketMatchTransportTest`, `TextFramePanelTest` |
+
+로컬 Linux/Java 21: `./gradlew --offline --no-daemon build jacocoTestReport` 성공, **777개 테스트**, 실패·오류·건너뜀 0개. 라인 커버리지 **95.42% (5,083 / 5,327)**, 70% 게이트 통과. 보고서: `build/reports/tests/test/index.html`, `build/reports/jacoco/test/html/index.html`.
+
+카드 24는 진행 중이다. 실제 두 PC LAN 실측, 카드 20·21 후속 작업과 최종 통합, 원격 CI·GitHub 담당자/보드 갱신·상대방 리뷰·PR 머지는 실행하지 않았다. 카드 25의 랙/끊김 정책도 별도 작업이다.
