@@ -16,7 +16,9 @@ public final class P2pRenderer {
     public TextFrame render(P2pMatch match) {
         var frame = new TextFrame(88, 28, palette.base());
         frame.putCentered(0, "P2P · " + match.mode() + (match.mode() == MatchMessage.Mode.TIMED
-                ? " · " + ((match.remainingNanos() + 999_999_999L) / 1_000_000_000L) + "초" : ""), palette.accentStyle());
+                ? " · " + ((match.remainingNanos() + 999_999_999L) / 1_000_000_000L) + "초" : "")
+                + (match.lagging() ? " · 네트워크 지연 (랙)" : ""),
+                match.lagging() ? palette.warningStyle() : palette.accentStyle());
         player(frame, 1, match.local(), "나 (" + match.role() + ")");
         match.remote().ifPresentOrElse(state -> player(frame, 45, state, "상대"),
                 () -> frame.put(46, 3, "상대 화면 수신 대기", palette.base()));

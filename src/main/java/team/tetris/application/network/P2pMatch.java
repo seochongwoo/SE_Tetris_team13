@@ -67,6 +67,7 @@ public final class P2pMatch {
     public Role pauseOwner() { return pauseOwner; }
     public Optional<Result> result() { return Optional.ofNullable(result); }
     public Optional<String> failure() { return Optional.ofNullable(failure); }
+    public boolean lagging() { return failure == null && connection.transport().lagging(); }
     public PlayerState local() {
         if (result != null && result.server() != null) return role() == Role.SERVER ? result.server() : result.client();
         return PlayerStates.from(local.snapshot(), incoming.pending(), result != null || defeated());
@@ -130,13 +131,13 @@ public final class P2pMatch {
     }
 
     private void receive() {
-        if (result != null || failure != null) return; // 다음 LOBBY는 로비가 읽어야 한다.
+        if (failure != null) return;
         var status = connection.transport().status();
         if (status.state() == MatchTransport.State.FAILED || status.state() == MatchTransport.State.CLOSED) {
-            failure = status.detail().isBlank() ? "상대 연결이 종료되었습니다" : status.detail();
-            buffered.clear();
+            fail(status.detail().isBlank() ? "상대 연결이 종료되었습니다" : status.detail());
             return;
         }
+        if (result != null) return; // 연결 감시는 결과 연출 중에도 유지하되 다음 LOBBY는 로비가 읽는다.
         // 한 프레임의 작업량 제한. 거부 메시지도 MatchConnection에서 제한한다.
         for (int count = 0; count < 256 && result == null; count++) {
             var next = connection.receive();
@@ -205,6 +206,12 @@ public final class P2pMatch {
     private void send(MatchMessage message) {
         if (failure != null) return;
         try { connection.send(started.matchId(), message); }
-        catch (RuntimeException error) { failure = "전송 실패: " + error.getMessage(); }
+        catch (RuntimeException error) { fail("전송 실패: " + error.getMessage()); }
+    }
+
+    private void fail(String reason) {
+        failure = reason;
+        buffered.clear();
+        connection.close();
     }
 }

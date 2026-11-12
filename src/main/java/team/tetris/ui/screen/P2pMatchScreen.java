@@ -17,6 +17,8 @@ public final class P2pMatchScreen implements Screen {
     private long now;
     private long resultElapsed;
     private boolean handedOff;
+    private boolean failureShown;
+    private long failureElapsed;
 
     public P2pMatchScreen(ScreenRouter router, P2pLobby lobby, P2pMatch match) {
         this.router = router;
@@ -42,6 +44,13 @@ public final class P2pMatchScreen implements Screen {
         boolean paused = match.paused();
         boolean finished = match.result().isPresent();
         match.update(elapsedNanos);
+        if (match.failure().isPresent()) {
+            repeats.releaseAll();
+            if (failureShown) failureElapsed += Math.min(elapsedNanos, 2_000_000_000L);
+            else { failureShown = true; failureElapsed = 0; router.ignoreHeldKeys(); }
+            if (failureElapsed >= 2_000_000_000L) router.showP2pLobby();
+            return;
+        }
         if (match.paused() != paused || match.result().isPresent()) {
             repeats.releaseAll();
             router.ignoreHeldKeys();
@@ -62,7 +71,7 @@ public final class P2pMatchScreen implements Screen {
         if (match.failure().isPresent()) {
             frame.fill(0, 24, frame.columns(), 2, router.palette().base());
             frame.putCentered(24, "연결 오류: " + match.failure().orElseThrow(), router.palette().warningStyle());
-            frame.putCentered(25, "Enter: P2P 첫 화면", router.palette().base());
+            frame.putCentered(25, "잠시 후 P2P 첫 화면 · Enter 바로 돌아가기", router.palette().base());
         }
         frame.putCentered(26, keys.keyFor(GameCommand.MOVE_LEFT) + "/" + keys.keyFor(GameCommand.MOVE_RIGHT)
                 + " 이동 · " + keys.keyFor(GameCommand.ROTATE_CW) + " 회전 · " + keys.keyFor(GameCommand.HARD_DROP) + " 떨어뜨리기", router.palette().base());

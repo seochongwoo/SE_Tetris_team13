@@ -55,6 +55,7 @@ public final class P2pLobby implements AutoCloseable {
     public boolean isServer() { return connection != null && connection.role() == Role.SERVER; }
     public boolean localReady() { return localReady; }
     public boolean remoteReady() { return remoteReady; }
+    public boolean lagging() { return connection != null && connection.transport().lagging(); }
     public int localPort() { return connection == null ? 0 : connection.transport().status().localPort(); }
 
     public void host() {

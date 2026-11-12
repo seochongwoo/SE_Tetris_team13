@@ -17,6 +17,8 @@ public final class P2pLobbyScreen implements Screen {
     private String input = "";
     private String error = "";
     private boolean handedOff;
+    private boolean failureShown;
+    private long failureElapsed;
 
     public P2pLobbyScreen(ScreenRouter router, P2pLobby lobby) {
         this.router = router;
@@ -29,12 +31,16 @@ public final class P2pLobbyScreen implements Screen {
         if (key.equals("ESCAPE")) {
             if (clientEntry || lobby.stage() != P2pLobby.Stage.CHOICE) {
                 lobby.reset(); clientEntry = false; error = ""; addressPage = 0;
+                failureShown = false; failureElapsed = 0;
                 router.ignoreHeldKeys();
             } else router.showMenu();
             return;
         }
         if (lobby.stage() == P2pLobby.Stage.FAILED) {
-            if (key.equals("ENTER")) { lobby.reset(); clientEntry = false; error = ""; router.ignoreHeldKeys(); }
+            if (key.equals("ENTER")) {
+                lobby.reset(); clientEntry = false; error = "";
+                failureShown = false; failureElapsed = 0; router.ignoreHeldKeys();
+            }
             return;
         }
         if (lobby.stage() == P2pLobby.Stage.CHOICE) {
@@ -92,6 +98,14 @@ public final class P2pLobbyScreen implements Screen {
 
     @Override public void update(long elapsedNanos) {
         lobby.update();
+        if (lobby.stage() == P2pLobby.Stage.FAILED) {
+            if (failureShown) failureElapsed += Math.min(elapsedNanos, 2_000_000_000L);
+            else { failureShown = true; failureElapsed = 0; router.ignoreHeldKeys(); }
+            if (failureElapsed >= 2_000_000_000L) {
+                lobby.reset(); clientEntry = false; error = ""; addressPage = 0;
+                router.ignoreHeldKeys();
+            }
+        } else { failureShown = false; failureElapsed = 0; }
         handoffStartedMatch().ifPresent(started -> router.startP2pMatch(lobby, started));
     }
     /** 경기 화면으로 전환하기 직전에 호출. 연결 정리는 이후 경기 화면의 책임이다. */
@@ -150,8 +164,10 @@ public final class P2pLobbyScreen implements Screen {
             frame.putCentered(11, "양쪽 준비 완료", palette.base());
             frame.putCentered(13, "경기 연결 준비됨", palette.base());
         } else if (lobby.stage() == P2pLobby.Stage.FAILED) {
-            frame.put(2, 19, "Enter 다시 접속", palette.base());
+            frame.put(2, 18, "잠시 후 P2P 첫 화면으로", palette.base());
+            frame.put(2, 19, "Enter 바로 돌아가기", palette.base());
         }
+        if (lobby.lagging()) frame.putCentered(2, "네트워크 지연 (랙)", palette.warningStyle());
         frame.put(2, 21, lobby.recent().warning(), palette.base());
         frame.put(2, 23, "Esc 돌아가기", palette.base());
         return frame;
