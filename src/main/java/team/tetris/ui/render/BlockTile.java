@@ -26,9 +26,12 @@ public record BlockTile(Kind kind, Color color, Pattern pattern, String label) {
         PREVIEW
     }
 
-    /** 블록 안쪽 무늬. 좌우가 뒤집힌 블록(S/Z, J/L)은 서로 거울상인 무늬를 쓴다. */
+    /**
+     * 블록 안쪽 무늬. 좌우가 뒤집힌 블록(S/Z, J/L)은 서로 거울상인 무늬를 쓴다. BARS(가로줄 두 개)는 대전의
+     * 공격 칸 전용으로, 색맹 모드에서도 직접 쌓은 칸과 구분된다 (3차 H3-02).
+     */
     public enum Pattern {
-        NONE, SQUARE, DOT, DIAMOND, SLASH, BACKSLASH, LEFT, RIGHT, CROSS, CHECKER
+        NONE, SQUARE, DOT, DIAMOND, SLASH, BACKSLASH, LEFT, RIGHT, CROSS, CHECKER, BARS
     }
 
     public BlockTile {

@@ -9,6 +9,9 @@ import team.tetris.application.ScoreboardService;
 import team.tetris.application.SettingsService;
 import team.tetris.application.SinglePlayerSession;
 import team.tetris.application.StartedGame;
+import team.tetris.application.battle.BattlePlayer;
+import team.tetris.application.battle.LocalBattleSession;
+import team.tetris.application.battle.StartedBattle;
 import team.tetris.application.ScorePolicy;
 import team.tetris.application.SpeedPolicy;
 import team.tetris.application.model.GameMode;
@@ -23,6 +26,7 @@ import team.tetris.core.rule.PieceGenerator;
 import team.tetris.core.rule.PieceSource;
 import team.tetris.core.rule.PlainPieceSource;
 import team.tetris.core.rule.SevenBagGenerator;
+import team.tetris.core.rule.SharedPieceSequence;
 import team.tetris.storage.memory.InMemoryScoreRepository;
 import team.tetris.storage.memory.InMemorySettingsRepository;
 import team.tetris.ui.input.KeyNames;
@@ -92,6 +96,26 @@ public final class TestApplication implements ApplicationContext {
         }
         return new StartedGame(new SinglePlayerSession(new PlayerEngine(10, 20, pieces),
                 new ScorePolicy(), new SpeedPolicy(difficulty), mode, difficulty), loaded);
+    }
+
+    /** 로컬 대전: 두 플레이어가 같은 생성기 순서를 나눠 읽는다 (실제 조립과 같은 방식). */
+    @Override
+    public StartedBattle newLocalBattle(GameMode mode) {
+        var loaded = settings.loadOrDefault();
+        var difficulty = loaded.value().difficulty();
+        var sequence = new SharedPieceSequence(generators.get());
+        var readers = new java.util.EnumMap<BattlePlayer, PieceGenerator>(BattlePlayer.class);
+        for (BattlePlayer player : BattlePlayer.values()) {
+            readers.put(player, sequence.newReader());
+        }
+        var session = new LocalBattleSession(10, (player, incoming) -> {
+            PieceSource pieces = new PlainPieceSource(readers.get(player));
+            if (mode == GameMode.ITEM) {
+                pieces = new ItemPieceSource(pieces, itemKinds, new Random(7L + player.ordinal()));
+            }
+            return new PlayerEngine(10, 20, pieces, incoming);
+        }, new ScorePolicy(), new SpeedPolicy(difficulty), mode, difficulty);
+        return new StartedBattle(session, loaded);
     }
 
     public ScreenRouter router() {
