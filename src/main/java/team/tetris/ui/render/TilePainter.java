@@ -125,8 +125,8 @@ final class TilePainter {
                 g.fill(new Rectangle2D.Float(cx, cy, h, h));
             }
             case BARS -> {
-                g.draw(new Line2D.Float(cx - h, cy - h / 2, cx + h, cy - h / 2));
-                g.draw(new Line2D.Float(cx - h, cy + h / 2, cx + h, cy + h / 2));
+                g.draw(new Line2D.Float(cx - h, cy - h * 0.45f, cx + h, cy - h * 0.45f));
+                g.draw(new Line2D.Float(cx - h, cy + h * 0.45f, cx + h, cy + h * 0.45f));
             }
         }
     }

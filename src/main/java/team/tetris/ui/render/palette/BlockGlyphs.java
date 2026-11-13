@@ -52,7 +52,7 @@ public final class BlockGlyphs {
     /** 타일로 그릴 때의 무늬. 글자 무늬({@link #of(Shape)})와 같은 뜻을 그림으로 옮긴 것이다. */
     public static Pattern patternOf(Shape shape) {
         if (shape == TemporaryBlock.INSTANCE) return Pattern.CHECKER;
-        // 공격 칸은 회색과 전용 가로줄 무늬를 함께 사용한다.
+        // 공격 칸은 회색에 전용 가로줄 무늬를 넣어 색맹 모드에서도 블록과 구분한다 (H3-02).
         if (shape == AttackBlock.INSTANCE) return Pattern.BARS;
         if (!(shape instanceof TetrominoType type)) {
             return Pattern.CROSS;
