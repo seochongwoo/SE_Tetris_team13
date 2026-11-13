@@ -30,6 +30,12 @@ import team.tetris.core.rule.PieceSource;
 import team.tetris.core.rule.PlainPieceSource;
 import team.tetris.core.rule.SharedPieceSequence;
 import team.tetris.core.rule.WeightedRandomGenerator;
+import team.tetris.application.network.P2pLobby;
+import team.tetris.application.network.RecentIps;
+import team.tetris.application.port.RecentIpRepository;
+import team.tetris.network.LocalIpv4Addresses;
+import team.tetris.network.SocketMatchTransport;
+import team.tetris.storage.FileRecentIpRepository;
 import team.tetris.storage.BinaryScoreRepository;
 import team.tetris.storage.PropertiesSettingsRepository;
 import team.tetris.storage.ConsoleFileDebugLog;
@@ -38,6 +44,7 @@ import team.tetris.storage.ConsoleFileDebugLog;
 public final class AppComposition implements ApplicationContext {
     private static final int BOARD_WIDTH = 10;
     private static final int BOARD_HEIGHT = 20;
+    private final RecentIpRepository recentIps;
     private final SettingsService settings;
     private final ScoreboardService scores;
     private final EndGameCoordinator endings;
@@ -96,6 +103,7 @@ public final class AppComposition implements ApplicationContext {
         this.generators = Objects.requireNonNull(generators, "generators");
         this.scoring = Objects.requireNonNull(scoring, "scoring");
         this.speeds = Objects.requireNonNull(speeds, "speeds");
+        recentIps = new FileRecentIpRepository(directory.resolve("recent-ips.txt"));
         settings = new SettingsService(new PropertiesSettingsRepository(directory.resolve("settings.properties")));
         scores = new ScoreboardService(new BinaryScoreRepository(directory.resolve("scores.bin")));
         endings = new EndGameCoordinator(scores);
@@ -163,6 +171,14 @@ public final class AppComposition implements ApplicationContext {
             return new PlayerEngine(BOARD_WIDTH, BOARD_HEIGHT, pieces, incoming);
         }, scoring, Objects.requireNonNull(speeds.apply(difficulty), "speed"), mode, difficulty);
         return new StartedBattle(session, loaded);
+    }
+
+    @Override
+    public P2pLobby newP2pLobby() {
+        return new P2pLobby(
+                SocketMatchTransport::new, LocalIpv4Addresses::discover,
+                new RecentIps(recentIps),
+                settings.loadOrDefault().value().difficulty(), () -> ThreadLocalRandom.current().nextLong());
     }
 
     @Override public boolean debugEnabled() { return debug; }

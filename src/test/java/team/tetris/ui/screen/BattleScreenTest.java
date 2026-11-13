@@ -55,6 +55,7 @@ class BattleScreenTest {
         router.showMenu();
         tap(KeyNames.DOWN);
         tap(KeyNames.DOWN);
+        tap(KeyNames.DOWN);
         tap(KeyNames.ENTER);
         MenuScreen modes = assertInstanceOf(MenuScreen.class, router.current());
         String text = router.render().text();

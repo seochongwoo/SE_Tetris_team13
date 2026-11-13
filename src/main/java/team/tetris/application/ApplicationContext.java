@@ -1,6 +1,7 @@
 package team.tetris.application;
 
 import team.tetris.application.model.GameMode;
+import team.tetris.application.network.P2pLobby;
 
 /** UI에 제공하는 서비스와 새 게임 생성 경계. */
 public interface ApplicationContext {
@@ -10,6 +11,10 @@ public interface ApplicationContext {
 
     /** mode로 새 게임 시작. 모드는 결과·기록·순위 구분까지 유지된다. */
     StartedGame newGame(GameMode mode);
+
+    default P2pLobby newP2pLobby() {
+        throw new UnsupportedOperationException("P2P is not available");
+    }
 
     default boolean debugEnabled() { return false; }
 
