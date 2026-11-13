@@ -76,10 +76,12 @@ class MenuScreenTest {
         tap("DOWN");
         tap("DOWN");
         tap("DOWN");
+        tap("DOWN");
         tap("ENTER");
         assertInstanceOf(SettingsScreen.class, router.current());
 
         router.showMenu();
+        tap("DOWN");
         tap("DOWN");
         tap("DOWN");
         tap("DOWN");
