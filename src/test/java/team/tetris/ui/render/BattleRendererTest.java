@@ -131,6 +131,23 @@ class BattleRendererTest {
     }
 
     @ParameterizedTest
+    @ValueSource(longs = {1234, 12345678})
+    void doubleScoreIndicatorDoesNotOverwriteEitherPlayersScore(long score) {
+        // 리뷰 지적: 점수 2배 표시가 네 자리 이상 점수의 첫 자리를 덮었다.
+        GameSnapshot base = game(board(), score, 2, 15);
+        GameSnapshot boosted = new GameSnapshot(base.engine(), score, 2, 15,
+                base.gravityIntervalNanos(), GameStatus.RUNNING, 3, null, GameMode.ITEM, Difficulty.HARD);
+        TextFrame frame = renderer(false).render(new BattleSnapshot(boosted, boosted, List.of(), List.of(),
+                BattleStatus.RUNNING, null, GameMode.ITEM, Difficulty.HARD));
+
+        String scoreRow = frame.rowText(2 + BoardPainter.NEXT_BOX_HEIGHT + 1);
+        assertEquals(2, count(scoreRow, Long.toString(score)));
+        assertEquals(2, count(scoreRow, "SCORE"));
+        assertEquals(2, count(frame.rowText(2), "NEXT"));
+        assertEquals(2, count(frame.rowText(2), "x2(3)"));
+    }
+
+    @ParameterizedTest
     @ValueSource(booleans = {false, true})
     void attackCellsOnTheBoardAreGreyWithTheirOwnPattern(boolean colorBlind) {
         // H3-02: 색맹 모드에서도 직접 쌓은 칸과 구분되도록 회색 + 전용 무늬.

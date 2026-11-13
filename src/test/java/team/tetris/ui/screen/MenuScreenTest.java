@@ -69,6 +69,13 @@ class MenuScreenTest {
         tap("DOWN");
         tap("DOWN");
         tap("DOWN");
+        tap("ENTER");
+        assertEquals(router.battleModeItems().size(), menu().items().size()); // 대전 모드 선택
+
+        router.showMenu();
+        tap("DOWN");
+        tap("DOWN");
+        tap("DOWN");
         tap("DOWN");
         tap("ENTER");
         assertInstanceOf(SettingsScreen.class, router.current());

@@ -76,10 +76,13 @@ public final class TetrisUi implements GameUi {
             if (!router.hasExited()) {
                 // 이름 입력 화면에서만 입력기를 켠다 (화면은 키 입력이나 게임 종료로 바뀌므로 매 프레임 맞춘다).
                 panel.setTextInput(router.acceptsTextInput());
-                var next = router.render();
-                boolean resized = next.columns() != panel.frameColumns() || next.rows() != panel.frameRows();
-                panel.show(next);
-                if (resized) fitToScreen(window, panel, router.settings().screenSize());
+                TextFrame frame = router.render();
+                boolean resized = frame.columns() != panel.frameColumns() || frame.rows() != panel.frameRows();
+                panel.show(frame);
+                if (resized) {
+                    // 대전 화면처럼 격자 크기가 다른 화면으로 바뀌면 같은 화면 크기 설정으로 창을 다시 맞춘다.
+                    fitToScreen(window, panel, router.settings().screenSize());
+                }
                 if (debugPanel != null) debugPanel.refresh();
             }
         });
