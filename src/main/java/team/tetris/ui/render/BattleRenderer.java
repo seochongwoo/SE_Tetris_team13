@@ -88,14 +88,16 @@ public final class BattleRenderer {
         frame.put(info, BOARD_TOP, label(player), palette.accentStyle().asBold());
         frame.putRight(info + INFO_WIDTH, BOARD_TOP, "LV " + game.level(), palette.dimStyle());
         board.drawNext(frame, game.engine().nextPiece(), info, NEXT_TITLE_ROW);
+        if (game.doubleScoreClears() > 0) {
+            // 점수 2배 아이템($)이 남은 줄 삭제 횟수. 점수 줄에 두면 네 자리 이상 점수를 덮으므로
+            // 비어 있는 NEXT 제목 줄 오른쪽에 둔다.
+            frame.putRight(info + INFO_WIDTH, NEXT_TITLE_ROW, "x2(" + game.doubleScoreClears() + ")",
+                    palette.accentStyle());
+        }
         frame.put(info, SCORE_ROW, "SCORE", palette.dimStyle());
         frame.putRight(info + INFO_WIDTH, SCORE_ROW, Long.toString(game.score()), palette.base().asBold());
         frame.put(info, SCORE_ROW + 1, "LINES", palette.dimStyle());
         frame.putRight(info + INFO_WIDTH, SCORE_ROW + 1, Integer.toString(game.clearedLines()), palette.base().asBold());
-        if (game.doubleScoreClears() > 0) {
-            // 점수 2배 아이템($)이 남은 줄 삭제 횟수
-            frame.put(info + 6, SCORE_ROW, "x2(" + game.doubleScoreClears() + ")", palette.accentStyle());
-        }
         drawPending(frame, info, game.engine().board()[0].length, pending);
         drawHelp(frame, player, left);
     }
