@@ -132,6 +132,15 @@ public final class TextFramePanel extends JComponent {
         repaint();
     }
 
+    /** 지금 보여 주는 격자의 열 수. 다음 화면의 격자 크기가 다르면 창을 다시 맞춘다. */
+    public int frameColumns() {
+        return frame.columns();
+    }
+
+    public int frameRows() {
+        return frame.rows();
+    }
+
     @Override
     public Dimension getPreferredSize() {
         return new Dimension(frame.columns() * cellWidth, frame.rows() * cellHeight);
