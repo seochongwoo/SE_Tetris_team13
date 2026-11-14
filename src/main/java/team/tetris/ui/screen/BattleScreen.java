@@ -171,13 +171,20 @@ public final class BattleScreen implements Screen {
         }
         if (isSelectKey(key)) {
             switch (cursor) {
-                case REMATCH_ITEM -> leave(() -> router.startBattle(session.snapshot().mode()));
+                case REMATCH_ITEM -> leave(this::rematch);
                 case MENU_ITEM -> leave(router::showMenu);
                 default -> leave(router::exit);
             }
         } else {
             moveCursor(key, RESULT_ITEMS.size());
         }
+    }
+
+    /** 같은 모드·같은 시간제한으로 새 대전. */
+    private void rematch() {
+        BattleSnapshot last = session.snapshot();
+        router.startBattle(last.mode(),
+                last.timer() == null ? null : java.time.Duration.ofNanos(last.timer().limitNanos()));
     }
 
     /** 메뉴 선택: Enter 또는 Space. 두 사람 누구나 고를 수 있다. */
@@ -234,6 +241,13 @@ public final class BattleScreen implements Screen {
             showResult(elapsedNanos);
             return;
         }
+        BattleSnapshot before = session.snapshot();
+        if (before.status() == BattleStatus.RUNNING && before.timer() != null
+                && elapsedNanos >= before.timer().remainingNanos()) {
+            // 이번 프레임 안에 시간제한이 끝난다. 큐의 입력은 만료 전에 눌린 것이므로 시간을 흘리기 전에
+            // 전달한다. 그렇지 않으면 마지막 프레임의 입력이 결과 뒤로 밀려 버려진다 (안건 ㉓).
+            deliverPending();
+        }
         session.update(elapsedNanos);
         BattleSnapshot now = session.snapshot();
         if (now.status() == BattleStatus.RUNNING) {
@@ -249,6 +263,14 @@ public final class BattleScreen implements Screen {
                 }
             }
         }
+        deliverPending();
+        if (session.result().isPresent()) {
+            showResult(0);
+        }
+    }
+
+    /** 큐에 쌓인 입력을 순서대로 전달한다. 결과가 나오면 남은 입력은 버린다. */
+    private void deliverPending() {
         while (!pending.isEmpty() && session.result().isEmpty()) {
             BattleStatus before = session.snapshot().status();
             Input input = pending.poll();
@@ -265,9 +287,6 @@ public final class BattleScreen implements Screen {
                 router.ignoreHeldKeys();
                 cursor = RESUME_ITEM;
             }
-        }
-        if (session.result().isPresent()) {
-            showResult(0);
         }
     }
 
@@ -313,11 +332,18 @@ public final class BattleScreen implements Screen {
         if (result.end() == BattleEnd.ABORTED) {
             return "대전 중단";
         }
+        if (result.end() == BattleEnd.TIME_UP_DRAW) {
+            return "시간 종료 · 무승부";
+        }
         if (result.draw()) {
             return "무승부";
         }
         String winner = result.winner() == BattlePlayer.ONE ? "1P" : "2P";
-        return result.end() == BattleEnd.FORFEIT ? winner + " 승리 (기권승)" : winner + " 승리!";
+        return switch (result.end()) {
+            case FORFEIT -> winner + " 승리 (기권승)";
+            case TIME_UP -> "시간 종료 · " + winner + " 승리!";
+            default -> winner + " 승리!";
+        };
     }
 
     private static String scoreLine(BattleResult result) {

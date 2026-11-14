@@ -68,12 +68,21 @@ public final class MenuScreen implements Screen {
 
     /** 하위 메뉴: back이 있으면 Esc로 돌아간다. */
     public MenuScreen(ScreenRouter router, List<MenuItem> items, Runnable back) {
+        this(router, items, back, 0);
+    }
+
+    /** cursor 항목을 고른 상태로 시작하는 하위 메뉴 (기본값이 첫 항목이 아닐 때). */
+    public MenuScreen(ScreenRouter router, List<MenuItem> items, Runnable back, int cursor) {
         this.router = Objects.requireNonNull(router, "router");
         this.back = back;
         this.items = List.copyOf(items);
         if (this.items.isEmpty()) {
             throw new IllegalArgumentException("Menu requires at least one item");
         }
+        if (cursor < 0 || cursor >= this.items.size()) {
+            throw new IllegalArgumentException("Cursor must point to an item: " + cursor);
+        }
+        this.cursor = cursor;
     }
 
     public int cursor() {
