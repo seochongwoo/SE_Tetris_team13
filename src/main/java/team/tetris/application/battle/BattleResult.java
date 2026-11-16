@@ -15,7 +15,7 @@ public record BattleResult(BattlePlayer winner, BattleEnd end, long scoreOne, lo
 
     public BattleResult {
         Objects.requireNonNull(end, "end");
-        boolean hasWinner = end == BattleEnd.TOPPED_OUT || end == BattleEnd.FORFEIT;
+        boolean hasWinner = end == BattleEnd.TOPPED_OUT || end == BattleEnd.FORFEIT || end == BattleEnd.TIME_UP;
         if (hasWinner != (winner != null)) {
             throw new IllegalArgumentException("Winner must be given exactly when " + end + " decides one");
         }
@@ -25,9 +25,9 @@ public record BattleResult(BattlePlayer winner, BattleEnd end, long scoreOne, lo
         return Optional.ofNullable(winner);
     }
 
-    /** 같은 프레임 동시 패배로 무승부인가. */
+    /** 무승부인가: 같은 프레임 동시 패배(안건 ⑬)나 시간 종료 때 동점(안건 ⑫). */
     public boolean draw() {
-        return end == BattleEnd.BOTH_TOPPED_OUT;
+        return end == BattleEnd.BOTH_TOPPED_OUT || end == BattleEnd.TIME_UP_DRAW;
     }
 
     public long scoreOf(BattlePlayer player) {

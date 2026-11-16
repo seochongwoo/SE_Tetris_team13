@@ -411,4 +411,127 @@ class LocalBattleSessionTest {
         assertThrows(IllegalArgumentException.class, () -> new BattleSnapshot(running.one(), running.two(),
                 List.of(), List.of(), BattleStatus.FINISHED, null, GameMode.NORMAL, Difficulty.NORMAL));
     }
+
+    // ---- 시간제한 (R3-05, 안건 ⑪⑫⑱㉓) ----
+
+    private static LocalBattleSession timed(Cell[][] one, Cell[][] two, long seconds) {
+        return new LocalBattleSession(WIDTH, engines(one, two), new ScorePolicy(), ONE_SECOND,
+                GameMode.NORMAL, Difficulty.NORMAL, java.time.Duration.ofSeconds(seconds));
+    }
+
+    @Test
+    void inputsCountUntilTheExactMomentTheTimeRunsOutAndNotAfter() {
+        LocalBattleSession battle = timed(empty(), empty(), 3);
+
+        battle.update(3 * SECOND - 1);
+        assertTrue(battle.result().isEmpty(), "만료 직전에는 진행 중");
+        assertEquals(1, battle.snapshot().timer().remainingNanos());
+        long before = battle.snapshot().of(TWO).score();
+        battle.handle(TWO, GameCommand.HARD_DROP);
+        long justBefore = battle.snapshot().of(TWO).score();
+        assertTrue(justBefore > before, "만료 직전 입력의 점수는 반영된다");
+
+        battle.update(1);
+
+        BattleResult result = battle.result().orElseThrow();
+        assertEquals(BattleEnd.TIME_UP, result.end());
+        assertTrue(battle.snapshot().timer().expired());
+        BattlePlayer higher = result.scoreOne() > result.scoreTwo() ? ONE : TWO;
+        assertEquals(higher, result.winner());
+        assertEquals(justBefore, result.scoreOf(TWO));
+
+        battle.handle(ONE, GameCommand.HARD_DROP);
+        battle.update(SECOND);
+        assertEquals(result.scoreOne(), battle.snapshot().of(ONE).score(), "만료 뒤 입력은 반영되지 않는다");
+    }
+
+    @Test
+    void aLongFrameMovesTheBoardsOnlyUpToTheTimeLimit() {
+        // 2초 제한에 10초짜리 프레임이 와도 보드는 2초만큼(중력 두 번)만 진행한다.
+        LocalBattleSession battle = timed(empty(), empty(), 2);
+
+        battle.update(10 * SECOND);
+
+        assertEquals(BattleEnd.TIME_UP_DRAW, battle.result().orElseThrow().end());
+        assertEquals(new Position(3, 2), battle.snapshot().of(ONE).engine().activePiece().origin());
+        assertEquals(new Position(3, 2), battle.snapshot().of(TWO).engine().activePiece().origin());
+    }
+
+    @Test
+    void equalScoresWhenTheTimeRunsOutAreADraw() {
+        LocalBattleSession battle = timed(empty(), empty(), 1);
+
+        battle.update(SECOND);
+
+        BattleResult result = battle.result().orElseThrow();
+        assertEquals(result.scoreOne(), result.scoreTwo());
+        assertEquals(BattleEnd.TIME_UP_DRAW, result.end());
+        assertTrue(result.draw());
+        assertTrue(result.winnerIfAny().isEmpty());
+    }
+
+    @Test
+    void theClockStopsWhileThePlayersArePaused() {
+        LocalBattleSession battle = timed(empty(), empty(), 3);
+        battle.update(SECOND);
+
+        battle.handle(ONE, GameCommand.PAUSE);
+        battle.update(60 * SECOND);
+        battle.handle(TWO, GameCommand.RESUME);
+
+        assertEquals(2 * SECOND, battle.snapshot().timer().remainingNanos());
+        battle.update(2 * SECOND - 1);
+        assertTrue(battle.result().isEmpty());
+        battle.update(1);
+        assertTrue(battle.result().isPresent());
+    }
+
+    @Test
+    void aLossInTheSameFrameAsTheTimeRunningOutWins() {
+        // 1P는 1초 뒤 중력으로 고정되며 더 쌓을 수 없게 되고, 같은 프레임에 1초 제한도 끝난다.
+        LocalBattleSession battle = timed(blockedTop(), empty(), 1);
+
+        battle.update(SECOND);
+
+        BattleResult result = battle.result().orElseThrow();
+        assertEquals(BattleEnd.TOPPED_OUT, result.end());
+        assertEquals(TWO, result.winner());
+    }
+
+    @Test
+    void theTimeCanRunOutDuringALineClearAnimationWithoutAffectingTheResult() {
+        LocalBattleSession battle = timed(twoLineClear(), empty(), 1);
+        battle.handle(ONE, GameCommand.HARD_DROP);
+        assertNotNull(battle.snapshot().of(ONE).lineClearAnimation());
+        long cleared = battle.snapshot().of(ONE).score();
+
+        battle.update(SECOND);
+
+        BattleResult result = battle.result().orElseThrow();
+        assertEquals(BattleEnd.TIME_UP, result.end());
+        assertEquals(ONE, result.winner());
+        assertEquals(cleared, result.scoreOne(), "줄을 지운 순간의 점수 그대로");
+        assertNull(battle.snapshot().of(ONE).lineClearAnimation());
+    }
+
+    @Test
+    void battlesWithoutATimeLimitHaveNoClockAndLimitsMustBePositive() {
+        assertNull(battle(empty(), empty()).snapshot().timer());
+        assertThrows(IllegalArgumentException.class, () -> timed(empty(), empty(), 0));
+        assertThrows(IllegalArgumentException.class, () -> timed(empty(), empty(), -1));
+        assertEquals(java.time.Duration.ofSeconds(5).toNanos(), timed(empty(), empty(), 5).snapshot().timer().limitNanos());
+    }
+
+    @Test
+    void timersAndTimeUpResultsCheckTheirOwnValues() {
+        assertThrows(IllegalArgumentException.class, () -> new BattleTimer(0, 0));
+        assertThrows(IllegalArgumentException.class, () -> new BattleTimer(10, 11));
+        assertThrows(IllegalArgumentException.class, () -> new BattleTimer(10, -1));
+        assertEquals(2, new BattleTimer(5 * SECOND, SECOND + 1).remainingSeconds());
+        assertEquals(1, new BattleTimer(5 * SECOND, 1).remainingSeconds());
+        assertEquals(0, new BattleTimer(5 * SECOND, 0).remainingSeconds());
+        assertThrows(IllegalArgumentException.class, () -> new BattleResult(null, BattleEnd.TIME_UP, 1, 1));
+        assertThrows(IllegalArgumentException.class, () -> new BattleResult(ONE, BattleEnd.TIME_UP_DRAW, 1, 1));
+        assertFalse(new BattleResult(ONE, BattleEnd.TIME_UP, 2, 1).draw());
+    }
 }
