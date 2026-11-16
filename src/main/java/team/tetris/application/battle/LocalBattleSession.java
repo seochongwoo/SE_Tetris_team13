@@ -36,6 +36,10 @@ import team.tetris.core.rule.IncomingLines;
  *       줄 삭제 연출은 화면에서 지운다.</li>
  *   <li>한 명이 정지하면 둘 다 정지하고, 나가면 나간 사람이 진다 (안건 ⑱).</li>
  *   <li>결과는 스코어보드에 기록하지 않는다. 이 세션은 기록 서비스를 모른다.</li>
+ *   <li>시간제한 대전은 정한 시간이 지나면 점수가 높은 쪽이 이기고, 같으면 무승부다 (R3-05, 안건 ⑪⑫).
+ *       시계는 정지 중에 멈춘다. 한 프레임이 남은 시간보다 길면 남은 시간만큼만 보드를 진행해 만료 뒤의
+ *       점수가 생기지 않게 하고, 그 사이에 진 사람이 있으면 시간 만료보다 패배를 먼저 본다 (안건 ㉓).
+ *       줄 삭제 연출은 결과에 영향이 없다. 점수는 줄을 지운 순간에 이미 더해져 있다.</li>
  * </ul>
  */
 public final class LocalBattleSession implements BattleSession {
@@ -49,6 +53,9 @@ public final class LocalBattleSession implements BattleSession {
     private BattleResult result;
     /** {@link #update} 도중에 생긴 공격. 두 보드를 모두 진행한 뒤 넣는다. 그 밖에는 null. */
     private Map<BattlePlayer, List<List<Cell>>> frameAttacks;
+    /** 시간제한(나노초). 시간제한이 없으면 0. */
+    private final long timeLimitNanos;
+    private long remainingNanos;
 
     /**
      * @param width   두 보드의 폭 (공격 줄 검사용)
@@ -56,7 +63,19 @@ public final class LocalBattleSession implements BattleSession {
      */
     public LocalBattleSession(int width, BiFunction<BattlePlayer, IncomingLines, TetrisEnginePort> engines,
                               ScoreRule scoring, SpeedRule speed, GameMode mode, Difficulty difficulty) {
+        this(width, engines, scoring, speed, mode, difficulty, null);
+    }
+
+    /** @param timeLimit 시간제한 대전의 시간. null이면 시간제한 없음 */
+    public LocalBattleSession(int width, BiFunction<BattlePlayer, IncomingLines, TetrisEnginePort> engines,
+                              ScoreRule scoring, SpeedRule speed, GameMode mode, Difficulty difficulty,
+                              java.time.Duration timeLimit) {
         Objects.requireNonNull(engines, "engines");
+        if (timeLimit != null && (timeLimit.isNegative() || timeLimit.isZero())) {
+            throw new IllegalArgumentException("Time limit must be positive: " + timeLimit);
+        }
+        this.timeLimitNanos = timeLimit == null ? 0 : timeLimit.toNanos();
+        this.remainingNanos = timeLimitNanos;
         this.mode = Objects.requireNonNull(mode, "mode");
         this.difficulty = Objects.requireNonNull(difficulty, "difficulty");
         for (BattlePlayer player : BattlePlayer.values()) {
@@ -121,23 +140,42 @@ public final class LocalBattleSession implements BattleSession {
         if (status != BattleStatus.RUNNING) {
             return;
         }
+        // 시간제한이 있으면 남은 시간까지만 진행한다. 만료 뒤의 중력으로 점수가 생기지 않게 한다.
+        long step = timeLimitNanos == 0 ? elapsedNanos : Math.min(elapsedNanos, remainingNanos);
         Map<BattlePlayer, List<List<Cell>>> attacks = new EnumMap<>(BattlePlayer.class);
         frameAttacks = attacks;
         try {
             for (SinglePlayerSession session : sessions.values()) {
-                session.update(elapsedNanos);
+                session.update(step);
             }
         } finally {
             frameAttacks = null;
         }
+        if (timeLimitNanos > 0) {
+            remainingNanos -= step;
+        }
         boolean oneLost = toppedOut(BattlePlayer.ONE);
         boolean twoLost = toppedOut(BattlePlayer.TWO);
-        if (!oneLost && !twoLost) {
-            attacks.forEach((receiver, lines) -> incoming.get(receiver).add(lines));
-        } else if (oneLost && twoLost) {
+        // 같은 프레임이면 패배가 시간 만료보다 먼저다 (안건 ㉓).
+        if (oneLost && twoLost) {
             finish(null, BattleEnd.BOTH_TOPPED_OUT);
         } else if (oneLost || twoLost) {
             finish(oneLost ? BattlePlayer.TWO : BattlePlayer.ONE, BattleEnd.TOPPED_OUT);
+        } else if (timeLimitNanos > 0 && remainingNanos == 0) {
+            finishByScore();
+        } else {
+            attacks.forEach((receiver, lines) -> incoming.get(receiver).add(lines));
+        }
+    }
+
+    /** 시간 종료: 점수가 높은 쪽이 이기고 같으면 무승부 (R3-05, 안건 ⑫). */
+    private void finishByScore() {
+        long one = scoreOf(BattlePlayer.ONE);
+        long two = scoreOf(BattlePlayer.TWO);
+        if (one == two) {
+            finish(null, BattleEnd.TIME_UP_DRAW);
+        } else {
+            finish(one > two ? BattlePlayer.ONE : BattlePlayer.TWO, BattleEnd.TIME_UP);
         }
     }
 
@@ -177,7 +215,8 @@ public final class LocalBattleSession implements BattleSession {
     public BattleSnapshot snapshot() {
         return new BattleSnapshot(view(BattlePlayer.ONE), view(BattlePlayer.TWO),
                 incoming.get(BattlePlayer.ONE).pending(), incoming.get(BattlePlayer.TWO).pending(),
-                status, result, mode, difficulty);
+                status, result, mode, difficulty,
+                timeLimitNanos == 0 ? null : new BattleTimer(timeLimitNanos, remainingNanos));
     }
 
     /**
