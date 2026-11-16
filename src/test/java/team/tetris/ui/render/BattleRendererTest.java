@@ -1,6 +1,7 @@
 package team.tetris.ui.render;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -165,6 +166,29 @@ class BattleRendererTest {
         assertNotEquals(block.pattern(), attack.pattern());
         assertNotEquals(block.color(), attack.color());
         assertEquals(attack.color().getRed(), attack.color().getGreen());
+    }
+
+    @Test
+    void aTimedBattleShowsTheRemainingTimeAndWarnsInTheLastTenSeconds() {
+        BattleSnapshot base = snapshot(board(), board(), List.of());
+        BattleSnapshot timed = new BattleSnapshot(base.one(), base.two(), List.of(), List.of(), BattleStatus.RUNNING,
+                null, GameMode.NORMAL, Difficulty.NORMAL,
+                new team.tetris.application.battle.BattleTimer(120_000_000_000L, 9_500_000_000L));
+
+        TextFrame frame = renderer(false).render(timed);
+
+        String header = frame.rowText(0);
+        assertTrue(header.contains("대전 · 시간제한 / 보통"), header);
+        assertTrue(header.contains("남은 시간 0:10"), header);
+        boolean warned = false;
+        for (int col = 0; col < frame.columns(); col++) {
+            warned |= frame.codePointAt(col, 0) == ':'
+                    && frame.styleAt(col, 0).equals(ColorPalette.standard().warningStyle());
+        }
+        assertTrue(warned, "마지막 10초는 경고색");
+        assertEquals("2:05", BattleRenderer.clock(125));
+        assertEquals("0:00", BattleRenderer.clock(0));
+        assertFalse(renderer(false).render(base).rowText(0).contains("남은 시간"));
     }
 
     /** col부터 열 칸의 글자 (행 문자열은 넓은 글자 때문에 열 위치와 어긋날 수 있다). */

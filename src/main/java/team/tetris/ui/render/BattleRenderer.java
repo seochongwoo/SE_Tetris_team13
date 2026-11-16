@@ -5,6 +5,7 @@ import team.tetris.application.GameCommand;
 import team.tetris.application.GameSnapshot;
 import team.tetris.application.battle.BattlePlayer;
 import team.tetris.application.battle.BattleSnapshot;
+import team.tetris.application.battle.BattleTimer;
 import team.tetris.application.model.GameMode;
 import team.tetris.core.AttackBlock;
 import team.tetris.core.Cell;
@@ -74,8 +75,14 @@ public final class BattleRenderer {
     }
 
     private void drawHeader(TextFrame frame, BattleSnapshot snapshot) {
-        String mode = snapshot.mode() == GameMode.ITEM ? "아이템" : "일반";
+        BattleTimer timer = snapshot.timer();
+        String mode = timer != null ? "시간제한" : snapshot.mode() == GameMode.ITEM ? "아이템" : "일반";
         frame.put(ONE_LEFT, 0, "대전 · " + mode + " / " + DisplayNames.of(snapshot.difficulty()), palette.accentStyle());
+        if (timer != null) {
+            // 남은 시간은 가운데. 마지막 10초는 경고색으로 바꾼다.
+            frame.putCentered(0, "남은 시간 " + clock(timer.remainingSeconds()),
+                    timer.remainingSeconds() <= WARNING_SECONDS ? palette.warningStyle() : palette.base().asBold());
+        }
         String common = KeyNames.display(keys.pauseKey()) + " 일시정지  " + KeyNames.display(keys.menuKey()) + " 메뉴";
         frame.putRight(COLUMNS - 1, 0, common, palette.dimStyle());
     }
@@ -128,6 +135,14 @@ public final class BattleRenderer {
         }
         text.append("· ").append(KeyNames.display(keys.keyFor(player, GameCommand.HARD_DROP)));
         frame.put(left, HELP_ROW, text.toString(), palette.dimStyle());
+    }
+
+    /** 남은 시간이 이 초 이하면 경고색으로 표시한다. */
+    static final int WARNING_SECONDS = 10;
+
+    /** 초를 m:ss로. */
+    static String clock(long seconds) {
+        return seconds / 60 + ":" + String.format(java.util.Locale.ROOT, "%02d", seconds % 60);
     }
 
     static String label(BattlePlayer player) {

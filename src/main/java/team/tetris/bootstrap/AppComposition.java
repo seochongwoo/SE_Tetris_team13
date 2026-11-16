@@ -139,7 +139,7 @@ public final class AppComposition implements ApplicationContext {
     }
 
     @Override
-    public StartedBattle newLocalBattle(GameMode mode) {
+    public StartedBattle newLocalBattle(GameMode mode, java.time.Duration timeLimit) {
         Objects.requireNonNull(mode, "mode");
         var loaded = settings.loadOrDefault();
         var difficulty = loaded.value().difficulty();
@@ -161,7 +161,7 @@ public final class AppComposition implements ApplicationContext {
                 pieces = new ItemPieceSource(pieces, itemKinds, new Random(itemSeeds.get(player)));
             }
             return new PlayerEngine(BOARD_WIDTH, BOARD_HEIGHT, pieces, incoming);
-        }, scoring, Objects.requireNonNull(speeds.apply(difficulty), "speed"), mode, difficulty);
+        }, scoring, Objects.requireNonNull(speeds.apply(difficulty), "speed"), mode, difficulty, timeLimit);
         return new StartedBattle(session, loaded);
     }
 

@@ -1,5 +1,6 @@
 package team.tetris.ui;
 
+import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashSet;
@@ -124,25 +125,47 @@ public final class ScreenRouter {
         debugSetupHistory.clear();
     }
 
-    /** 대전 모드 선택: 일반 / 아이템 / 시간제한 (R3-02). 시간제한은 아직 고를 수 없다. */
+    /** 대전 모드 선택: 일반 / 아이템 / 시간제한 (R3-02). */
     public List<MenuItem> battleModeItems() {
         return List.of(
                 new MenuItem("일반 대전", () -> startBattle(GameMode.NORMAL)),
                 new MenuItem("아이템 대전", () -> startBattle(GameMode.ITEM)),
-                new MenuItem(TIME_LIMIT_SOON, () -> { }),
+                new MenuItem("시간제한 대전", this::showTimeLimits),
                 new MenuItem("뒤로", this::showMenu));
     }
 
-    /** 시간제한 대전 항목. 카드 20에서 시간 선택과 함께 연결한다. */
-    static final String TIME_LIMIT_SOON = "시간제한 (예정)";
+    /** 시간제한 대전에서 고를 수 있는 시간 (안건 ⑪: 1·2·3분, 기본 2분). */
+    public static final List<Duration> TIME_LIMITS = List.of(Duration.ofMinutes(1), Duration.ofMinutes(2),
+            Duration.ofMinutes(3));
+    public static final Duration DEFAULT_TIME_LIMIT = Duration.ofMinutes(2);
 
     public void showBattleModes() {
         show(new MenuScreen(this, battleModeItems(), this::showMenu));
     }
 
+    /** 시간제한 대전의 시간 선택. 커서는 기본 2분에서 시작한다. */
+    public List<MenuItem> timeLimitItems() {
+        List<MenuItem> items = new java.util.ArrayList<>();
+        for (Duration limit : TIME_LIMITS) {
+            String label = limit.toMinutes() + "분" + (limit.equals(DEFAULT_TIME_LIMIT) ? " (기본)" : "");
+            items.add(new MenuItem(label, () -> startBattle(GameMode.NORMAL, limit)));
+        }
+        items.add(new MenuItem("뒤로", this::showBattleModes));
+        return items;
+    }
+
+    public void showTimeLimits() {
+        show(new MenuScreen(this, timeLimitItems(), this::showBattleModes, TIME_LIMITS.indexOf(DEFAULT_TIME_LIMIT)));
+    }
+
     /** 한 컴퓨터에서 두 명이 하는 대전 시작. 결과는 스코어보드에 기록하지 않는다. */
     public void startBattle(GameMode mode) {
-        show(new BattleScreen(this, application.newLocalBattle(mode)));
+        startBattle(mode, null);
+    }
+
+    /** timeLimit이 있으면 시간제한 대전 (R3-05). */
+    public void startBattle(GameMode mode, Duration timeLimit) {
+        show(new BattleScreen(this, application.newLocalBattle(mode, timeLimit)));
         debugSetupHistory.clear();
     }
 

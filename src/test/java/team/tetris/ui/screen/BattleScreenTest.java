@@ -69,17 +69,49 @@ class BattleScreenTest {
     }
 
     @Test
-    void theTimeLimitEntryIsNotYetSelectableAndEscapeGoesBack() {
+    void theTimeLimitChoiceStartsAtTwoMinutesAndEscapeGoesBackStepByStep() {
+        // 안건 ⑪: 기본 2분, 시작 전에 1·2·3분 중 선택.
         router.showBattleModes();
         tap(KeyNames.DOWN);
         tap(KeyNames.DOWN);
         tap(KeyNames.ENTER);
-        assertInstanceOf(MenuScreen.class, router.current());
+        MenuScreen times = assertInstanceOf(MenuScreen.class, router.current());
+        assertEquals(1, times.cursor());
+        String text = router.render().text();
+        assertTrue(text.contains("1분") && text.contains("2분 (기본)") && text.contains("3분"));
 
         tap(KeyNames.ESCAPE);
+        assertEquals(router.battleModeItems().size(),
+                assertInstanceOf(MenuScreen.class, router.current()).items().size());
+        tap(KeyNames.ESCAPE);
+        assertEquals(router.menuItems().size(), assertInstanceOf(MenuScreen.class, router.current()).items().size());
+    }
 
-        MenuScreen main = assertInstanceOf(MenuScreen.class, router.current());
-        assertEquals(router.menuItems().size(), main.items().size());
+    @Test
+    void aTimedBattleShowsTheClockAndEndsByScoreAndARematchKeepsTheLimit() {
+        router.showTimeLimits();
+        tap(KeyNames.ENTER); // 기본 2분
+
+        assertEquals(java.time.Duration.ofMinutes(2).toNanos(), snapshot().timer().limitNanos());
+        assertTrue(router.render().rowText(0).contains("시간제한"));
+        assertTrue(router.render().rowText(0).contains("남은 시간 2:00"));
+        router.update(1_000_000_000L);
+        assertTrue(router.render().rowText(0).contains("남은 시간 1:59"));
+
+        tap("SPACE"); // 1P가 점수를 더 얻는다
+        router.update(java.time.Duration.ofMinutes(2).toNanos());
+
+        var result = battle().session().result().orElseThrow();
+        assertEquals(BattleEnd.TIME_UP, result.end());
+        assertEquals(BattlePlayer.ONE, result.winner());
+        assertTrue(router.render().text().contains("시간 종료 · 1P 승리!"));
+
+        router.update(BattleScreen.RESULT_INPUT_DELAY_NANOS);
+        tap(KeyNames.ENTER); // 다시 대전
+        assertTrue(battle().session().result().isEmpty());
+        // 새 대전은 같은 2분으로 다시 시작한다 (tap이 한 프레임을 흘린다).
+        assertEquals(java.time.Duration.ofMinutes(2).toNanos(), snapshot().timer().limitNanos());
+        assertEquals(java.time.Duration.ofMinutes(2).toNanos() - FRAME, snapshot().timer().remainingNanos());
     }
 
     @Test
@@ -276,11 +308,32 @@ class BattleScreenTest {
     }
 
     @Test
+    void keysPressedInTheFrameWhereTheTimeRunsOutStillCount() {
+        // 화면은 시간을 흘린 뒤 입력을 전달하므로, 만료되는 프레임에서는 입력을 먼저 전달해야 만료 직전에 누른
+        // 키가 버려지지 않는다 (안건 ㉓).
+        router.startBattle(GameMode.NORMAL, java.time.Duration.ofMinutes(1));
+        router.update(java.time.Duration.ofMinutes(1).toNanos() - FRAME / 2);
+        long before = snapshot().of(BattlePlayer.ONE).score();
+
+        TestApplication.tap(router, "SPACE"); // 만료 8ms 전에 1P 떨어뜨리기
+        router.update(FRAME);                 // 이 프레임 안에서 시간이 끝난다
+
+        var result = battle().session().result().orElseThrow();
+        assertEquals(BattleEnd.TIME_UP, result.end());
+        assertTrue(result.scoreOne() > before, "만료 직전 입력의 점수가 결과에 들어간다");
+        assertEquals(BattlePlayer.ONE, result.winner());
+    }
+
+    @Test
     void theResultTitlesCoverEveryEnding() {
         assertEquals("무승부", BattleScreen.resultTitle(
                 new team.tetris.application.battle.BattleResult(null, BattleEnd.BOTH_TOPPED_OUT, 1, 2)));
         assertEquals("대전 중단", BattleScreen.resultTitle(
                 new team.tetris.application.battle.BattleResult(null, BattleEnd.ABORTED, 1, 2)));
+        assertEquals("시간 종료 · 무승부", BattleScreen.resultTitle(
+                new team.tetris.application.battle.BattleResult(null, BattleEnd.TIME_UP_DRAW, 3, 3)));
+        assertEquals("시간 종료 · 2P 승리!", BattleScreen.resultTitle(
+                new team.tetris.application.battle.BattleResult(BattlePlayer.TWO, BattleEnd.TIME_UP, 1, 3)));
         assertEquals("2P 승리!", BattleScreen.resultTitle(
                 new team.tetris.application.battle.BattleResult(BattlePlayer.TWO, BattleEnd.TOPPED_OUT, 1, 2)));
         assertFalse(BattleScreen.PAUSE_ITEMS.isEmpty());

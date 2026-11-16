@@ -100,7 +100,7 @@ public final class TestApplication implements ApplicationContext {
 
     /** 로컬 대전: 두 플레이어가 같은 생성기 순서를 나눠 읽는다 (실제 조립과 같은 방식). */
     @Override
-    public StartedBattle newLocalBattle(GameMode mode) {
+    public StartedBattle newLocalBattle(GameMode mode, java.time.Duration timeLimit) {
         var loaded = settings.loadOrDefault();
         var difficulty = loaded.value().difficulty();
         var sequence = new SharedPieceSequence(generators.get());
@@ -114,7 +114,7 @@ public final class TestApplication implements ApplicationContext {
                 pieces = new ItemPieceSource(pieces, itemKinds, new Random(7L + player.ordinal()));
             }
             return new PlayerEngine(10, 20, pieces, incoming);
-        }, new ScorePolicy(), new SpeedPolicy(difficulty), mode, difficulty);
+        }, new ScorePolicy(), new SpeedPolicy(difficulty), mode, difficulty, timeLimit);
         return new StartedBattle(session, loaded);
     }
 
