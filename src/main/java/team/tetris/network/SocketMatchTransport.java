@@ -216,11 +216,13 @@ public final class SocketMatchTransport implements MatchTransport {
     }
 
     private void terminate(State state, String detail) {
+        // 종료 상태를 관찰한 스레드가 대기 메시지를 가져가지 않도록 공개 전에 비운다.
+        // 큐에 넣는 작업도 같은 모니터를 사용하므로 종료 처리 중 다시 채워지지 않는다.
+        incoming.clear();
+        outgoing.clear();
         status = new Status(state, detail, status.localPort());
         closeQuietly(socket);
         closeQuietly(listener);
-        incoming.clear();
-        outgoing.clear();
         workers.shutdownNow();
     }
 

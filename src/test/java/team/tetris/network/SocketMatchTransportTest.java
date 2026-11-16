@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Timeout;
 import team.tetris.application.model.Difficulty;
 import team.tetris.application.network.*;
@@ -188,7 +189,7 @@ class SocketMatchTransportTest {
         }
     }
 
-    @Test
+    @RepeatedTest(25)
     void receiveQueueOverflowFailsInsteadOfSilentlyLosingAttacks() throws Exception {
         try (var server = new SocketMatchTransport(); var peer = new Socket("127.0.0.1", listen(server))) {
             var codec = new MessageCodec();
