@@ -74,6 +74,11 @@ public final class P2pMatch {
     }
     public Optional<PlayerState> remote() { return Optional.ofNullable(remote); }
 
+    /** 자동 반복은 삭제 연출 뒤로 쌓지 않는다. 직접 누른 입력만 버퍼에 보관한다. */
+    public void handleRepeat(GameCommand command) {
+        if (local.snapshot().lineClearAnimation() == null) handle(command);
+    }
+
     public void handle(GameCommand command) {
         long receivedNanos = latency == null ? 0 : latency.now();
         receive();

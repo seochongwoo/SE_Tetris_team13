@@ -61,7 +61,7 @@ public final class P2pMatchScreen implements Screen {
             router.ignoreHeldKeys();
         }
         for (String key : repeats.dueWithoutCatchUp(clock.nanoTime())) {
-            keys.commandFor(key, status()).ifPresent(match::handle);
+            keys.commandFor(key, status()).ifPresent(match::handleRepeat);
         }
         if (finished && match.failure().isEmpty()) {
             resultElapsed = Math.min(2_000_000_000L, resultElapsed + Math.min(elapsedNanos, 2_000_000_000L));

@@ -17,6 +17,22 @@ class P2pMatchTest {
         assertEquals(reason, actual.reason());
     }
 
+    @Test void animationDoesNotQueueAutomaticMovementRepeats() {
+        try (var p = new Pair(Mode.NORMAL, twoLines(), empty())) {
+            p.s.handle(GameCommand.HARD_DROP);
+            for (int i = 0; i < 5; i++) p.s.handleRepeat(GameCommand.MOVE_LEFT);
+            p.s.update(1_000_000_000L);
+            var afterAnimation = p.s.local().active();
+            assertFalse(afterAnimation.isEmpty());
+            // Compare with a match receiving no automatic inputs during the animation.
+            try (var control = new Pair(Mode.NORMAL, twoLines(), empty())) {
+                control.s.handle(GameCommand.HARD_DROP);
+                control.s.update(1_000_000_000L);
+                assertEquals(control.s.local().active(), afterAnimation);
+            }
+        }
+    }
+
     @Test void delayedResultRestoresBothViewsToServerDecisionSnapshot() {
         try (var p = new Pair(Mode.TIMED, null, null)) {
             p.s.update(60_000_000_000L);
