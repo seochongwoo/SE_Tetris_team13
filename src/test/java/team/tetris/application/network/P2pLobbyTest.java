@@ -135,10 +135,11 @@ class P2pLobbyTest {
 
     @Test void failuresCancellationAndPeerLeaveCloseResources() {
         client.connect("192.168.1.2");
-        clientWire.status = new MatchTransport.Status(MatchTransport.State.FAILED, "Connection refused", 0);
+        String detail = "서버에 접속할 수 없습니다. 방이 열려 있는지 확인해 주세요.";
+        clientWire.status = new MatchTransport.Status(MatchTransport.State.FAILED, detail, 0);
         client.update();
         assertEquals(P2pLobby.Stage.FAILED, client.stage());
-        assertTrue(client.status().contains("Connection refused"));
+        assertTrue(client.status().contains(detail));
         assertTrue(clientWire.closed); assertEquals(0, ips.writes);
         connect();
         serverWire.incoming.add(new MatchEnvelope(0, 1, new Leave()));
