@@ -29,6 +29,28 @@ class P2pMatchSocketTest {
             Thread.sleep(5);
         }
     }
+    @ParameterizedTest @EnumSource(Role.class)
+    void closingWindowAwardsRemainingPeerWin(Role leaving) throws Exception {
+        try (var server = lobby(0)) {
+            server.host();
+            await(() -> server.localPort() > 0);
+            try (var client = lobby(server.localPort())) {
+                client.connect("127.0.0.1");
+                await(() -> { server.update(); client.update(); return client.configuration().isPresent(); });
+                server.ready();
+                client.ready();
+                await(() -> { server.update(); client.update(); return client.stage() == P2pLobby.Stage.STARTED; });
+                var remaining = leaving == Role.SERVER ? client : server;
+                var match = new AppComposition(directory).newP2pMatch(remaining.takeStartedMatch().orElseThrow());
+                (leaving == Role.SERVER ? server : client).close();
+                await(() -> { match.update(0); return match.result().isPresent(); });
+                assertEquals(leaving == Role.SERVER ? Outcome.CLIENT_WINS : Outcome.SERVER_WINS,
+                        match.result().orElseThrow().outcome());
+                assertTrue(match.failure().isEmpty());
+            }
+        }
+    }
+
     @ParameterizedTest @EnumSource(Mode.class)
     void realCompositionTwoGamesStatePauseResultAndNoScoreFile(Mode mode) throws Exception {
         var serverApp = new AppComposition(directory.resolve("server"));
