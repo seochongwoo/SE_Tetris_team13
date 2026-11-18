@@ -5,6 +5,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.net.ProtocolException;
 import java.util.ArrayList;
 import java.util.List;
 import team.tetris.application.model.Difficulty;
@@ -42,7 +43,7 @@ public final class MessageCodec {
             case Ping m -> { out.writeUTF("PING"); out.writeLong(m.id()); }
             case Pong m -> { out.writeUTF("PONG"); out.writeLong(m.id()); }
         }
-        if (buffer.size() > MAX_FRAME_BYTES) throw new IOException("Frame too large");
+        if (buffer.size() > MAX_FRAME_BYTES) throw new ProtocolException("보낼 메시지가 너무 큽니다.");
         output.writeInt(buffer.size());
         buffer.writeTo(output);
         output.flush();
@@ -50,7 +51,7 @@ public final class MessageCodec {
 
     public MatchEnvelope read(DataInputStream input) throws IOException {
         int size = input.readInt();
-        if (size <= 0 || size > MAX_FRAME_BYTES) throw new IOException("Invalid frame length: " + size);
+        if (size <= 0 || size > MAX_FRAME_BYTES) throw new ProtocolException("받은 메시지의 길이가 올바르지 않습니다.");
         byte[] bytes = new byte[size];
         input.readFully(bytes);
         var in = new DataInputStream(new ByteArrayInputStream(bytes));
@@ -75,8 +76,10 @@ public final class MessageCodec {
             };
             if (in.available() != 0) throw new IOException("Trailing frame data");
             return new MatchEnvelope(match, sequence, message);
-        } catch (IllegalArgumentException e) {
-            throw new IOException("Invalid message fields", e);
+        } catch (IOException | IllegalArgumentException e) {
+            var invalid = new ProtocolException("받은 메시지의 형식이 올바르지 않습니다.");
+            invalid.initCause(e);
+            throw invalid;
         }
     }
 
