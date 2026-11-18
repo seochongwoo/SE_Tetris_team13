@@ -90,7 +90,7 @@ public final class MatchProtocol {
                         ? Decision.WRONG_SENDER : Decision.ACCEPTED;
             case Result ignored -> sender != Role.SERVER ? Decision.WRONG_SENDER
                     : !inMatch() ? Decision.WRONG_STATE : Decision.ACCEPTED;
-            case Leave ignored -> Decision.ACCEPTED;
+            case Leave ignored -> phase == Phase.LOBBY ? Decision.WRONG_STATE : Decision.ACCEPTED;
             default -> Decision.WRONG_STATE;
         };
     }

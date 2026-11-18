@@ -107,7 +107,6 @@ public final class P2pLobby implements AutoCloseable {
                     case Lobby config -> applyConfiguration(config);
                     case Ready ready -> remoteReady = ready.ready();
                     case Start start -> start(envelope.get().matchId(), start);
-                    case Leave ignored -> fail("상대가 로비를 나갔습니다");
                     default -> { }
                 }
             }

@@ -40,7 +40,7 @@ Java 객체 직렬화 대신 다음 순서의 binary frame을 사용한다. 구�
 | PAUSE | owner 문자열, request boolean | request=true: 양쪽 중 본인이 owner인 정지 요청 / PLAYING. false: 서버 확정, PAUSED로 전환하고 재개 권한자를 기록 |
 | RESUME | request boolean | request=true: PAUSED에서 정지 owner만 요청. false: 서버 확정, PLAYING으로 전환 |
 | RESULT | outcome 문자열, reason 문자열 | 서버 / PLAYING·PAUSED. RESULT로 전환. 이후 상태·공격·정지·재개 메시지 적용 금지 |
-| LEAVE | 없음 | 양쪽 / 로비 및 경기·결과. 송신자가 나감을 통지하고 해당 준비를 해제. 경기 중/정지 중 상대 승리 확정은 카드 24의 서버가 RESULT로 보냄 |
+| LEAVE | 없음 | 양쪽 / 경기·결과. 송신자가 나감을 통지한다. 경기 중/정지 중 상대 승리 확정은 카드 24의 서버가 RESULT로 보냄 |
 | PING | id int64 | 양쪽 / CONNECTED 수명 전체, matchId=0. 어댑터가 1초마다 전송 |
 | PONG | id int64 | 상대 PING의 id를 그대로 응답, matchId=0. 어댑터에서 소비 |
 
@@ -70,7 +70,7 @@ Tile은 shape 문자열 다음 item 문자열이다. shape는 `EMPTY/I/O/T/S/Z/J
 
 ## 4. 경기 번호·순서·중복
 
-- LOBBY/READY 및 transport 제어 메시지는 matchId=0. START는 이전 경기보다 큰 양수. STATE/ATTACK/PAUSE/RESUME/RESULT는 현재 경기 번호. LEAVE는 로비에서 0, 그 밖에는 현재 경기 번호다.
+- LOBBY/READY 및 transport 제어 메시지는 matchId=0. START는 이전 경기보다 큰 양수. STATE/ATTACK/PAUSE/RESUME/RESULT는 현재 경기 번호. LEAVE도 현재 경기 번호를 쓴다. 로비에서 나가면 소켓을 닫고 상대는 연결 종료를 감지한다.
 - sequence는 **application 메시지의 송신자별 연결 전체 순번**이다. 1에서 시작하고 재대전에도 리셋하지 않는다. 로컬 발신 전과 원격 수신 후 동일한 `MatchProtocol.accept(sender, envelope)`를 호출한다. sender는 연결 역할에서 결정하며 payload로 임의 지정하지 않는다.
 - HELLO/PING/PONG은 어댑터 전용이다. HELLO의 sequence는 1, heartbeat는 id를 sequence에도 사용한다. application의 순번 검사와 별개이며 `poll()`로 나오지 않는다.
 - 이미 승인한 sequence 이하의 메시지 및 현재 경기에서 이미 승인한 eventId 이하의 ATTACK은 `DUPLICATE`. 다른 경기 메시지는 `STALE_MATCH`. 틀린 상태/권한/설정은 각각 `WRONG_STATE` / `WRONG_SENDER` / `STALE_CONFIGURATION`이다. 거부 시 게임과 검사기 상태는 바뀌지 않는다.

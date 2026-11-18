@@ -108,8 +108,8 @@ public final class ScreenRouter {
         return List.of(
                 new MenuItem("게임 시작", this::startGame),
                 new MenuItem("아이템 모드", this::startItemGame),
-                new MenuItem("P2P 대전", this::showP2pLobby),
                 new MenuItem("대전 모드", this::showBattleModes),
+                new MenuItem("P2P 대전", this::showP2pLobby),
                 new MenuItem("설정", this::showSettings),
                 new MenuItem("스코어보드", this::showScoreboard),
                 new MenuItem("종료", this::exit));
