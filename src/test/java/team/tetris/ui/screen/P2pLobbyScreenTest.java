@@ -9,6 +9,7 @@ import team.tetris.application.network.LobbyTestSupport.*;
 import team.tetris.application.port.MatchTransport;
 import team.tetris.ui.ScreenRouter;
 import team.tetris.ui.TestApplication;
+import team.tetris.ui.input.KeyNames;
 import static org.junit.jupiter.api.Assertions.*;
 
 class P2pLobbyScreenTest {
@@ -21,7 +22,7 @@ class P2pLobbyScreenTest {
     private final ScreenRouter router = app.router();
     private void tap(String key) { TestApplication.tap(router, key); }
     private void enter() {
-        for (int i = 0; i < 2; i++) tap("DOWN");
+        for (int i = 0; i < 3; i++) tap("DOWN");
         tap("ENTER");
         assertInstanceOf(P2pLobbyScreen.class, router.current());
     }
@@ -41,12 +42,14 @@ class P2pLobbyScreenTest {
 
     @Test void clientInputValidationConnectionAndServerOnlyConfiguration() {
         enter(); tap("DOWN"); tap("ENTER");
+        assertTrue(router.render().text().contains("접속할 서버의 IPv4 주소를 입력하세요"));
+        assertFalse(router.render().text().contains("서버 또는 클라이언트를 선택하세요"));
         for (char c : "999.1.1.1".toCharArray()) router.charTyped(c);
         tap("ENTER");
         assertTrue(router.render().text().contains("IPv4 주소를 입력하세요"));
         tap("DELETE");
         for (char c : "127.0.0.12".toCharArray()) router.charTyped(c);
-        tap("BACKSPACE"); router.charTyped('x');
+        tap(KeyNames.BACK_SPACE); router.charTyped('x');
         assertEquals("127.0.0.1", ((P2pLobbyScreen) router.current()).input());
         tap("ENTER");
         assertTrue(router.render().text().contains("접속 중"));
@@ -54,6 +57,7 @@ class P2pLobbyScreenTest {
         transport.incoming.add(new MatchEnvelope(0, 1, new Lobby(1, Mode.TIMED, Difficulty.HARD, 180)));
         router.update(1);
         assertTrue(router.render().text().contains("연결됨"));
+        assertTrue(router.render().text().contains("난이도: 어려움"));
         assertTrue(router.render().text().contains("3분"));
         tap("LEFT"); tap("UP");
         assertEquals(Mode.TIMED, lobby.configuration().orElseThrow().mode());
@@ -67,6 +71,7 @@ class P2pLobbyScreenTest {
 
     @Test void serverControlsDefaultTimeAndReadyResetAndStartedDisplay() {
         enter(); tap("ENTER"); transport.connected(); router.update(1);
+        assertTrue(router.render().text().contains("난이도: 보통"));
         tap("RIGHT");
         assertEquals(Mode.ITEM, lobby.configuration().orElseThrow().mode());
         tap("RIGHT");
