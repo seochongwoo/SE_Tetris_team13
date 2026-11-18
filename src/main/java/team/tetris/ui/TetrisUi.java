@@ -93,6 +93,9 @@ public final class TetrisUi implements GameUi {
                 String key = KeyNames.nameOf(event.getKeyCode());
                 if (key != null) {
                     router.keyPressed(key);
+                    if (!router.hasExited() && router.current() instanceof team.tetris.ui.screen.P2pMatchScreen) {
+                        panel.show(router.render());
+                    }
                 }
             }
 
