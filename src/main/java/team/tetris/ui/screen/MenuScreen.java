@@ -133,13 +133,13 @@ public final class MenuScreen implements Screen {
         TextStyle light = new TextStyle(HINT, palette.background(), false);
         frame.putCentered(TITLE_TOP + 5, "SE Tetris · Team 13", light);
 
-        // 대성당은 왼쪽, 메뉴는 오른쪽 하늘의 패널 위에 둔다. 항목은 두 줄 간격.
+        // 대성당은 왼쪽, 메뉴는 오른쪽 하늘의 패널 위에 둔다.
         int itemsTop = itemsTop(items.size());
         int panelRight = PANEL_LEFT + PANEL_WIDTH;
-        frame.addPlate(PANEL_LEFT, itemsTop - 1, PANEL_WIDTH, items.size() * 2 + 1);
+        frame.addPlate(PANEL_LEFT, itemsTop - 1, PANEL_WIDTH, panelHeight(items.size()));
         frame.addPlate(1, HINT_ROW, TextFrame.COLUMNS - 2, 1);
         for (int i = 0; i < items.size(); i++) {
-            int row = itemsTop + i * 2;
+            int row = itemsTop + i * itemSpacing(items.size());
             String label = items.get(i).label();
             if (i == cursor) {
                 frame.fill(PANEL_LEFT + 1, row, PANEL_WIDTH - 2, 1, palette.highlightStyle());
@@ -183,13 +183,20 @@ public final class MenuScreen implements Screen {
         }
     }
 
-    /**
-     * 메뉴 항목 첫 줄. 항목이 적으면 패널 안에서 세로 가운데로 내리고, 패널보다 많으면(대전 모드를 더한 6개)
-     * 넘치는 만큼 위로 올려 땅을 덮지 않게 한다. 위쪽은 부제 아래 하늘이라 비어 있다.
-     */
+    /** 두 줄 간격으로 부제와 땅 사이에 들어가지 않으면 한 줄 간격으로 표시한다. */
+    private static int itemSpacing(int itemCount) {
+        int skyRows = GROUND_ROW - (TITLE_TOP + 6);
+        return itemCount * 2 + 1 <= skyRows ? 2 : 1;
+    }
+
+    private static int panelHeight(int itemCount) {
+        return (itemCount - 1) * itemSpacing(itemCount) + 3; // 첫 항목과 위아래 여백 포함
+    }
+
+    /** 하늘 영역 안에서 메뉴를 세로로 가운데 정렬한다. */
     static int itemsTop(int itemCount) {
         int panelRows = GROUND_ROW - PANEL_TOP;
-        return PANEL_TOP + 1 + Math.floorDiv(panelRows - (itemCount * 2 + 1), 2);
+        return PANEL_TOP + 1 + Math.floorDiv(panelRows - panelHeight(itemCount), 2);
     }
 
     private static void drawTitle(TextFrame frame, ColorPalette palette) {

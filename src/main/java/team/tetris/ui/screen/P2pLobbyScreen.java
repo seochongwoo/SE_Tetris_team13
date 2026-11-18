@@ -2,7 +2,9 @@ package team.tetris.ui.screen;
 
 import team.tetris.application.network.P2pLobby;
 import team.tetris.application.network.MatchMessage.Mode;
+import team.tetris.ui.DisplayNames;
 import team.tetris.ui.ScreenRouter;
+import team.tetris.ui.input.KeyNames;
 import team.tetris.ui.render.TextFrame;
 import team.tetris.ui.render.TextStyle;
 
@@ -47,7 +49,7 @@ public final class P2pLobbyScreen implements Screen {
                             input = lobby.recent().addresses().get(recentCursor);
                         }
                     }
-                    case "BACKSPACE" -> { if (!input.isEmpty()) input = input.substring(0, input.length() - 1); }
+                    case KeyNames.BACK_SPACE -> { if (!input.isEmpty()) input = input.substring(0, input.length() - 1); }
                     case "DELETE" -> input = "";
                     case "ENTER" -> {
                         try { lobby.connect(input); clientEntry = false; error = ""; router.ignoreHeldKeys(); }
@@ -108,7 +110,8 @@ public final class P2pLobbyScreen implements Screen {
         var frame = TextFrame.blank(palette.base());
         frame.putCentered(1, "P2P 대전", palette.base());
         frame.put(2, 3, "포트: " + P2pLobby.PORT, palette.base());
-        wrapped(frame, 5, error.isEmpty() ? lobby.status() : error, palette.base(), 3);
+        String prompt = clientEntry ? "접속할 서버의 IPv4 주소를 입력하세요" : lobby.status();
+        wrapped(frame, 5, error.isEmpty() ? prompt : error, palette.base(), 3);
         if (lobby.stage() == P2pLobby.Stage.CHOICE) {
             if (!clientEntry) {
                 frame.put(4, 10, (roleCursor == 0 ? "> " : "  ") + "서버", palette.base());
@@ -136,7 +139,7 @@ public final class P2pLobbyScreen implements Screen {
             lobby.configuration().ifPresent(config -> {
                 String mode = switch (config.mode()) { case NORMAL -> "일반"; case ITEM -> "아이템"; case TIMED -> "시간제한"; };
                 frame.put(2, 9, "모드: " + mode, palette.base());
-                frame.put(2, 10, "난이도: " + config.difficulty(), palette.base());
+                frame.put(2, 10, "난이도: " + DisplayNames.of(config.difficulty()), palette.base());
                 if (config.mode() == Mode.TIMED) frame.put(2, 11, "제한시간: " + config.timeLimitSeconds() / 60 + "분", palette.base());
             });
             frame.put(2, 13, "나: " + (lobby.localReady() ? "준비 완료" : "대기"), palette.base());

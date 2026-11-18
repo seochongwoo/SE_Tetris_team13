@@ -39,7 +39,7 @@ class MenuScreenTest {
 
         assertTrue(text.contains("█"));
         assertTrue(text.contains("SE Tetris"));
-        for (String label : List.of("게임 시작", "아이템 모드", "P2P 대전", "대전 모드", "설정", "스코어보드", "종료")) {
+        for (String label : List.of("게임 시작", "아이템 모드", "대전 모드", "P2P 대전", "설정", "스코어보드", "종료")) {
             assertTrue(text.contains(label), label);
         }
         assertTrue(text.contains("이동") && text.contains("Enter") && text.contains("선택"));
@@ -66,7 +66,6 @@ class MenuScreenTest {
         assertInstanceOf(GameScreen.class, router.current()); // 아이템 모드
 
         router.showMenu();
-        tap("DOWN");
         tap("DOWN");
         tap("DOWN");
         tap("ENTER");
@@ -141,7 +140,14 @@ class MenuScreenTest {
         int items = menu().items().size();
         int itemsTop = MenuScreen.itemsTop(items);
 
-        assertTrue(frame.plates().stream().anyMatch(plate -> plate.y < itemsTop && plate.y + plate.height > itemsTop + items));
+        var panel = frame.plates().stream().filter(plate -> plate.x == MenuScreen.PANEL_LEFT).findFirst().orElseThrow();
+        assertTrue(panel.y > 6); // 부제 아래
+        assertTrue(panel.y + panel.height <= 21); // 배경의 땅 위
+        var panelRows = java.util.stream.IntStream.range(panel.y, panel.y + panel.height)
+                .mapToObj(frame::rowText).toList();
+        for (var item : menu().items()) {
+            assertTrue(panelRows.stream().anyMatch(row -> row.contains(item.label())), item.label());
+        }
         assertTrue(frame.plates().stream().anyMatch(plate -> plate.y == MenuScreen.HINT_ROW));
         assertTrue(MenuScreen.HINT_ROW < TextFrame.ROWS - 1);
         assertTrue(frame.rowText(MenuScreen.HINT_ROW).contains(" Enter  선택"));

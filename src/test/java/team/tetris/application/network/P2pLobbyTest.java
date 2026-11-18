@@ -133,7 +133,7 @@ class P2pLobbyTest {
         assertInstanceOf(Result.class, clientStart.connection().receive().orElseThrow().message());
     }
 
-    @Test void failuresCancellationAndPeerLeaveCloseResources() {
+    @Test void failuresCancellationAndPeerDisconnectCloseResources() {
         client.connect("192.168.1.2");
         String detail = "서버에 접속할 수 없습니다. 방이 열려 있는지 확인해 주세요.";
         clientWire.status = new MatchTransport.Status(MatchTransport.State.FAILED, detail, 0);
@@ -142,9 +142,10 @@ class P2pLobbyTest {
         assertTrue(client.status().contains(detail));
         assertTrue(clientWire.closed); assertEquals(0, ips.writes);
         connect();
-        serverWire.incoming.add(new MatchEnvelope(0, 1, new Leave()));
+        serverWire.status = new MatchTransport.Status(MatchTransport.State.CLOSED, "", 0);
         server.update();
         assertEquals(P2pLobby.Stage.FAILED, server.stage());
+        assertTrue(server.status().contains("상대 연결이 종료되었습니다"));
         assertTrue(serverWire.closed);
         client.reset();
         assertEquals(P2pLobby.Stage.CHOICE, client.stage());

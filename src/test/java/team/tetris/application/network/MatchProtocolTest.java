@@ -88,6 +88,7 @@ class MatchProtocolTest {
 
     @Test
     void leavingWhilePausedStillAllowsServerResultAndLobbyReturn() {
+        assertEquals(WRONG_STATE, apply(Role.CLIENT, 0, new Leave()));
         start(1, 1);
         assertEquals(ACCEPTED, apply(Role.SERVER, 1, new Pause(Role.SERVER, false)));
         assertEquals(ACCEPTED, apply(Role.CLIENT, 1, new Leave()));
