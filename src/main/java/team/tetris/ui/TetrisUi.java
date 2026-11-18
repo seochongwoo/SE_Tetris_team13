@@ -87,7 +87,7 @@ public final class TetrisUi implements GameUi {
             }
         });
 
-        panel.addKeyListener(new KeyAdapter() {
+        KeyAdapter gameKeys = new KeyAdapter() {
             @Override
             public void keyPressed(KeyEvent event) {
                 String key = KeyNames.nameOf(event.getKeyCode());
@@ -114,6 +114,13 @@ public final class TetrisUi implements GameUi {
                     router.charTyped(character);
                 }
             }
+        };
+        var keyFilter = new team.tetris.ui.input.KeyReleaseFilter(SwingUtilities::invokeLater,
+                gameKeys::keyPressed, gameKeys::keyReleased);
+        panel.addKeyListener(new KeyAdapter() {
+            @Override public void keyPressed(KeyEvent event) { keyFilter.press(event); }
+            @Override public void keyReleased(KeyEvent event) { keyFilter.release(event); }
+            @Override public void keyTyped(KeyEvent event) { gameKeys.keyTyped(event); }
         });
         window.addWindowListener(new WindowAdapter() {
             @Override
