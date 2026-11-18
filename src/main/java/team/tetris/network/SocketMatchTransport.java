@@ -4,10 +4,17 @@ import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
+import java.net.BindException;
+import java.net.ConnectException;
 import java.net.InetSocketAddress;
+import java.net.ProtocolException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
@@ -48,14 +55,15 @@ public final class SocketMatchTransport implements MatchTransport {
 
     @Override
     public synchronized void connect(String host, int port) {
-        if (Objects.requireNonNull(host).isBlank()) throw new IllegalArgumentException("Host is blank");
+        if (Objects.requireNonNull(host, "서버 주소를 입력해 주세요.").isBlank())
+            throw new IllegalArgumentException("서버 주소를 입력해 주세요.");
         checkPort(port, false);
         begin(State.CONNECTING);
         workers.execute(() -> connectPeer(host, port));
     }
 
     private void begin(State state) {
-        if (status.state() != State.NEW) throw new IllegalStateException("Create a new transport for each connection");
+        if (status.state() != State.NEW) throw new IllegalStateException("이미 사용한 연결입니다. 새 연결을 만들어 주세요.");
         status = new Status(state, "", 0);
     }
 
@@ -106,9 +114,9 @@ public final class SocketMatchTransport implements MatchTransport {
         codec.write(out, new MatchEnvelope(0, 1, new Hello(version, role)));
         MatchEnvelope first = codec.read(in);
         if (first.matchId() != 0 || !(first.message() instanceof Hello hello))
-            throw new IOException("Expected HELLO before game messages");
-        if (hello.version() != version) throw new IOException("Incompatible protocol version: " + hello.version());
-        if (hello.role() == role) throw new IOException("Peer must have the opposite role");
+            throw new ProtocolException("상대방이 올바른 접속 정보를 보내지 않았습니다.");
+        if (hello.version() != version) throw new ProtocolException("상대방과 통신 버전이 다릅니다. 같은 버전의 게임을 사용해 주세요.");
+        if (hello.role() == role) throw new ProtocolException("한쪽은 방을 만들고 다른 쪽은 참가해 주세요.");
         peer.setSoTimeout(0);
         synchronized (this) {
             if (terminal()) return;
@@ -123,15 +131,18 @@ public final class SocketMatchTransport implements MatchTransport {
         while (!terminal()) {
             MatchEnvelope envelope = codec.read(in);
             MatchMessage message = envelope.message();
-            if (message instanceof Hello) throw new IOException("Repeated HELLO");
+            if (message instanceof Hello) throw new ProtocolException("상대방이 접속 정보를 중복해서 보냈습니다.");
             if (message instanceof Ping || message instanceof Pong) {
-                if (envelope.matchId() != 0) throw new IOException("Heartbeat must use match 0");
+                if (envelope.matchId() != 0) throw new ProtocolException("상대방이 잘못된 연결 확인 메시지를 보냈습니다.");
                 if (message instanceof Ping request) enqueue(new MatchEnvelope(0, request.id(), new Pong(request.id())));
                 else ping.received(((Pong) message).id());
             } else {
                 synchronized (this) {
                     if (terminal()) return;
-                    if (!incoming.offer(envelope)) throw new IOException("Receive queue overflow");
+                    if (!incoming.offer(envelope)) {
+                        terminate(State.FAILED, "수신 대기 중인 메시지가 너무 많습니다.");
+                        return;
+                    }
                 }
             }
         }
@@ -166,16 +177,16 @@ public final class SocketMatchTransport implements MatchTransport {
 
     @Override
     public synchronized void send(MatchEnvelope envelope) {
-        Objects.requireNonNull(envelope);
+        Objects.requireNonNull(envelope, "보낼 메시지가 없습니다.");
         if (envelope.message() instanceof Hello || envelope.message() instanceof Ping || envelope.message() instanceof Pong)
-            throw new IllegalArgumentException("Handshake and heartbeat belong to the transport");
-        if (status.state() != State.CONNECTED) throw new IllegalStateException("Transport is not connected");
+            throw new IllegalArgumentException("접속 정보와 연결 확인 메시지는 자동으로 전송됩니다.");
+        if (status.state() != State.CONNECTED) throw new IllegalStateException("연결된 상태에서만 메시지를 보낼 수 있습니다.");
         enqueue(envelope);
     }
 
     private synchronized void enqueue(MatchEnvelope envelope) {
         if (terminal()) return;
-        if (!outgoing.offer(envelope)) terminate(State.FAILED, "Send queue overflow");
+        if (!outgoing.offer(envelope)) terminate(State.FAILED, "전송 대기 중인 메시지가 너무 많습니다.");
     }
 
     @Override
@@ -190,7 +201,19 @@ public final class SocketMatchTransport implements MatchTransport {
     private boolean terminal() { return status.state() == State.CLOSED || status.state() == State.FAILED; }
 
     private synchronized void fail(Exception error) {
-        if (!terminal()) terminate(State.FAILED, error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage());
+        if (terminal()) return;
+        String detail = switch (error) {
+            case ProtocolException protocol -> protocol.getMessage();
+            case BindException ignored -> "대기 포트를 열 수 없습니다. 포트가 사용 중인지 확인해 주세요.";
+            case UnknownHostException ignored -> "서버 주소를 찾을 수 없습니다. 주소를 확인해 주세요.";
+            case ConnectException ignored -> "서버에 접속할 수 없습니다. 방이 열려 있는지 확인해 주세요.";
+            case SocketTimeoutException ignored -> "상대방의 응답 시간이 초과되었습니다.";
+            case EOFException ignored -> "상대방과의 연결이 끊어졌습니다.";
+            case SocketException ignored when status.state() == State.HANDSHAKING || status.state() == State.CONNECTED ->
+                    "상대방과의 연결이 끊어졌습니다.";
+            default -> "네트워크 오류가 발생했습니다. 연결 상태를 확인해 주세요.";
+        };
+        terminate(State.FAILED, detail);
     }
 
     @Override
@@ -216,6 +239,8 @@ public final class SocketMatchTransport implements MatchTransport {
     }
 
     private static void checkPort(int port, boolean ephemeralAllowed) {
-        if (port < (ephemeralAllowed ? 0 : 1) || port > 65_535) throw new IllegalArgumentException("Invalid port");
+        int minPort = ephemeralAllowed ? 0 : 1;
+        if (port < minPort || port > 65_535)
+            throw new IllegalArgumentException("포트 번호는 " + minPort + " 이상 65535 이하로 입력해 주세요.");
     }
 }
