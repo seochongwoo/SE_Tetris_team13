@@ -10,7 +10,7 @@
 - 접속과 핸드셰이크 읽기 타임아웃은 각각 3초다. 정상 연결 후에는 읽기 타임아웃으로 경기 종료를 판단하지 않는다. 카드 25에서 3초 무응답 정책을 적용한다.
 - 송신도 유한 큐(256개)에 넣고 즉시 반환한다. 별도 writer가 FIFO로 전송한다. 수신 큐도 256개이며, 어느 큐든 넘치면 메시지를 조용히 버리지 않고 연결을 실패 처리한다. 한 프레임은 최대 16KiB다.
 - `close()`는 대기 중인 accept/connect와 연결 소켓을 닫고 작업을 중단하며 큐를 비운다. 실패도 같은 자원 정리를 수행한다. 종료된 객체를 재사용하지 않고 새 어댑터로 재접속한다. 연결을 유지하는 재대전은 같은 어댑터를 사용한다.
-- 종료 시 미전송 메시지는 보장하지 않는다. 정상 경기 종료는 `RESULT`를 전송하고 연결을 유지한다. `LEAVE`에 따른 결과 교환을 마치기 전에 `close()`하지 않는다. 갑작스러운 종료/EOF는 끊김으로 처리한다.
+- 종료 시 미전송 메시지는 보장하지 않는다. 정상 경기 종료는 `RESULT`를 전송하고 연결을 유지한다. `LEAVE`에 따른 결과 교환을 마치기 전에 `close()`하지 않는다. 경기 중 상대 연결이 끊어지면 남은 쪽에 승리를 표시하고 P2P 첫 화면으로 돌아간다.
 
 ## 2. 호환성과 프레임 형식
 
@@ -159,17 +159,17 @@ PING을 실제 writer가 쓰기 직전에 로컬 `System.nanoTime()`을 저장�
 ### 실행·상태·종료 계약
 
 - `AppComposition.newP2pMatch`가 로비에서 받은 설정·시드로 **자기 엔진 하나**와 `SinglePlayerSession`, `AttackQueue`를 만든다. 기본 블록 생성기는 같은 시드와 난이도를 사용하며 아이템 난수·삭제 줄 수·효과는 각자 독립이다. 아이템 공급과 공격 계산은 로컬 대전과 같은 `ItemPieceSource`, `AttackRule`, `AttackQueue`를 쓴다.
-- EDT의 `P2pMatch.update`/`handle`이 수신한 메시지를 검증하고 자기 엔진을 진행한다. 수신 스레드는 엔진에 접근하지 않는다. 매 프레임과 입력 직후 `STATE`를 보내며 상대는 `PlayerStates`의 화면 DTO만 그린다. 엔진 레벨 0은 표시 레벨 1로 변환한다. 삭제 연출의 복원·지워지는 칸을 투영하되 논리적 패배와 결과에는 연출을 제거한다.
+- EDT의 `P2pMatch.update`/`handle`이 수신한 메시지를 검증하고 자기 엔진을 진행한다. 수신 스레드는 엔진에 접근하지 않는다. 매 프레임과 입력 직후 `STATE`를 보내며 상대는 `PlayerStates`의 화면 DTO만 그린다. 레벨은 전송 시 1부터 인코딩하고, 화면에는 엔진과 같이 0부터 표시한다. 삭제 연출의 복원·지워지는 칸을 투영하되 논리적 패배와 결과에는 연출을 제거한다.
 - 블록 고정으로 생긴 `ATTACK`은 고유 eventId로 즉시 전송한다. 수신 공격은 대기열에만 넣으며 자기 블록 고정 후 다음 생성 전에 적용한다. 최대 10줄·행 순서·아이템 제거는 기존 규칙을 사용한다. 정지 전에 전송 중이던 공격은 정지 상태에서도 대기열에 보관한다.
 - 서버 프레임이 남은 시간을 감소시키며 클라이언트는 서버 값을 표시한다. 프레임 경과는 남은 시간까지 잘라 적용한다. 서버가 이번 프레임에 받은 원격 상태와 로컬 진행 결과로 판정하며, 같은 프레임의 양쪽 패배는 무승부, 패배와 시간 만료가 겹치면 패배가 우선한다. 시간 만료 점수는 그 서버 판정 시점까지 받은 최신 클라이언트 점수와 서버 점수이다. 두 PC의 동기화되지 않은 시계로 사건 순서를 추정하지 않는다. 결과는 서버만 확정한다. `RESULT`에 판정에 사용한 양쪽 `PlayerState`를 함께 넣어 결과 화면을 고정한다. 결과 수신 지연 중 클라이언트에서 추가된 점수·보드는 최종 화면에 반영하지 않으며, 양쪽 화면의 점수와 판정 근거를 일치시킨다. 최초 상대 `STATE` 수신 전 기권처럼 상대 화면을 아직 모르는 경우에만 양쪽 최종 화면을 생략한다.
-- 어느 쪽이든 정지 요청 가능. 서버가 정지를 확정하고 정지 요청자만 재개한다. 재개를 수신한 프레임은 이전 정지 중 경과 시간을 버린다. 정지 중 입력·중력·시간은 진행하지 않는다. 줄 삭제 연출 중 입력은 순서대로 보관하고 연출 후 적용하며 정지·기권·결과 때 비운다.
+- 어느 쪽이든 정지 요청 가능. 서버가 정지를 확정하고 정지 요청자만 재개한다. 재개를 수신한 프레임은 이전 정지 중 경과 시간을 버린다. 정지 중 입력·중력·시간은 진행하지 않는다. 줄 삭제 연출 중 블록 조작 입력은 무시한다.
 - 기권은 `LEAVE`→서버 `RESULT` 교환을 마치며 소켓을 바로 닫지 않는다. 결과 확정 후 입력·점수·공격을 적용하지 않는다. `RESULT` 수신 즉시 메시지 소비를 멈춰 뒤따른 `LOBBY`를 경기 화면이 삼키지 않게 한다.
 - 결과를 **2초 표시**한 뒤 같은 `P2pLobby.returnAfterResult()`로 돌아간다. 서버가 새 revision을 보내고 양쪽 준비를 초기화한다. 다시 양쪽 Enter를 눌러야 새 matchId로 새 엔진·타이머·점수·대기열·아이템 효과를 생성한다. 연결과 송신 순번은 유지한다. 경기 화면은 `EndGameCoordinator`와 점수 저장소를 호출하지 않는다.
 - 연결 실패는 경기 진행을 멈추고 연결 자원을 정리한다. 사유를 2초 표시한 뒤 P2P 첫 화면으로 자동 복귀하며 Enter/Esc로 바로 복귀할 수도 있다. RTT 랙 표시·3초 무응답 정책은 카드 25에서 구현했다(9장).
 
 ### 화면과 조작
 
-양쪽 10×20 보드, NEXT, 점수·레벨·삭제 줄·2배 잔여 횟수, 최대 10줄 대기 공격을 88×28 격자로 표시한다. 내 보드는 왼쪽, 상대는 오른쪽이다. 공격 칸은 회색과 전용 가로줄 무늬를 사용한다. 기존 개인 키 설정·반복 입력을 사용하고 하단에 정지·재개·기권 키를 표시한다. 포커스 상실은 정지 요청을 보낸다. 화면 전환 시 Swing 창을 다시 맞추며 기존 크기 3단계와 모니터 크기 제한을 유지한다.
+양쪽 10×20 보드, NEXT, 점수·레벨·삭제 줄·2배 잔여 횟수, 최대 10줄 대기 공격을 88×28 격자로 표시한다. 내 보드는 왼쪽, 상대는 오른쪽이다. 공격 칸은 회색과 전용 가로줄 무늬를 사용한다. 기존 개인 키 설정·반복 입력을 사용하고 하단에 정지·재개·기권 키를 표시한다. 진행 중 기권 키는 정지를 요청하고 정지 중에는 기권한다. 포커스를 잃으면 키 반복만 해제한다. 화면 전환 시 Swing 창을 다시 맞추며 기존 크기 3단계와 모니터 크기 제한을 유지한다.
 
 카드 19의 기존 `feat/battle-screen` 커밋 `2269a1803e61a46bd7633533d3de47fe91394b8b`에서 로컬 대전 화면·키·렌더러 및 관련 테스트를 통합했다. P2P 항목은 아이템 모드 바로 아래에 유지하고 로컬 대전을 그다음에 배치한다. `BoardPainter`의 블록·아이템 표시를 단일/로컬/P2P에서 공유하고 창 크기 전환도 함께 처리한다. 카드 18 키 설정과 카드 20 로컬 시간제한 선택은 아직 미구현이며 카드 20·21 후속 작업과 최종 통합은 남아 있다. 원래 브랜치의 리뷰·머지 완료를 대신하지 않는다.
 
@@ -262,7 +262,7 @@ N3-02의 접속 자동화와 N3-03의 저하 환경 대비를 카드 22~25 테�
 | 잘못된 IP와 접속 실패 (N3-02, R3-23, R3-31~32) | [P2pLobbyScreenTest](../src/test/java/team/tetris/ui/screen/P2pLobbyScreenTest.java).`clientInputValidationConnectionAndServerOnlyConfiguration`: 잘못된 IPv4 안내 후 수정·접속. [SocketMatchTransportTest](../src/test/java/team/tetris/network/SocketMatchTransportTest.java).`connectionFailuresAndInvalidLifecycleAreObservable`: localhost 연결 거부·포트 충돌. [P2pLobbyTest](../src/test/java/team/tetris/application/network/P2pLobbyTest.java).`failuresCancellationAndPeerLeaveCloseResources`: 실패 IP 미저장 |
 | 비호환 버전 (N3-02, H3-10) | [SocketMatchTransportTest](../src/test/java/team/tetris/network/SocketMatchTransportTest.java).`handshakeRejectsIncompatibleProtocolsOnBothEnds`: 양쪽 거부. [P2pLobbySocketTest](../src/test/java/team/tetris/network/P2pLobbySocketTest.java).`incompatiblePeerFailsWithoutSavingIp`: 로비 실패 안내·IP 미저장 |
 | 접속 중 끊김과 재접속 (N3-02~03, R3-29) | **신규** [P2pRecoverySocketTest](../src/test/java/team/tetris/network/P2pRecoverySocketTest.java).`peerDisconnectDuringHandshakeFailsWithoutSavingIpAndCanReconnect`: 서버/클라이언트 각각 HELLO 전 EOF, IP 미저장·작업 종료, 같은 포트 재접속 후 경기·결과 교환. CONNECTING/HANDSHAKING 화면의 실패·확인은 [P2pNetworkFailureScreenTest](../src/test/java/team/tetris/ui/screen/P2pNetworkFailureScreenTest.java).`connectionErrorsAlsoAutoReturnAndCanBeAcknowledgedEarly` |
-| 로비·경기 중 끊김과 재접속 (N3-02~03, R3-29) | **신규** [P2pRecoverySocketTest](../src/test/java/team/tetris/network/P2pRecoverySocketTest.java).`peerDisconnectInLobbyOrGameStopsSessionAndReconnectsOnSamePort`: 로비/경기 × 양쪽 역할 4개 사례. 실제 EOF → 실패 전달·작업/큐 정리 → 입력·시간·보드 정지, 통신 오류를 승패로 확정하지 않음 → 동일 포트에서 준비·점수·대기열·시간 초기화 후 새 경기, 점수 파일 미생성 |
+| 로비·경기 중 끊김과 재접속 (N3-02~03, R3-29) | **신규** [P2pRecoverySocketTest](../src/test/java/team/tetris/network/P2pRecoverySocketTest.java).`peerDisconnectInLobbyOrGameStopsSessionAndReconnectsOnSamePort`: 로비/경기 × 양쪽 역할 4개 사례. 실제 EOF → 작업/큐 정리 → 로비에서는 연결 실패, 경기에서는 남은 쪽 승리 및 입력·시간·보드 정지 → 동일 포트에서 준비·점수·대기열·시간 초기화 후 새 경기, 점수 파일 미생성 |
 | 지연·회복·끊김의 경계 (N3-03, R3-28~30) | [PingTrackerTest](../src/test/java/team/tetris/network/PingTrackerTest.java): 가짜 단조 시계로 200ms/초과, 3초 직전/경계, 첫 pong 없음·잘못된 pong·중복·회복·재접속 초기화. [SocketMatchTransportTest](../src/test/java/team/tetris/network/SocketMatchTransportTest.java).`delayedPongShowsLagAndNextFastPongRecoversOnRealSocket`, `unresponsiveEstablishedPeerTimesOutCleansWorkersAndReconnectsOnSamePort`: 실제 소켓의 늦은 응답·부분 프레임 무응답과 자원 정리 |
 | 랙 표시·해제·오류 후 첫 화면 (N3-03, R3-28~29) | [P2pNetworkFailureScreenTest](../src/test/java/team/tetris/ui/screen/P2pNetworkFailureScreenTest.java).`lagRecoveryAndDisconnectReturnToChoiceInEveryConnectedPhase`: 가짜 통신으로 양쪽 역할 × 로비/경기/정지/결과 8개 사례. 랙 표시·회복·실패 사유·즉시 close·2초 경계 복귀·입력 차단 |
 | 세 모드 진행·연속 두 경기·양쪽 화면·미기록 (R3-04~05, R3-13, R3-26~27) | [P2pMatchSocketTest](../src/test/java/team/tetris/network/P2pMatchSocketTest.java).`realCompositionTwoGamesStatePauseResultAndNoScoreFile`: 실제 localhost와 AppComposition으로 세 모드 각각 두 경기, 상태·결과 일치·점수 파일 미생성. [P2pMatchTest](../src/test/java/team/tetris/application/network/P2pMatchTest.java).`bothScreensAttackTopOutAndSecondMatch`: 공격→대기→다음 블록 전 반영·재대전 초기화 |

@@ -113,12 +113,15 @@ class P2pRecoverySocketTest {
                 var frozen = match.local();
                 long remaining = match.remainingNanos();
                 peer.close();
-                await(() -> { match.update(0); return match.failure().isPresent(); });
+                await(() -> { match.update(0); return match.result().isPresent(); });
                 match.handle(GameCommand.HARD_DROP);
                 match.update(10_000_000_000L);
                 assertEquals(frozen, match.local());
                 assertEquals(remaining, match.remainingNanos());
-                assertTrue(match.result().isEmpty()); // 통신 실패를 승패로 기록하지 않는다.
+                assertTrue(match.failure().isEmpty());
+                var result = match.result().orElseThrow();
+                assertEquals(EndReason.LEFT, result.reason());
+                assertEquals(survivor == Role.SERVER ? Outcome.SERVER_WINS : Outcome.CLIENT_WINS, result.outcome());
             }
             await(() -> pair.sw.workersTerminated() && pair.cw.workersTerminated());
             assertTrue(wire.poll().isEmpty());

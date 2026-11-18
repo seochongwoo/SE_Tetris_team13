@@ -30,6 +30,7 @@ class P2pMatchScreenTest {
                 var c = assertInstanceOf(P2pMatchScreen.class, cr.current());
                 assertEquals(round, s.match().matchId());
                 assertEquals(88, sr.render().columns());
+                assertTrue(sr.render().text().contains("레벨 0"));
                 assertEquals(2, sr.render().text().split("NEXT", -1).length - 1);
                 assertNotNull(sr.render().tileAt(2, 3)); assertNotNull(sr.render().tileAt(46, 3));
                 // 실제 paint 콜백과 3단계 화면 크기에서도 넓은 프레임을 그릴 수 있다.
@@ -56,12 +57,11 @@ class P2pMatchScreenTest {
                 inputScreen.update(0);
                 assertNotEquals(afterPress, s.match().local().active());
                 inputScreen.onKeyReleased(left);
-                sr.focusLost(); cr.update(0); assertTrue(c.match().paused());
+                sr.focusLost(); cr.update(0); assertFalse(c.match().paused());
+                TestApplication.tap(sr, "ESCAPE"); cr.update(0); assertTrue(c.match().paused());
                 TestApplication.tap(sr, sr.settings().keyBindings().get(GameCommand.QUIT_GAME)); cr.update(0);
-                assertTrue(sr.render().text().contains("클라이언트 승리"));
-                assertTrue(cr.render().text().contains("클라이언트 승리"));
-                assertEquals("클라이언트 승리", sr.render().rowText(24).strip());
-                assertEquals("클라이언트 승리", cr.render().rowText(24).strip());
+                assertEquals("패배", sr.render().rowText(24).strip());
+                assertEquals("승리", cr.render().rowText(24).strip());
                 sr.update(2_000_000_000L); cr.update(2_000_000_000L); cr.update(0);
                 assertInstanceOf(P2pLobbyScreen.class, sr.current());
                 assertInstanceOf(P2pLobbyScreen.class, cr.current());

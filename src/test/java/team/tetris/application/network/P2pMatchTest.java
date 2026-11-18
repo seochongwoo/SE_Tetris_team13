@@ -33,6 +33,22 @@ class P2pMatchTest {
         }
     }
 
+    @Test void lineClearDiscardsMovementAndHardDrops() {
+        try (var p = new Pair(Mode.NORMAL, twoLines(), empty());
+             var control = new Pair(Mode.NORMAL, twoLines(), empty())) {
+            p.s.handle(GameCommand.HARD_DROP);
+            control.s.handle(GameCommand.HARD_DROP);
+            for (int i = 0; i < 6; i++) p.s.handle(GameCommand.MOVE_LEFT);
+            p.s.handle(GameCommand.HARD_DROP);
+            p.s.handle(GameCommand.HARD_DROP);
+            long duration = team.tetris.application.LineClearAnimation.DURATION_NANOS;
+            p.s.update(duration);
+            control.s.update(duration);
+            assertEquals(control.s.local().active(), p.s.local().active());
+            assertEquals(control.s.local().board(), p.s.local().board());
+        }
+    }
+
     @Test void delayedResultRestoresBothViewsToServerDecisionSnapshot() {
         try (var p = new Pair(Mode.TIMED, null, null)) {
             p.s.update(60_000_000_000L);
