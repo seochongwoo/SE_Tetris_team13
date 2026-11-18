@@ -14,13 +14,18 @@ public final class P2pMatchScreen implements Screen {
     private final P2pMatch match;
     private final InputMapper keys;
     private final RepeatController repeats = new RepeatController();
-    private long now;
+    private final NanoClock clock;
     private long resultElapsed;
     private boolean handedOff;
     private boolean failureShown;
     private long failureElapsed;
 
     public P2pMatchScreen(ScreenRouter router, P2pLobby lobby, P2pMatch match) {
+        this(router, lobby, match, NanoClock.system());
+    }
+
+    P2pMatchScreen(ScreenRouter router, P2pLobby lobby, P2pMatch match, NanoClock clock) {
+        this.clock = clock;
         this.router = router;
         this.lobby = lobby;
         this.match = match;
@@ -34,13 +39,13 @@ public final class P2pMatchScreen implements Screen {
             return;
         }
         keys.commandFor(key, status()).ifPresent(command -> {
-            if (repeats.press(key, now, InputMapper.isRepeatable(command))) match.handle(command);
+            boolean accepted = repeats.press(key, clock.nanoTime(), InputMapper.isRepeatable(command));
+            if (accepted) match.handle(command);
         });
     }
     @Override public void onKeyReleased(String key) { repeats.release(key); }
     @Override public void onFocusLost() { repeats.releaseAll(); match.handle(GameCommand.PAUSE); }
     @Override public void update(long elapsedNanos) {
-        now += elapsedNanos;
         boolean paused = match.paused();
         boolean finished = match.result().isPresent();
         match.update(elapsedNanos);
@@ -55,7 +60,9 @@ public final class P2pMatchScreen implements Screen {
             repeats.releaseAll();
             router.ignoreHeldKeys();
         }
-        for (String key : repeats.due(now)) keys.commandFor(key, status()).ifPresent(match::handle);
+        for (String key : repeats.dueWithoutCatchUp(clock.nanoTime())) {
+            keys.commandFor(key, status()).ifPresent(match::handle);
+        }
         if (finished && match.failure().isEmpty()) {
             resultElapsed = Math.min(2_000_000_000L, resultElapsed + Math.min(elapsedNanos, 2_000_000_000L));
             if (resultElapsed == 2_000_000_000L) {

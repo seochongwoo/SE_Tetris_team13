@@ -65,6 +65,17 @@ class RepeatControllerTest {
     }
 
     @Test
+    void delayedPollDeliversOneRepeatAndWaitsAFullInterval() {
+        repeats.press("LEFT", 0, true);
+        long delayed = DELAY + 10 * INTERVAL + 1;
+        assertEquals(List.of("LEFT"), repeats.dueWithoutCatchUp(delayed));
+        assertEquals(List.of(), repeats.dueWithoutCatchUp(delayed + INTERVAL - 1));
+        assertEquals(List.of("LEFT"), repeats.dueWithoutCatchUp(delayed + INTERVAL));
+        repeats.release("LEFT");
+        assertEquals(List.of(), repeats.dueWithoutCatchUp(delayed + 10 * INTERVAL));
+    }
+
+    @Test
     void rejectsNonPositiveTimings() {
         assertThrows(IllegalArgumentException.class, () -> new RepeatController(0, 10));
         assertThrows(IllegalArgumentException.class, () -> new RepeatController(10, 0));

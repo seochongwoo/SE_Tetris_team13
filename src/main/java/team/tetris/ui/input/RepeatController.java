@@ -64,6 +64,18 @@ public final class RepeatController {
         return nextFire.containsKey(key);
     }
 
+    /** 지연된 반복을 몰아서 실행하지 않고, 실제 전달 시각부터 다음 간격을 센다. */
+    public List<String> dueWithoutCatchUp(long nowNanos) {
+        List<String> fired = new ArrayList<>();
+        for (Map.Entry<String, Long> entry : nextFire.entrySet()) {
+            if (entry.getValue() != NOT_REPEATING && nowNanos >= entry.getValue()) {
+                fired.add(entry.getKey());
+                entry.setValue(nowNanos + intervalNanos);
+            }
+        }
+        return fired;
+    }
+
     /**
      * nowNanos까지 발생해야 할 반복 입력을 순서대로 반환한다. 루프가 오래 멈췄다 돌아와도 한 번에
      * 쏟아지지 않도록 키당 최대 횟수를 두고, 그보다 밀린 만큼은 버리고 다음 주기부터 이어간다.

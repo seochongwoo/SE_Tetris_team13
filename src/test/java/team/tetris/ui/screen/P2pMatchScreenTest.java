@@ -44,6 +44,18 @@ class P2pMatchScreenTest {
                 var active = s.match().local().active(); TestApplication.tap(sr, left); cr.update(0);
                 assertNotEquals(active, s.match().local().active());
                 assertEquals(s.match().local(), c.match().remote().orElseThrow());
+                // A delayed frame must not turn a newly pressed key into catch-up repeats.
+                long[] clock = {1_000_000_000L};
+                var inputScreen = new P2pMatchScreen(sr, sl, s.match(), () -> clock[0]);
+                inputScreen.onKeyPressed(left);
+                var afterPress = s.match().local().active();
+                inputScreen.onKeyPressed(left); // OS repeat is ignored.
+                inputScreen.update(200_000_000L);
+                assertEquals(afterPress, s.match().local().active());
+                clock[0] += 170_000_000L;
+                inputScreen.update(0);
+                assertNotEquals(afterPress, s.match().local().active());
+                inputScreen.onKeyReleased(left);
                 sr.focusLost(); cr.update(0); assertTrue(c.match().paused());
                 TestApplication.tap(sr, sr.settings().keyBindings().get(GameCommand.QUIT_GAME)); cr.update(0);
                 assertTrue(sr.render().text().contains("클라이언트 승리"));
