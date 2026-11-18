@@ -14,6 +14,8 @@ import org.junit.jupiter.api.Test;
 import team.tetris.application.GameCommand;
 import team.tetris.application.GameResult;
 import team.tetris.application.GameStatus;
+import java.util.EnumMap;
+import team.tetris.application.model.BattleKeyBindings;
 import team.tetris.application.model.Settings;
 import team.tetris.application.model.Difficulty;
 import team.tetris.application.model.Settings.ScreenSize;
@@ -29,9 +31,10 @@ class SettingsScreenTest {
     private static final int SIZE_ROW = 1;
     private static final int COLOR_ROW = 2;
     private static final int KEYS_ROW = 3;
-    private static final int CLEAR_ROW = 4;
-    private static final int RESET_ROW = 5;
-    private static final int BACK_ROW = 6;
+    private static final int BATTLE_KEYS_ROW = 4;
+    private static final int CLEAR_ROW = 5;
+    private static final int RESET_ROW = 6;
+    private static final int BACK_ROW = 7;
     /** 조작 키 페이지 안의 줄. */
     private static final int FIRST_KEY_ROW = 0;
     private static final int KEY_PAGE_BACK_ROW = 8;
@@ -61,6 +64,17 @@ class SettingsScreenTest {
         moveTo(KEYS_ROW);
         tap("ENTER");
         assertTrue(screen.isEditingKeys());
+    }
+
+    /** 대전 키 페이지 안의 줄: 조작 다섯 줄(회전, ←, →, ↓, 떨어뜨리기), 기본 키로 되돌리기, 돌아가기. */
+    private static final int BATTLE_DROP_ROW = 4;
+    private static final int BATTLE_RESET_ROW = 5;
+    private static final int BATTLE_BACK_ROW = 6;
+
+    private void openBattlePage() {
+        moveTo(BATTLE_KEYS_ROW);
+        tap("ENTER");
+        assertTrue(screen.isEditingBattleKeys());
     }
 
     private Settings saved() throws Exception {
@@ -196,7 +210,7 @@ class SettingsScreenTest {
         tap("LEFT");
 
         assertEquals("RIGHT", saved().keyBindings().get(GameCommand.MOVE_RIGHT));
-        assertTrue(screen.message().contains("겹치는"));
+        assertTrue(screen.message().contains("겹칩"));
     }
 
     @Test
@@ -308,7 +322,7 @@ class SettingsScreenTest {
     }
 
     @Test
-    void mainListHasSevenRowsAndKeyRowsMovedOut() {
+    void mainListHasEightRowsAndKeyRowsMovedOut() {
         String text = router.render().text();
 
         assertTrue(text.contains("조작 키 설정"));
@@ -316,6 +330,139 @@ class SettingsScreenTest {
         moveTo(BACK_ROW);
         tap("DOWN");
         assertEquals(DIFFICULTY_ROW, screen.cursor());
+    }
+
+    @Test
+    void battlePageShowsBothPlayersAndRebindsTheChosenPlayersKey() throws Exception {
+        openBattlePage();
+        String text = router.render().text();
+        assertTrue(text.contains("대전 조작 키") && text.contains("1P") && text.contains("2P"), text);
+        assertTrue(text.contains("Space") && text.contains("Enter") && text.contains("두 사람 공통"), text);
+        assertFalse(text.contains("대체 키"), "기본 설정에서는 대체 키 안내가 없다");
+
+        tap("RIGHT");
+        assertEquals(2, screen.battlePlayer());
+        moveTo(BATTLE_DROP_ROW);
+        tap("ENTER");
+        assertTrue(router.render().text().contains("'2P 한 번에 떨어뜨리기'에 쓸 키를 누르세요"));
+        tap("SHIFT");
+
+        assertEquals("SHIFT", saved().battleKeys().two().get(GameCommand.HARD_DROP));
+        assertEquals(BattleKeyBindings.standard().one(), saved().battleKeys().one());
+        assertTrue(screen.message().contains("2P"));
+        assertEquals("SHIFT", app.applied().battleKeys().two().get(GameCommand.HARD_DROP));
+    }
+
+    @Test
+    void battleKeysCannotClashWithTheOtherPlayerOrTheCommonKeys() throws Exception {
+        openBattlePage();
+        tap("RIGHT");
+        tap("ENTER"); // 2P 회전
+        tap("W");     // 1P 회전 키
+
+        assertEquals("UP", saved().battleKeys().two().get(GameCommand.ROTATE_CW));
+        assertEquals("W: 1P '회전'과 겹칩니다", screen.message());
+
+        tap("LEFT");
+        moveTo(BATTLE_DROP_ROW);
+        tap("ENTER");
+        tap("P");     // 공통 일시정지 키
+
+        assertEquals("SPACE", saved().battleKeys().one().get(GameCommand.HARD_DROP));
+        assertEquals("P: 공통 '일시정지'와 겹칩니다", screen.message());
+    }
+
+    @Test
+    void aCommonKeyCannotTakeABattleKey() throws Exception {
+        openKeyPage();
+        moveTo(GameCommand.PAUSE.ordinal());
+        tap("ENTER");
+        tap("W");
+
+        assertEquals("P", saved().keyBindings().get(GameCommand.PAUSE));
+        assertEquals("W: 1P '회전'과 겹칩니다", screen.message());
+
+        // 1인 게임 조작 키는 대전 키와 같아도 된다.
+        moveTo(GameCommand.HARD_DROP.ordinal());
+        tap("ENTER");
+        tap("W");
+        assertEquals("W", saved().keyBindings().get(GameCommand.HARD_DROP));
+    }
+
+    @Test
+    void holdingTheEnterThatOpenedTheBattleKeyPromptDoesNotBindEnter() throws Exception {
+        openBattlePage();
+        router.keyPressed("ENTER");
+        router.keyPressed("ENTER"); // 떼지 않은 채 OS 자동 반복
+
+        assertTrue(screen.isWaitingForKey());
+        assertEquals("W", saved().battleKeys().one().get(GameCommand.ROTATE_CW));
+
+        router.keyReleased("ENTER");
+        tap("BACK_SPACE");
+        assertFalse(screen.isWaitingForKey());
+        assertEquals("W", saved().battleKeys().one().get(GameCommand.ROTATE_CW));
+    }
+
+    @Test
+    void resetRowRestoresOnlyTheBattleKeysAndBackOrEscapeLeave() throws Exception {
+        Settings changed = Settings.defaults().withDifficulty(Difficulty.HARD)
+                .withBattleKeys(Settings.defaults().battleKeys().with(1, GameCommand.HARD_DROP, "F"));
+        router.updateSettings(changed);
+        openBattlePage();
+        moveTo(BATTLE_RESET_ROW);
+        tap("ENTER");
+
+        assertEquals(BattleKeyBindings.standard(), saved().battleKeys());
+        assertEquals(Difficulty.HARD, saved().difficulty());
+
+        moveTo(BATTLE_BACK_ROW);
+        tap("ENTER");
+        assertFalse(screen.isEditingBattleKeys());
+        assertEquals(BATTLE_KEYS_ROW, screen.cursor());
+        tap("ENTER");
+        tap("ESCAPE");
+        assertFalse(screen.isEditingBattleKeys());
+        assertInstanceOf(SettingsScreen.class, router.current());
+    }
+
+    @Test
+    void usersWhoseCommonKeysHitTheDefaultsSeeTheReplacementAndResetKeepsIt() throws Exception {
+        var keys = new EnumMap<>(Settings.defaults().keyBindings());
+        keys.put(GameCommand.PAUSE, "S");
+        keys.put(GameCommand.RESUME, "S");
+        router.updateSettings(new Settings(ScreenSize.MEDIUM, keys, false));
+        openBattlePage();
+
+        String text = router.render().text();
+        assertTrue(text.contains("대체 키"), text);
+        assertEquals("Q", saved().battleKeys().one().get(GameCommand.SOFT_DROP));
+
+        moveTo(BATTLE_RESET_ROW);
+        tap("ENTER");
+        assertEquals("Q", saved().battleKeys().one().get(GameCommand.SOFT_DROP));
+        assertEquals("S", saved().keyBindings().get(GameCommand.PAUSE));
+    }
+
+    @Test
+    void longKeyNamesOnTheBattlePageStayInTheirColumn() throws Exception {
+        router.updateSettings(Settings.defaults().withBattleKeys(Settings.defaults().battleKeys()
+                .with(1, GameCommand.ROTATE_CW, "CLOSE_BRACKET").with(2, GameCommand.ROTATE_CW, "OPEN_BRACKET")));
+        openBattlePage();
+        String row = router.render().rowText(5);
+
+        assertTrue(row.contains("CLOSE_B~") && row.contains("OPEN_BR~"), row);
+    }
+
+    @Test
+    void conflictMessagesUseTheRightParticleAndFitOnScreen() {
+        assertEquals("'회전'과", SettingsScreen.quoted("회전"));
+        assertEquals("'한 번에 떨어뜨리기'와", SettingsScreen.quoted("한 번에 떨어뜨리기"));
+        assertEquals("'게임 메뉴'와", SettingsScreen.quoted("게임 메뉴"));
+        assertEquals("'재개'와", SettingsScreen.quoted("재개"));
+        String longest = "Space: 1P " + SettingsScreen.quoted("한 번에 떨어뜨리기") + " 겹칩니다";
+        assertTrue(team.tetris.ui.render.TextFrame.displayWidth(longest) <= team.tetris.ui.render.TextFrame.COLUMNS - 2,
+                longest);
     }
 
     @Test

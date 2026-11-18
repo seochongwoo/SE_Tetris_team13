@@ -134,7 +134,27 @@ public final class BattleRenderer {
             text.append(KeyNames.display(keys.keyFor(player, command))).append(' ');
         }
         text.append("· ").append(KeyNames.display(keys.keyFor(player, GameCommand.HARD_DROP)));
-        frame.put(left, HELP_ROW, text.toString(), palette.dimStyle());
+        // 바꾼 키 이름이 길어도 상대 쪽 안내를 덮지 않게 자기 영역에서 자른다.
+        int limit = (player == BattlePlayer.ONE ? leftOf(BattlePlayer.TWO) - 1 : COLUMNS) - left;
+        frame.put(left, HELP_ROW, clip(text.toString(), limit), palette.dimStyle());
+    }
+
+    /** 화면 폭 기준으로 width칸까지만 남긴다. 잘렸으면 끝을 ~로 표시한다. */
+    static String clip(String text, int width) {
+        if (TextFrame.displayWidth(text) <= width) {
+            return text;
+        }
+        StringBuilder kept = new StringBuilder();
+        for (int i = 0; i < text.length(); ) {
+            int codePoint = text.codePointAt(i);
+            String next = kept + new String(Character.toChars(codePoint));
+            if (TextFrame.displayWidth(next) > width - 1) {
+                break;
+            }
+            kept.appendCodePoint(codePoint);
+            i += Character.charCount(codePoint);
+        }
+        return kept + "~";
     }
 
     /** 남은 시간이 이 초 이하면 경고색으로 표시한다. */

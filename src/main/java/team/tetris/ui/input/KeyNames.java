@@ -59,6 +59,9 @@ public final class KeyNames {
         if (key.startsWith("DIGIT") && key.length() == 6) {
             return key.substring(5);
         }
+        if (key.startsWith("NUMPAD") && key.length() == 7) {
+            return "Num" + key.substring(6);
+        }
         return key;
     }
 

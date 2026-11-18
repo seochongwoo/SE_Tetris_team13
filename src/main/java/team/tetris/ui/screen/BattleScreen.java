@@ -79,7 +79,7 @@ public final class BattleScreen implements Screen {
         this.router = Objects.requireNonNull(router, "router");
         this.session = started.session();
         Settings settings = started.settings().value();
-        this.keys = BattleKeys.defaults(settings);
+        this.keys = BattleKeys.from(settings);
         this.repeats = repeats;
         this.palette = ColorPalette.of(settings.colorBlindMode());
         this.renderer = new BattleRenderer(palette, keys);
