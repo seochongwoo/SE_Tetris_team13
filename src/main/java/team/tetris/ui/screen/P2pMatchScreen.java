@@ -32,11 +32,12 @@ public final class P2pMatchScreen implements Screen {
             return;
         }
         keys.commandFor(key, status()).ifPresent(command -> {
-            if (repeats.press(key, now, InputMapper.isRepeatable(command))) match.handle(command);
+            if (repeats.press(key, now, InputMapper.isRepeatable(command))) match.handle(
+                    command == GameCommand.QUIT_GAME && !match.paused() ? GameCommand.PAUSE : command);
         });
     }
     @Override public void onKeyReleased(String key) { repeats.release(key); }
-    @Override public void onFocusLost() { repeats.releaseAll(); match.handle(GameCommand.PAUSE); }
+    @Override public void onFocusLost() { repeats.releaseAll(); }
     @Override public void update(long elapsedNanos) {
         now += elapsedNanos;
         boolean paused = match.paused();
@@ -50,6 +51,10 @@ public final class P2pMatchScreen implements Screen {
         if (finished && match.failure().isEmpty()) {
             resultElapsed = Math.min(2_000_000_000L, resultElapsed + Math.min(elapsedNanos, 2_000_000_000L));
             if (resultElapsed == 2_000_000_000L) {
+                if (match.peerDisconnected()) {
+                    router.showP2pLobby();
+                    return;
+                }
                 handedOff = true;
                 router.returnToP2pLobby(lobby);
             }
@@ -64,11 +69,13 @@ public final class P2pMatchScreen implements Screen {
             frame.putCentered(24, "연결 오류: " + match.failure().orElseThrow(), router.palette().warningStyle());
             frame.putCentered(25, "Enter: P2P 첫 화면", router.palette().base());
         }
-        frame.putCentered(26, keys.keyFor(GameCommand.MOVE_LEFT) + "/" + keys.keyFor(GameCommand.MOVE_RIGHT)
-                + " 이동 · " + keys.keyFor(GameCommand.ROTATE_CW) + " 회전 · " + keys.keyFor(GameCommand.HARD_DROP) + " 떨어뜨리기", router.palette().base());
-        frame.putCentered(27, keys.keyFor(GameCommand.PAUSE) + " 정지 · " + keys.keyFor(GameCommand.RESUME)
-                + " 재개 · " + keys.keyFor(GameCommand.QUIT_GAME) + " 기권", router.palette().base());
+        frame.putCentered(26, displayKey(GameCommand.MOVE_LEFT) + " " + displayKey(GameCommand.MOVE_RIGHT)
+                + " 이동 · " + displayKey(GameCommand.ROTATE_CW) + " 회전 · " + displayKey(GameCommand.HARD_DROP) + " 떨어뜨리기", router.palette().base());
+        frame.putCentered(27, match.paused()
+                ? displayKey(GameCommand.RESUME) + " 재개 · " + displayKey(GameCommand.QUIT_GAME) + " 기권"
+                : displayKey(GameCommand.PAUSE) + " / " + displayKey(GameCommand.QUIT_GAME) + " 정지", router.palette().base());
         return frame;
     }
+    private String displayKey(GameCommand command) { return KeyNames.display(keys.keyFor(command)); }
     @Override public void onLeave() { match.finishMeasurement(); if (!handedOff) lobby.close(); }
 }

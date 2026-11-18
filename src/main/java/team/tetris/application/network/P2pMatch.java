@@ -1,6 +1,5 @@
 package team.tetris.application.network;
 
-import java.util.ArrayDeque;
 import java.util.Optional;
 import java.util.function.Function;
 import team.tetris.application.*;
@@ -17,8 +16,6 @@ public final class P2pMatch {
     private final MatchConnection connection;
     private final AttackQueue incoming = new AttackQueue(10);
     private final SinglePlayerSession local;
-    private record Input(GameCommand command, long receivedNanos) {}
-    private final ArrayDeque<Input> buffered = new ArrayDeque<>();
     private PlayerState remote;
     private Role pauseOwner;
     private Result result;
@@ -63,6 +60,7 @@ public final class P2pMatch {
     public Mode mode() { return started.configuration().mode(); }
     public long matchId() { return started.matchId(); }
     public long remainingNanos() { return remaining; }
+    public boolean peerDisconnected() { return connection.transport().status().peerDisconnected(); }
     public boolean paused() { return pauseOwner != null; }
     public Role pauseOwner() { return pauseOwner; }
     public Optional<Result> result() { return Optional.ofNullable(result); }
@@ -81,7 +79,6 @@ public final class P2pMatch {
         switch (command) {
             case QUIT_GAME -> {
                 leaving = true;
-                buffered.clear();
                 send(new Leave());
                 if (role() == Role.SERVER) finish(Outcome.CLIENT_WINS, EndReason.LEFT);
             }
@@ -99,9 +96,8 @@ public final class P2pMatch {
             }
             default -> {
                 if (paused() || defeated() || (mode() == Mode.TIMED && remaining == 0)) return;
-                if (local.snapshot().lineClearAnimation() != null) {
-                    if (buffered.size() < 256) buffered.add(new Input(command, receivedNanos));
-                } else apply(new Input(command, receivedNanos));
+                if (local.snapshot().lineClearAnimation() != null) return;
+                apply(command, receivedNanos);
                 publish();
                 decide();
             }
@@ -118,12 +114,6 @@ public final class P2pMatch {
             long elapsed = mode() == Mode.TIMED ? Math.min(elapsedNanos, remaining) : elapsedNanos;
             if (!defeated()) local.update(elapsed);
             if (role() == Role.SERVER && mode() == Mode.TIMED) remaining -= elapsed;
-            decide();
-            while (result == null && !defeated() && local.snapshot().lineClearAnimation() == null && !buffered.isEmpty()
-                    && (mode() != Mode.TIMED || remaining > 0)) {
-                apply(buffered.remove());
-                decide();
-            }
         }
         decide();
         if (result == null) publish();
@@ -132,9 +122,13 @@ public final class P2pMatch {
     private void receive() {
         if (result != null || failure != null) return; // 다음 LOBBY는 로비가 읽어야 한다.
         var status = connection.transport().status();
+        if (status.peerDisconnected()) {
+            boolean serverWins = (role() == Role.SERVER) != leaving;
+            result = new Result(serverWins ? Outcome.SERVER_WINS : Outcome.CLIENT_WINS, EndReason.LEFT);
+            return;
+        }
         if (status.state() == MatchTransport.State.FAILED || status.state() == MatchTransport.State.CLOSED) {
             failure = status.detail().isBlank() ? "상대 연결이 종료되었습니다" : status.detail();
-            buffered.clear();
             return;
         }
         // 한 프레임의 작업량 제한. 거부 메시지도 MatchConnection에서 제한한다.
@@ -160,7 +154,6 @@ public final class P2pMatch {
                 case Result confirmed -> {
                     result = confirmed;
                     if (confirmed.server() != null) remote = confirmed.server();
-                    buffered.clear();
                 }
                 case Leave ignored -> {
                     if (role() == Role.SERVER) finish(Outcome.SERVER_WINS, EndReason.LEFT);
@@ -173,10 +166,10 @@ public final class P2pMatch {
 
     private boolean defeated() { return local.snapshot().engine().phase() == EnginePhase.GAME_OVER; }
 
-    private void apply(Input input) {
+    private void apply(GameCommand command, long receivedNanos) {
         PlayerState before = latency == null ? null : local();
-        local.handle(input.command());
-        if (latency != null && !local().equals(before)) inputId = latency.begin(input.command(), input.receivedNanos());
+        local.handle(command);
+        if (latency != null && !local().equals(before)) inputId = latency.begin(command, receivedNanos);
     }
 
     private void decide() {
@@ -194,17 +187,16 @@ public final class P2pMatch {
         result = remote == null ? new Result(outcome, reason) : new Result(outcome, reason,
                 PlayerStates.from(local.snapshot(), incoming.pending(), true), remote);
         publish(); // 연출을 제거한 확정 화면을 RESULT 앞에 보낸다.
-        buffered.clear();
         send(result);
     }
     private void pause(Role owner) { send(new Pause(owner, false)); applyPause(owner); publish(); }
-    private void applyPause(Role owner) { pauseOwner = owner; buffered.clear(); local.handle(GameCommand.PAUSE); }
+    private void applyPause(Role owner) { pauseOwner = owner; local.handle(GameCommand.PAUSE); }
     private void resume() { send(new Resume(false)); applyResume(); }
     private void applyResume() { pauseOwner = null; local.handle(GameCommand.RESUME); }
     private void publish() { send(new State(local(), role() == Role.SERVER ? remaining : -1, inputId)); }
     private void send(MatchMessage message) {
         if (failure != null) return;
         try { connection.send(started.matchId(), message); }
-        catch (RuntimeException error) { failure = "전송 실패: " + error.getMessage(); }
+        catch (RuntimeException error) { if (!peerDisconnected()) failure = "전송 실패: " + error.getMessage(); }
     }
 }

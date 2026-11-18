@@ -11,7 +11,11 @@ import team.tetris.application.network.MatchEnvelope;
  */
 public interface MatchTransport extends AutoCloseable {
     enum State { NEW, LISTENING, CONNECTING, HANDSHAKING, CONNECTED, CLOSED, FAILED }
-    record Status(State state, String detail, int localPort) {}
+    record Status(State state, String detail, int localPort, boolean peerDisconnected) {
+        public Status(State state, String detail, int localPort) {
+            this(state, detail, localPort, false);
+        }
+    }
 
     void listen(int port);
     void connect(String host, int port);

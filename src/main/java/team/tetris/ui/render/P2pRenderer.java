@@ -15,18 +15,22 @@ public final class P2pRenderer {
 
     public TextFrame render(P2pMatch match) {
         var frame = new TextFrame(88, 28, palette.base());
-        frame.putCentered(0, "P2P · " + match.mode() + (match.mode() == MatchMessage.Mode.TIMED
+        frame.putCentered(0, "P2P · " + switch (match.mode()) {
+            case NORMAL -> "일반";
+            case ITEM -> "아이템";
+            case TIMED -> "시간제한";
+        } + (match.mode() == MatchMessage.Mode.TIMED
                 ? " · " + ((match.remainingNanos() + 999_999_999L) / 1_000_000_000L) + "초" : ""), palette.accentStyle());
-        player(frame, 1, match.local(), "나 (" + match.role() + ")");
+        player(frame, 1, match.local(), "나");
         match.remote().ifPresentOrElse(state -> player(frame, 45, state, "상대"),
                 () -> frame.put(46, 3, "상대 화면 수신 대기", palette.base()));
         if (match.paused() && match.result().isEmpty())
-            frame.putCentered(24, "일시정지 · " + match.pauseOwner() + "만 재개 가능", palette.accentStyle());
+            frame.putCentered(24, "일시정지 · " + (match.pauseOwner() == match.role() ? "나" : "상대") + "만 재개 가능", palette.accentStyle());
         match.result().ifPresent(result -> {
             frame.putCentered(24, switch (result.outcome()) {
                 case DRAW -> "무승부";
-                case SERVER_WINS -> "서버 승리";
-                case CLIENT_WINS -> "클라이언트 승리";
+                case SERVER_WINS -> match.role() == MatchMessage.Role.SERVER ? "승리" : "패배";
+                case CLIENT_WINS -> match.role() == MatchMessage.Role.CLIENT ? "승리" : "패배";
             }, palette.accentStyle());
             frame.putCentered(25, "잠시 후 대기실로 돌아갑니다", palette.base());
         });
@@ -44,7 +48,7 @@ public final class P2pRenderer {
         frame.put(panel, 2, "NEXT", palette.base());
         for (var tile : state.next()) cell(frame, panel + tile.x() * 2, 4 + tile.y(), PlayerStates.cell(tile.tile()));
         frame.put(panel, 7, "점수 " + state.score(), palette.base());
-        frame.put(panel, 8, "레벨 " + state.level(), palette.base());
+        frame.put(panel, 8, "레벨 " + (state.level() - 1), palette.base());
         frame.put(panel, 9, "줄 " + state.clearedLines(), palette.base());
         frame.put(panel, 10, "2배 " + state.doubleScoreClears(), palette.base());
         frame.put(panel, 12, "대기 " + state.pendingRows().size(), palette.base());
