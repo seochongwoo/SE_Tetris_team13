@@ -72,8 +72,8 @@ class SocketMatchTransportTest {
             client.connect("127.0.0.1", listen(server));
             await(() -> server.status().state() == MatchTransport.State.FAILED
                     && client.status().state() == MatchTransport.State.FAILED);
-            assertTrue(server.status().detail().contains("Incompatible protocol"));
-            assertTrue(client.status().detail().contains("Incompatible protocol"));
+            assertEquals("상대방과 통신 버전이 다릅니다. 같은 버전의 게임을 사용해 주세요.", server.status().detail());
+            assertEquals(server.status().detail(), client.status().detail());
             assertTrue(server.poll().isEmpty());
         }
     }
@@ -93,7 +93,7 @@ class SocketMatchTransportTest {
     void silentHandshakeTimesOutAndMalformedFrameClosesConnection() throws Exception {
         try (var server = new SocketMatchTransport(); var peer = new Socket("127.0.0.1", listen(server))) {
             await(() -> server.status().state() == MatchTransport.State.FAILED);
-            assertFalse(server.status().detail().isBlank());
+            assertEquals("상대방의 응답 시간이 초과되었습니다.", server.status().detail());
         }
         try (var server = new SocketMatchTransport(); var peer = new Socket("127.0.0.1", listen(server))) {
             var codec = new MessageCodec();
@@ -103,7 +103,7 @@ class SocketMatchTransportTest {
             await(() -> server.status().state() == MatchTransport.State.CONNECTED);
             out.writeInt(Integer.MAX_VALUE); out.flush();
             await(() -> server.status().state() == MatchTransport.State.FAILED);
-            assertTrue(server.status().detail().contains("frame length"));
+            assertEquals("받은 메시지의 길이가 올바르지 않습니다.", server.status().detail());
         }
     }
 
@@ -119,7 +119,7 @@ class SocketMatchTransportTest {
                 codec.write(out, new MatchEnvelope(1, sequence, new Attack(sequence, List.of(3, 5))));
             }
             await(() -> server.status().state() == MatchTransport.State.FAILED);
-            assertEquals("Receive queue overflow", server.status().detail());
+            assertEquals("수신 대기 중인 메시지가 너무 많습니다.", server.status().detail());
             assertTrue(server.poll().isEmpty());
         }
     }
@@ -140,6 +140,7 @@ class SocketMatchTransportTest {
                     && server.status().state() == MatchTransport.State.CONNECTED);
             client.close();
             await(() -> server.status().state() == MatchTransport.State.FAILED);
+            assertEquals("상대방과의 연결이 끊어졌습니다.", server.status().detail());
             assertThrows(IllegalStateException.class, () -> client.send(new MatchEnvelope(0, 1, new Leave())));
         }
         try (var server = new SocketMatchTransport(); var client = new SocketMatchTransport()) {
@@ -158,13 +159,14 @@ class SocketMatchTransportTest {
         try (var occupied = new ServerSocket(0); var server = new SocketMatchTransport()) {
             server.listen(occupied.getLocalPort());
             await(() -> server.status().state() == MatchTransport.State.FAILED);
+            assertEquals("대기 포트를 열 수 없습니다. 포트가 사용 중인지 확인해 주세요.", server.status().detail());
         }
         int closedPort;
         try (var reservation = new ServerSocket(0)) { closedPort = reservation.getLocalPort(); }
         try (var client = new SocketMatchTransport()) {
             client.connect("127.0.0.1", closedPort);
             await(() -> client.status().state() == MatchTransport.State.FAILED);
-            assertFalse(client.status().detail().isBlank());
+            assertEquals("서버에 접속할 수 없습니다. 방이 열려 있는지 확인해 주세요.", client.status().detail());
         }
     }
 
