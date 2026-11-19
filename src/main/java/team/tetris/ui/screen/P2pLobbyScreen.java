@@ -1,5 +1,6 @@
 package team.tetris.ui.screen;
 
+import team.tetris.application.model.Difficulty;
 import team.tetris.application.network.P2pLobby;
 import team.tetris.application.network.MatchMessage.Mode;
 import team.tetris.ui.DisplayNames;
@@ -75,8 +76,15 @@ public final class P2pLobbyScreen implements Screen {
                 if (key.equals("LEFT") || key.equals("RIGHT")) {
                     Mode mode = Mode.values()[Math.floorMod(config.mode().ordinal() + (key.equals("LEFT") ? -1 : 1), 3)];
                     lobby.configure(mode, mode == Mode.TIMED ? 120 : 0);
-                } else if (config.mode() == Mode.TIMED && (key.equals("UP") || key.equals("DOWN"))) {
-                    int seconds = (Math.floorMod(config.timeLimitSeconds() / 60 - 1 + (key.equals("UP") ? 1 : -1), 3) + 1) * 60;
+                } else if (key.equals("UP") || key.equals("DOWN")) {
+                    Difficulty[] levels = Difficulty.values();
+                    int index = Math.floorMod(config.difficulty().ordinal() + (key.equals("UP") ? 1 : -1), levels.length);
+                    lobby.configure(config.mode(), levels[index], config.timeLimitSeconds());
+                } else if (config.mode() == Mode.TIMED && switch (key) {
+                    case "COMMA", "LESS", "PERIOD", "GREATER" -> true;
+                    default -> false;
+                }) {
+                    int seconds = (Math.floorMod(config.timeLimitSeconds() / 60 - 1 + (key.equals("COMMA") || key.equals("LESS") ? -1 : 1), 3) + 1) * 60;
                     lobby.configure(Mode.TIMED, seconds);
                 }
             }
@@ -137,14 +145,16 @@ public final class P2pLobbyScreen implements Screen {
                 String mode = switch (config.mode()) { case NORMAL -> "일반"; case ITEM -> "아이템"; case TIMED -> "시간제한"; };
                 frame.put(2, 9, "모드: " + mode, palette.base());
                 frame.put(2, 10, "난이도: " + DisplayNames.of(config.difficulty()), palette.base());
-                if (config.mode() == Mode.TIMED) frame.put(2, 11, "제한시간: " + config.timeLimitSeconds() / 60 + "분", palette.base());
+                if (config.mode() == Mode.TIMED) frame.put(21, 10, "제한시간: " + config.timeLimitSeconds() / 60 + "분", palette.base());
             });
             frame.put(2, 13, "나: " + (lobby.localReady() ? "준비 완료" : "대기"), palette.base());
             frame.put(2, 14, "상대: " + (lobby.remoteReady() ? "준비 완료" : "대기"), palette.base());
             if (lobby.isServer()) {
-                frame.put(2, 16, "←→ 모드 · ↑↓ 제한시간", palette.base());
+                frame.put(2, 16, "←→ 모드 · ↑↓ 난이도", palette.base());
+                if (lobby.configuration().filter(config -> config.mode() == Mode.TIMED).isPresent())
+                    frame.put(26, 16, "< > 제한시간", palette.base());
                 frame.put(2, 17, "설정 변경 시 양쪽 준비 해제", palette.base());
-            } else frame.put(2, 17, "서버가 모드와 시간을 선택합니다", palette.base());
+            } else frame.put(2, 17, "서버가 경기 설정을 선택합니다", palette.base());
             frame.put(2, 19, "Enter 게임 시작", palette.base());
         } else if (lobby.stage() == P2pLobby.Stage.STARTED) {
             frame.putCentered(11, "양쪽 준비 완료", palette.base());

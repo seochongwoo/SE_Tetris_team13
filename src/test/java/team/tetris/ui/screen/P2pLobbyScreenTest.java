@@ -75,11 +75,15 @@ class P2pLobbyScreenTest {
         tap("RIGHT");
         assertEquals(Mode.ITEM, lobby.configuration().orElseThrow().mode());
         tap("RIGHT");
-        assertTrue(router.render().text().contains("2분"));
+        assertTrue(router.render().text().lines().anyMatch(line -> line.matches(".*난이도: 보통 +제한시간: 2분.*")));
         tap("ENTER"); tap("UP");
         assertFalse(lobby.localReady());
+        assertEquals(Difficulty.HARD, lobby.configuration().orElseThrow().difficulty());
+        tap("DOWN");
+        assertEquals(Difficulty.NORMAL, lobby.configuration().orElseThrow().difficulty());
+        tap("PERIOD");
         assertTrue(router.render().text().contains("3분"));
-        tap("DOWN"); tap("DOWN");
+        tap("COMMA"); tap("COMMA");
         assertTrue(router.render().text().contains("1분"));
         tap("ENTER");
         long revision = lobby.configuration().orElseThrow().revision();
