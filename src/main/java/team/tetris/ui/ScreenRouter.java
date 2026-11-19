@@ -24,11 +24,13 @@ import team.tetris.ui.render.TextFrame;
 import team.tetris.ui.render.palette.ColorPalette;
 import team.tetris.ui.screen.BattleScreen;
 import team.tetris.ui.screen.GameScreen;
+import team.tetris.ui.screen.BattleScreen;
 import team.tetris.ui.screen.MenuScreen;
 import team.tetris.ui.screen.MenuScreen.MenuItem;
 import team.tetris.ui.screen.NameEntryScreen;
 import team.tetris.ui.screen.ScoreboardScreen;
 import team.tetris.ui.screen.Screen;
+import team.tetris.ui.screen.P2pLobbyScreen;
 import team.tetris.ui.screen.SettingsScreen;
 
 /**
@@ -108,9 +110,24 @@ public final class ScreenRouter {
                 new MenuItem("게임 시작", this::startGame),
                 new MenuItem("아이템 모드", this::startItemGame),
                 new MenuItem("대전 모드", this::showBattleModes),
+                new MenuItem("P2P 대전", this::showP2pLobby),
                 new MenuItem("설정", this::showSettings),
                 new MenuItem("스코어보드", this::showScoreboard),
                 new MenuItem("종료", this::exit));
+    }
+
+    public void showP2pLobby() {
+        show(new P2pLobbyScreen(this, application.newP2pLobby()));
+    }
+
+    public void startP2pMatch(team.tetris.application.network.P2pLobby lobby,
+                               team.tetris.application.network.P2pLobby.StartedMatch started) {
+        show(new team.tetris.ui.screen.P2pMatchScreen(this, lobby, application.newP2pMatch(started)));
+    }
+
+    public void returnToP2pLobby(team.tetris.application.network.P2pLobby lobby) {
+        lobby.returnAfterResult();
+        show(new P2pLobbyScreen(this, lobby));
     }
 
     /** 일반 모드 시작. */
@@ -350,12 +367,14 @@ public final class ScreenRouter {
         }
         debugSession().filter(debug -> debug.result().isEmpty())
                 .ifPresent(debug -> debug.handle(team.tetris.application.GameCommand.QUIT_GAME));
+        current.onLeave();
         exited = true;
         exitAction.run();
     }
 
     private void show(Screen next) {
         ignoreHeldKeys();
+        if (current != null) current.onLeave();
         current = next;
         next.onEnter();
     }

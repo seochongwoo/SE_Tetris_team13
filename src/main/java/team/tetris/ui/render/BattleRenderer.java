@@ -7,9 +7,7 @@ import team.tetris.application.battle.BattlePlayer;
 import team.tetris.application.battle.BattleSnapshot;
 import team.tetris.application.battle.BattleTimer;
 import team.tetris.application.model.GameMode;
-import team.tetris.core.AttackBlock;
 import team.tetris.core.Cell;
-import team.tetris.core.rule.AttackQueue;
 import team.tetris.ui.DisplayNames;
 import team.tetris.ui.input.BattleKeys;
 import team.tetris.ui.input.KeyNames;
@@ -36,23 +34,15 @@ public final class BattleRenderer {
     /** 플레이어 영역의 왼쪽 열: 보드(22) + 1칸 + 정보(14) = 37칸씩, 사이에 2칸. */
     static final int ONE_LEFT = 1;
     static final int TWO_LEFT = 40;
-    private static final int INFO_OFFSET = 23;
-    private static final int INFO_WIDTH = 14;
-    private static final int NEXT_TITLE_ROW = 2;
-    private static final int SCORE_ROW = NEXT_TITLE_ROW + BoardPainter.NEXT_BOX_HEIGHT + 1;
-    private static final int PENDING_TITLE_ROW = SCORE_ROW + 2;
-    /** 받을 줄 상자: 안쪽 폭은 보드 칸 수(한 칸 = 한 글자), 안쪽 높이는 대기열 최대 줄 수. */
-    private static final int PENDING_BOX_TOP = PENDING_TITLE_ROW + 1;
     private static final int HELP_ROW = ROWS - 1;
-    static final String PENDING_CELL = "█";
-    static final String PENDING_EMPTY = "·";
-
+    private final BattleInfoPanel panel;
     private final ColorPalette palette;
     private final BattleKeys keys;
 
     public BattleRenderer(ColorPalette palette, BattleKeys keys) {
         this.palette = palette;
         this.keys = keys;
+        panel = new BattleInfoPanel(palette);
     }
 
     /** player 영역의 왼쪽 열 (보드 테두리의 왼쪽 열). */
@@ -91,40 +81,10 @@ public final class BattleRenderer {
         int left = leftOf(player);
         BoardPainter board = boardOf(player);
         board.drawPlayfield(frame, game, false);
-        int info = left + INFO_OFFSET;
-        frame.put(info, BOARD_TOP, label(player), palette.accentStyle().asBold());
-        frame.putRight(info + INFO_WIDTH, BOARD_TOP, "LV " + game.level(), palette.dimStyle());
-        board.drawNext(frame, game.engine().nextPiece(), info, NEXT_TITLE_ROW);
-        if (game.doubleScoreClears() > 0) {
-            // 점수 2배 아이템($)이 남은 줄 삭제 횟수. 점수 줄에 두면 네 자리 이상 점수를 덮으므로
-            // 비어 있는 NEXT 제목 줄 오른쪽에 둔다.
-            frame.putRight(info + INFO_WIDTH, NEXT_TITLE_ROW, "x2(" + game.doubleScoreClears() + ")",
-                    palette.accentStyle());
-        }
-        frame.put(info, SCORE_ROW, "SCORE", palette.dimStyle());
-        frame.putRight(info + INFO_WIDTH, SCORE_ROW, Long.toString(game.score()), palette.base().asBold());
-        frame.put(info, SCORE_ROW + 1, "LINES", palette.dimStyle());
-        frame.putRight(info + INFO_WIDTH, SCORE_ROW + 1, Integer.toString(game.clearedLines()), palette.base().asBold());
-        drawPending(frame, info, game.engine().board()[0].length, pending);
+        board.drawNext(frame, game.engine().nextPiece(), left + BattleInfoPanel.INFO_OFFSET, BattleInfoPanel.NEXT_TITLE_ROW);
+        panel.draw(frame, left, label(player), game.level(), game.score(), game.clearedLines(),
+                game.doubleScoreClears(), game.engine().board()[0].length, pending);
         drawHelp(frame, player, left);
-    }
-
-    /** 받을 줄: 위에서 아래 순서의 대기열을 상자 아래쪽에 맞춰 그린다. 비어 있는 위쪽은 빈 줄이다. */
-    private void drawPending(TextFrame frame, int col, int width, List<List<Cell>> pending) {
-        TextStyle attack = palette.blockStyle(AttackBlock.INSTANCE);
-        frame.put(col, PENDING_TITLE_ROW, "받을 줄", palette.dimStyle());
-        frame.putRight(col + INFO_WIDTH, PENDING_TITLE_ROW, pending.size() + "/" + AttackQueue.MAX_LINES,
-                pending.isEmpty() ? palette.dimStyle() : palette.warningStyle());
-        frame.box(col, PENDING_BOX_TOP, width + 2, AttackQueue.MAX_LINES + 2, palette.borderStyle(), palette.base());
-        int firstRow = PENDING_BOX_TOP + 1 + AttackQueue.MAX_LINES - pending.size();
-        for (int i = 0; i < pending.size(); i++) {
-            List<Cell> line = pending.get(i);
-            for (int x = 0; x < line.size() && x < width; x++) {
-                boolean empty = line.get(x).isEmpty();
-                frame.put(col + 1 + x, firstRow + i, empty ? PENDING_EMPTY : PENDING_CELL,
-                        empty ? palette.dimStyle() : attack);
-            }
-        }
     }
 
     private void drawHelp(TextFrame frame, BattlePlayer player, int left) {

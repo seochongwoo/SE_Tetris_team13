@@ -99,6 +99,18 @@
 | N2-03 | 이슈를 GitHub Issue로 등록하고 해결 내역 추적 (p11) | GitHub Issues: 카드 #9~#22·#26 (PR 본문의 `Closes #번호`로 머지 시 자동 종료), 버그 #27~#35 (발견·원인·해결 커밋 기록) | ✅ |
 | N2-04 | 중간평가 라인 커버리지 50%, 기말 70% (p12) | JaCoCo, 70% 미만이면 build·CI 실패 | ✅ 94.8% |
 
+## 3차 요구사항: 카드 22 구현 증거
+
+전체 3차 추적표는 카드 28에서 통합한다. 아래는 카드 22의 로컬 구현 범위이며, 상대방 리뷰·PR 머지 전이다.
+
+| ID / 계약 | 구현 | 테스트 | 범위 |
+| --- | --- | --- | --- |
+| R3-21 서버/클라이언트 연결 | `MatchTransport`, `SocketMatchTransport` | `SocketMatchTransportTest` | 통신 기반 구현. 선택 화면은 카드 23 |
+| H3-10 통신 호환성 | HELLO, `MessageCodec`, 동일 프로토콜 버전 검사 | `MessageCodecTest`, `SocketMatchTransportTest.handshakeRejectsIncompatibleProtocolsOnBothEnds` | [명시적 통신 계약](network-protocol.md) |
+| 경기 번호·허용 상태·중복 공격 | `MatchEnvelope`, `MatchProtocol` | `MatchProtocolTest`, 소켓 수신→검사 통합 테스트 | 실제 대전 적용은 카드 24 |
+| 수신 실행 흐름·RTT | 큐 기반 `poll()`, `PingTracker` | `SocketMatchTransportTest`, `PingTrackerTest` | RTT는 N3-01의 입력→화면 측정을 대신하지 않음 |
+| N3-02 접속 자동화 | localhost 접속/실패/호환성/재접속 테스트 | `SocketMatchTransportTest` | 로비·경기 중 끊김·랙 UI 검증은 카드 23~26 |
+
 ## 3. 남은 작업
 
 | 항목 | 관련 ID | 카드 |
