@@ -77,6 +77,8 @@ public final class MatchProtocol {
                     : phase != Phase.LOBBY || !ready.getOrDefault(Role.SERVER, false)
                         || !ready.getOrDefault(Role.CLIENT, false) ? Decision.WRONG_STATE
                     : start.revision() != revision ? Decision.STALE_CONFIGURATION : Decision.ACCEPTED;
+            case FinalState ignored -> sender != Role.CLIENT ? Decision.WRONG_SENDER
+                    : inMatch() ? Decision.ACCEPTED : Decision.WRONG_STATE;
             case State state -> !inMatch() ? Decision.WRONG_STATE
                     : (sender == Role.SERVER ? state.remainingNanos() < 0 : state.remainingNanos() != -1)
                         ? Decision.WRONG_SENDER : Decision.ACCEPTED;

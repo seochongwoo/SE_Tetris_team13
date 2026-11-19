@@ -14,7 +14,7 @@
 
 ## 2. 호환성과 프레임 형식
 
-카드 22의 호환성 정책은 **동일한 프로토콜 버전 허용**이다. 앱 빌드 문자열은 비교하지 않는다. 현재 `MatchMessage.PROTOCOL_VERSION = 2` (카드 24에서 화면 표시 확인 계측과 최종 화면 동기화 추가)이며 메시지 필드·의미·상태 계약을 비호환으로 바꾸면 이 번호를 올린다. 양쪽은 접속 직후 `HELLO(version, role)`를 전송한다. 상대가 반대 역할이며 버전이 같아야 `CONNECTED`가 된다. HELLO 이전의 게임 메시지, 재차 HELLO, 버전/역할 불일치는 연결 실패다.
+카드 22의 호환성 정책은 **동일한 프로토콜 버전 허용**이다. 앱 빌드 문자열은 비교하지 않는다. 현재 `MatchMessage.PROTOCOL_VERSION = 3` (시간 만료 시 FINAL_STATE 확인 추가)이며 메시지 필드·의미·상태 계약을 비호환으로 바꾸면 이 번호를 올린다. 양쪽은 접속 직후 `HELLO(version, role)`를 전송한다. 상대가 반대 역할이며 버전이 같아야 `CONNECTED`가 된다. HELLO 이전의 게임 메시지, 재차 HELLO, 버전/역할 불일치는 연결 실패다.
 
 Java 객체 직렬화 대신 다음 순서의 binary frame을 사용한다. 구현은 `MessageCodec`이다.
 
@@ -36,6 +36,7 @@ Java 객체 직렬화 대신 다음 순서의 binary frame을 사용한다. 구�
 | READY | revision int64, ready boolean | 양쪽 / LOBBY. 현재 설정 revision에 대한 준비 또는 해제 |
 | START | revision int64, pieceSeed int64 | 서버 / LOBBY. 현재 설정에 양쪽 준비 완료, 이전보다 큰 matchId 필요. PLAYING으로 전환 |
 | STATE | player (아래 형식), remainingNanos int64, inputId int64 | 양쪽 / PLAYING·PAUSED. 송신자 자신의 화면·논리적 패배. 서버는 남은 시간 0 이상(시간제한 외 모드는 0), 클라이언트는 -1 |
+| FINAL_STATE | player | 클라이언트 / 시간제한 경기. 서버의 남은 시간 0을 확인한 뒤 마감 화면을 한 번 전송 |
 | PAINTED | inputId int64 | 양쪽 / PLAYING·PAUSED. 해당 입력을 포함한 프레임의 실제 paint 완료 후 확인. 디버그 표본만 양수 ID 사용 |
 | ATTACK | eventId int64, rows (int32 배열) | 양쪽 / PLAYING·PAUSED. eventId는 경기·송신자별 증가. 줄 모양만 전송 |
 | PAUSE | owner 문자열, request boolean | request=true: 양쪽 중 본인이 owner인 정지 요청 / PLAYING. false: 서버 확정, PAUSED로 전환하고 재개 권한자를 기록 |
@@ -71,7 +72,7 @@ Tile은 shape 문자열 다음 item 문자열이다. shape는 `EMPTY/I/O/T/S/Z/J
 
 ## 4. 경기 번호·순서·중복
 
-- LOBBY/READY 및 transport 제어 메시지는 matchId=0. START는 이전 경기보다 큰 양수. STATE/ATTACK/PAUSE/RESUME/RESULT/PAINTED는 현재 경기 번호. LEAVE도 현재 경기 번호를 쓴다. 로비에서 나가면 소켓을 닫고 상대는 연결 종료를 감지한다.
+- LOBBY/READY 및 transport 제어 메시지는 matchId=0. START는 이전 경기보다 큰 양수. STATE/FINAL_STATE/ATTACK/PAUSE/RESUME/RESULT/PAINTED는 현재 경기 번호. LEAVE도 현재 경기 번호를 쓴다. 로비에서 나가면 소켓을 닫고 상대는 연결 종료를 감지한다.
 - sequence는 **application 메시지의 송신자별 연결 전체 순번**이다. 1에서 시작하고 재대전에도 리셋하지 않는다. 로컬 발신 전과 원격 수신 후 동일한 `MatchProtocol.accept(sender, envelope)`를 호출한다. sender는 연결 역할에서 결정하며 payload로 임의 지정하지 않는다.
 - HELLO/PING/PONG은 어댑터 전용이다. HELLO의 sequence는 1, heartbeat는 id를 sequence에도 사용한다. application의 순번 검사와 별개이며 `poll()`로 나오지 않는다.
 - 이미 승인한 sequence 이하의 메시지 및 현재 경기에서 이미 승인한 eventId 이하의 ATTACK은 `DUPLICATE`. 다른 경기 메시지는 `STALE_MATCH`. 틀린 상태/권한/설정은 각각 `WRONG_STATE` / `WRONG_SENDER` / `STALE_CONFIGURATION`이다. 거부 시 게임과 검사기 상태는 바뀌지 않는다.
@@ -161,7 +162,7 @@ PING을 실제 writer가 쓰기 직전에 로컬 `System.nanoTime()`을 저장�
 - `AppComposition.newP2pMatch`가 로비에서 받은 설정·시드로 **자기 엔진 하나**와 `SinglePlayerSession`, `AttackQueue`를 만든다. 기본 블록 생성기는 같은 시드와 난이도를 사용하며 아이템 난수·삭제 줄 수·효과는 각자 독립이다. 아이템 공급과 공격 계산은 로컬 대전과 같은 `ItemPieceSource`, `AttackRule`, `AttackQueue`를 쓴다.
 - EDT의 `P2pMatch.update`/`handle`이 수신한 메시지를 검증하고 자기 엔진을 진행한다. 수신 스레드는 엔진에 접근하지 않는다. 매 프레임과 입력 직후 `STATE`를 보내며 상대는 `PlayerStates`의 화면 DTO만 그린다. 레벨은 전송 시 1부터 인코딩하고, 화면에는 엔진과 같이 0부터 표시한다. 삭제 연출의 복원·지워지는 칸을 투영하되 논리적 패배와 결과에는 연출을 제거한다.
 - 블록 고정으로 생긴 `ATTACK`은 고유 eventId로 즉시 전송한다. 수신 공격은 대기열에만 넣으며 자기 블록 고정 후 다음 생성 전에 적용한다. 최대 10줄·행 순서·아이템 제거는 기존 규칙을 사용한다. 정지 전에 전송 중이던 공격은 정지 상태에서도 대기열에 보관한다.
-- 서버 프레임이 남은 시간을 감소시키며 클라이언트는 서버 값을 표시한다. 프레임 경과는 남은 시간까지 잘라 적용한다. 서버가 이번 프레임에 받은 원격 상태와 로컬 진행 결과로 판정하며, 같은 프레임의 양쪽 패배는 무승부, 패배와 시간 만료가 겹치면 패배가 우선한다. 시간 만료 점수는 그 서버 판정 시점까지 받은 최신 클라이언트 점수와 서버 점수이다. 두 PC의 동기화되지 않은 시계로 사건 순서를 추정하지 않는다. 결과는 서버만 확정한다. `RESULT`에 판정에 사용한 양쪽 `PlayerState`를 함께 넣어 결과 화면을 고정한다. 결과 수신 지연 중 클라이언트에서 추가된 점수·보드는 최종 화면에 반영하지 않으며, 양쪽 화면의 점수와 판정 근거를 일치시킨다. 최초 상대 `STATE` 수신 전 기권처럼 상대 화면을 아직 모르는 경우에만 양쪽 최종 화면을 생략한다.
+- 서버 프레임이 남은 시간을 감소시키며 클라이언트는 서버 값을 표시한다. 프레임 경과는 남은 시간까지 잘라 적용한다. 서버가 이번 프레임에 받은 원격 상태와 로컬 진행 결과로 판정하며, 같은 프레임의 양쪽 패배는 무승부, 패배와 시간 만료가 겹치면 패배가 우선한다. 시간 만료 시 서버는 진행을 멈추고 남은 시간 0을 보낸다. 클라이언트도 남은 플레이 시간까지만 조작과 중력을 진행하며, 서버의 0을 받으면 FINAL_STATE(player)를 한 번 회신한다. 서버는 이 마감 상태와 서버 점수를 비교한다. 두 PC의 동기화되지 않은 시계로 사건 순서를 추정하지 않는다. 결과는 서버만 확정한다. `RESULT`에 판정에 사용한 양쪽 `PlayerState`를 함께 넣어 결과 화면을 고정한다. 결과 수신 지연 중 클라이언트에서 추가된 점수·보드는 최종 화면에 반영하지 않으며, 양쪽 화면의 점수와 판정 근거를 일치시킨다. 최초 상대 `STATE` 수신 전 기권처럼 상대 화면을 아직 모르는 경우에만 양쪽 최종 화면을 생략한다.
 - 어느 쪽이든 정지 요청 가능. 서버가 정지를 확정하고 정지 요청자만 재개한다. 재개를 수신한 프레임은 이전 정지 중 경과 시간을 버린다. 정지 중 입력·중력·시간은 진행하지 않는다. 줄 삭제 연출 중 블록 조작 입력은 무시한다.
 - 기권은 `LEAVE`→서버 `RESULT` 교환을 마치며 소켓을 바로 닫지 않는다. 결과 확정 후 입력·점수·공격을 적용하지 않는다. `RESULT` 수신 즉시 메시지 소비를 멈춰 뒤따른 `LOBBY`를 경기 화면이 삼키지 않게 한다.
 - 결과를 **2초 표시**한 뒤 같은 `P2pLobby.returnAfterResult()`로 돌아간다. 서버가 새 revision을 보내고 양쪽 준비를 초기화한다. 다시 양쪽 Enter를 눌러야 새 matchId로 새 엔진·타이머·점수·대기열·아이템 효과를 생성한다. 연결과 송신 순번은 유지한다. 경기 화면은 `EndGameCoordinator`와 점수 저장소를 호출하지 않는다.

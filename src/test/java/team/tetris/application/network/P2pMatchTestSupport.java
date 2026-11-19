@@ -53,7 +53,7 @@ public final class P2pMatchTestSupport {
             ss = server.takeStartedMatch().orElseThrow(); cs = client.takeStartedMatch().orElseThrow();
             s = match(ss, sb); c = match(cs, cb); pump();
         }
-        public void pump() { s.update(0); c.update(0); s.update(0); }
+        public void pump() { s.update(0); c.update(0); s.update(0); c.update(0); }
         public void rematch() {
             server.returnAfterResult(); client.returnAfterResult(); client.update();
             start(null, null);

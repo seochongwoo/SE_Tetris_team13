@@ -6,7 +6,7 @@ import team.tetris.application.model.Difficulty;
 
 /** 통신용 불변 값. 엔진 객체나 Java 직렬화를 전송하지 않는다. 필드·상태 계약은 docs/network-protocol.md. */
 public sealed interface MatchMessage {
-    int PROTOCOL_VERSION = 2;
+    int PROTOCOL_VERSION = 3;
 
     enum Role { SERVER, CLIENT }
     enum Mode { NORMAL, ITEM, TIMED }
@@ -43,6 +43,10 @@ public sealed interface MatchMessage {
             if (remainingNanos < -1) throw new IllegalArgumentException("Invalid remaining time");
             if (inputId < 0) throw new IllegalArgumentException("Invalid input id");
         }
+    }
+
+    record FinalState(PlayerState player) implements MatchMessage {
+        public FinalState { Objects.requireNonNull(player); }
     }
 
     /** 디버그 입력 표본을 포함한 화면을 paint한 뒤에만 보낸다. RTT ping과 별개. */

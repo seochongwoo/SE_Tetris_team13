@@ -34,6 +34,7 @@ public final class MessageCodec {
             }
             case Ready m -> { out.writeUTF("READY"); out.writeLong(m.revision()); out.writeBoolean(m.ready()); }
             case Start m -> { out.writeUTF("START"); out.writeLong(m.revision()); out.writeLong(m.pieceSeed()); }
+            case FinalState m -> { out.writeUTF("FINAL_STATE"); writePlayer(out, m.player()); }
             case State m -> { out.writeUTF("STATE"); writePlayer(out, m.player()); out.writeLong(m.remainingNanos()); out.writeLong(m.inputId()); }
             case Painted m -> { out.writeUTF("PAINTED"); out.writeLong(m.inputId()); }
             case Attack m -> { out.writeUTF("ATTACK"); out.writeLong(m.eventId()); writeRows(out, m.rows()); }
@@ -69,6 +70,7 @@ public final class MessageCodec {
                 case "LOBBY" -> new Lobby(in.readLong(), value(in, Mode.class), value(in, Difficulty.class), in.readInt());
                 case "READY" -> new Ready(in.readLong(), bool(in));
                 case "START" -> new Start(in.readLong(), in.readLong());
+                case "FINAL_STATE" -> new FinalState(readPlayer(in));
                 case "STATE" -> new State(readPlayer(in), in.readLong(), in.readLong());
                 case "PAINTED" -> new Painted(in.readLong());
                 case "ATTACK" -> new Attack(in.readLong(), readRows(in));
