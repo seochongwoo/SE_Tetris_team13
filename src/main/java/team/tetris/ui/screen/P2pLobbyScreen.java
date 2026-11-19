@@ -6,6 +6,7 @@ import team.tetris.application.network.MatchMessage.Mode;
 import team.tetris.ui.DisplayNames;
 import team.tetris.ui.ScreenRouter;
 import team.tetris.ui.input.KeyNames;
+import team.tetris.ui.render.Backdrop;
 import team.tetris.ui.render.TextFrame;
 import team.tetris.ui.render.TextStyle;
 
@@ -21,6 +22,7 @@ public final class P2pLobbyScreen implements Screen {
     private String error = "";
     private boolean invalidCharacter;
     private boolean handedOff;
+    private long clockNanos;
 
     public P2pLobbyScreen(ScreenRouter router, P2pLobby lobby) {
         this.router = router;
@@ -104,7 +106,10 @@ public final class P2pLobbyScreen implements Screen {
         if (!invalidCharacter && input.length() < 15) input += value;
     }
 
-    @Override public void update(long elapsedNanos) { lobby.update(); }
+    @Override public void update(long elapsedNanos) {
+        clockNanos += elapsedNanos;
+        lobby.update();
+    }
     /** 경기 화면으로 전환하기 직전에 호출. 연결 정리는 이후 경기 화면의 책임이다. */
     public java.util.Optional<P2pLobby.StartedMatch> handoffStartedMatch() {
         var started = lobby.takeStartedMatch();
@@ -117,24 +122,36 @@ public final class P2pLobbyScreen implements Screen {
     @Override public TextFrame render() {
         var palette = router.palette();
         var frame = TextFrame.blank(palette.base());
-        frame.putCentered(1, "P2P 대전", palette.base());
-        frame.put(2, 3, "포트: " + P2pLobby.PORT, palette.base());
+        frame.setBackdrop(Backdrop.cathedral(clockNanos));
+        frame.addPlate(1, 0, TextFrame.COLUMNS - 2, 8);
+        frame.putCentered(1, "P2P 대전 로비", palette.accentStyle());
+        frame.put(2, 3, "포트: " + P2pLobby.PORT, palette.dimStyle());
         String prompt = clientEntry ? "접속할 서버의 IPv4 주소를 입력하세요" : lobby.status();
-        wrapped(frame, 5, error.isEmpty() ? prompt : error, palette.base(), 3);
+        wrapped(frame, 4, error.isEmpty() ? prompt : error,
+                !error.isEmpty() || lobby.stage() == P2pLobby.Stage.FAILED ? palette.warningStyle() : palette.base(), 3);
         if (lobby.stage() == P2pLobby.Stage.CHOICE) {
             if (!clientEntry) {
-                frame.put(4, 10, (roleCursor == 0 ? "> " : "  ") + "서버", palette.base());
-                frame.put(4, 12, (roleCursor == 1 ? "> " : "  ") + "클라이언트", palette.base());
-                frame.put(2, 20, "↑↓ 선택 · Enter 확인", palette.base());
+                frame.addPlate(11, 9, 22, 5);
+                for (int i = 0; i < 2; i++) {
+                    int row = 10 + 2 * i;
+                    var style = i == roleCursor ? palette.highlightStyle() : palette.base();
+                    if (i == roleCursor) {
+                        frame.fill(12, row, 20, 1, style);
+                        frame.put(13, row, "►", style);
+                    }
+                    frame.putCentered(row, i == 0 ? "서버" : "클라이언트", style);
+                }
             } else {
+                frame.addPlate(1, 8, TextFrame.COLUMNS - 2, 12);
                 frame.put(2, 9, "서버 IPv4: " + input + "_", palette.base());
                 if (invalidCharacter) frame.put(2, 10, "숫자와 점(.)만 입력할 수 있습니다", palette.warningStyle());
                 frame.put(2, 11, "최근 IP (↑↓ 불러오기)", palette.base());
                 for (int i = 0; i < lobby.recent().addresses().size(); i++)
                     frame.put(4, 12 + i, lobby.recent().addresses().get(i), palette.base());
-                frame.put(2, 19, "Delete 지우기 · Enter 접속", palette.base());
+                frame.put(2, 18, "Delete 지우기 · Enter 접속", palette.base());
             }
         } else if (lobby.stage() == P2pLobby.Stage.CONNECTING && lobby.isServer()) {
+            frame.addPlate(1, 8, TextFrame.COLUMNS - 2, 12);
             frame.put(2, 9, "상대 PC에서 입력할 IPv4:", palette.base());
             var addresses = lobby.addresses();
             if (addresses.isEmpty()) {
@@ -144,31 +161,42 @@ public final class P2pLobbyScreen implements Screen {
                     frame.put(4, 11 + i % 5, addresses.get(i), palette.base());
                 frame.put(2, 17, "↑↓ 주소 페이지 " + (addressPage + 1) + "/" + ((addresses.size() + 4) / 5), palette.base());
             }
-            frame.put(2, 19, "같은 PC 테스트: 127.0.0.1", palette.base());
+            frame.put(2, 18, "같은 PC 테스트: 127.0.0.1", palette.base());
         } else if (lobby.stage() == P2pLobby.Stage.LOBBY) {
+            frame.addPlate(1, 8, TextFrame.COLUMNS - 2, 12);
             lobby.configuration().ifPresent(config -> {
                 String mode = switch (config.mode()) { case NORMAL -> "일반"; case ITEM -> "아이템"; case TIMED -> "시간제한"; };
                 frame.put(2, 9, "모드: " + mode, palette.base());
                 frame.put(2, 10, "난이도: " + DisplayNames.of(config.difficulty()), palette.base());
                 if (config.mode() == Mode.TIMED) frame.put(21, 10, "제한시간: " + config.timeLimitSeconds() / 60 + "분", palette.base());
             });
-            frame.put(2, 13, "나: " + (lobby.localReady() ? "준비 완료" : "대기"), palette.base());
-            frame.put(2, 14, "상대: " + (lobby.remoteReady() ? "준비 완료" : "대기"), palette.base());
+            frame.put(2, 13, "나: " + (lobby.localReady() ? "준비 완료" : "대기"), lobby.localReady() ? palette.accentStyle() : palette.base());
+            frame.put(2, 14, "상대: " + (lobby.remoteReady() ? "준비 완료" : "대기"), lobby.remoteReady() ? palette.accentStyle() : palette.base());
             if (lobby.isServer()) {
                 frame.put(2, 16, "←→ 모드 · ↑↓ 난이도", palette.base());
                 if (lobby.configuration().filter(config -> config.mode() == Mode.TIMED).isPresent())
                     frame.put(26, 16, "< > 제한시간", palette.base());
                 frame.put(2, 17, "설정 변경 시 양쪽 준비 해제", palette.base());
             } else frame.put(2, 17, "서버가 경기 설정을 선택합니다", palette.base());
-            frame.put(2, 19, "Enter 게임 시작", palette.base());
+            if (!lobby.localReady()) frame.putCentered(18, "Enter 준비", palette.accentStyle());
         } else if (lobby.stage() == P2pLobby.Stage.STARTED) {
+            frame.addPlate(8, 10, 28, 5);
             frame.putCentered(11, "양쪽 준비 완료", palette.base());
             frame.putCentered(13, "경기 연결 준비됨", palette.base());
         } else if (lobby.stage() == P2pLobby.Stage.FAILED) {
-            frame.put(2, 19, "Enter 다시 접속", palette.base());
+            frame.addPlate(1, 17, TextFrame.COLUMNS - 2, 3);
+            frame.putCentered(18, "Enter 다시 접속", palette.base());
         }
-        frame.put(2, 21, lobby.recent().warning(), palette.base());
-        frame.put(2, 23, "Esc 돌아가기", palette.base());
+        boolean hasWarning = !lobby.recent().warning().isEmpty();
+        int footerTop = hasWarning ? 20 : 21;
+        frame.addPlate(1, footerTop, TextFrame.COLUMNS - 2, TextFrame.ROWS - footerTop);
+        if (hasWarning) {
+            frame.put(2, 21, lobby.recent().warning(), palette.warningStyle());
+        }
+        String hint = lobby.stage() == P2pLobby.Stage.CHOICE && !clientEntry
+                ? "↑↓ 선택 · Enter 확인 · Esc 돌아가기"
+                : "Esc 돌아가기";
+        frame.putCentered(22, hint, palette.dimStyle());
         return frame;
     }
 
