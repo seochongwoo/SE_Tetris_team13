@@ -67,6 +67,10 @@ public final class P2pMatch {
     public long matchId() { return started.matchId(); }
     public long remainingNanos() { return remaining; }
     public boolean peerDisconnected() { return connection.transport().status().peerDisconnected(); }
+    public String disconnectReason() {
+        String detail = connection.transport().status().detail();
+        return detail.isBlank() ? "상대 연결이 종료되었습니다" : detail;
+    }
     public boolean paused() { return pauseOwner != null; }
     public Role pauseOwner() { return pauseOwner; }
     public Optional<Result> result() { return Optional.ofNullable(result); }

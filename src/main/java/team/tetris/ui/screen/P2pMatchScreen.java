@@ -88,7 +88,11 @@ public final class P2pMatchScreen implements Screen {
                 case CLIENT_WINS -> match.role() == MatchMessage.Role.CLIENT ? "승리" : "패배";
             };
             String scores = "나 " + match.local().score() + match.remote().map(r -> "  :  " + r.score() + " 상대").orElse("");
-            drawOverlay(frame, title, scores, "잠시 후 대기실로 돌아갑니다");
+            if (match.peerDisconnected()) {
+                drawOverlay(frame, title + " · 연결 끊김", match.disconnectReason(), "잠시 후 서버/클라이언트 선택 화면으로 돌아갑니다");
+            } else {
+                drawOverlay(frame, title, scores, "잠시 후 대기실로 돌아갑니다");
+            }
         } else if (match.paused()) {
             drawOverlay(frame, "일시정지", match.pauseOwner() == match.role()
                     ? displayKey(GameCommand.RESUME) + " 재개" : "상대가 재개할 때까지 대기",
