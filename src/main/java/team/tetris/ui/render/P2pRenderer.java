@@ -30,13 +30,18 @@ public final class P2pRenderer {
             frame.putCentered(0, "남은 시간 " + BattleRenderer.clock(seconds),
                     seconds <= BattleRenderer.WARNING_SECONDS ? palette.warningStyle() : palette.base().asBold());
         }
-        if (match.lagging()) {
-            frame.putRight(frame.columns() - 1, frame.rows() - 1, "네트워크 지연 (랙)", palette.warningStyle());
-        }
+        drawLatency(frame, palette, match.roundTripNanos(), match.lagging());
         player(frame, BattleRenderer.ONE_LEFT, match.local(), "나");
         match.remote().ifPresentOrElse(state -> player(frame, BattleRenderer.TWO_LEFT, state, "상대"),
                 () -> frame.put(BattleRenderer.TWO_LEFT, 3, "상대 화면 수신 대기", palette.dimStyle()));
         return frame;
+    }
+
+    public static void drawLatency(TextFrame frame, ColorPalette palette, java.util.OptionalLong nanos, boolean lagging) {
+        if (nanos.isEmpty() && !lagging) return;
+        String label = lagging ? "네트워크 지연 (랙)" : "지연";
+        if (nanos.isPresent()) label += " " + java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(nanos.getAsLong()) + " ms";
+        frame.putRight(frame.columns() - 1, frame.rows() - 1, label, lagging ? palette.warningStyle() : palette.dimStyle());
     }
 
     private void player(TextFrame frame, int left, PlayerState state, String label) {
