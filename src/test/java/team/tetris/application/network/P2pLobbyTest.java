@@ -70,6 +70,16 @@ class P2pLobbyTest {
         assertEquals(1, serverWire.sent.stream().filter(e -> e.message() instanceof Start).count());
     }
 
+    @Test void difficultyChangeReachesClientAndSurvivesModeChange() {
+        connect();
+        server.configure(Mode.NORMAL, Difficulty.EASY, 0);
+        client.update();
+        assertEquals(Difficulty.EASY, client.configuration().orElseThrow().difficulty());
+        server.configure(Mode.TIMED, 120);
+        client.update();
+        assertEquals(Difficulty.EASY, client.configuration().orElseThrow().difficulty());
+    }
+
     @Test void configurationChangesClearBothReadyFlagsAndStaleReadyCannotStart() {
         connect();
         server.ready(); client.ready(); // 클라이언트 준비가 서버에 아직 도착하지 않은 경합

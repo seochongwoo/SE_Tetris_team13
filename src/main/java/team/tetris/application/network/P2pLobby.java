@@ -116,8 +116,13 @@ public final class P2pLobby implements AutoCloseable {
     }
 
     public void configure(Mode mode, int seconds) {
+        configure(mode, configuration == null ? difficulty : configuration.difficulty(), seconds);
+    }
+
+    public void configure(Mode mode, Difficulty difficulty, int seconds) {
         if (stage != Stage.LOBBY || !isServer()) return;
-        if (configuration != null && configuration.mode() == mode && configuration.timeLimitSeconds() == seconds) return;
+        if (configuration != null && configuration.mode() == mode && configuration.difficulty() == difficulty
+                && configuration.timeLimitSeconds() == seconds) return;
         var next = new Lobby(configuration == null ? 1 : configuration.revision() + 1, mode, difficulty, seconds);
         try { connection.send(0, next); applyConfiguration(next); }
         catch (RuntimeException error) { fail(error.getMessage()); }
