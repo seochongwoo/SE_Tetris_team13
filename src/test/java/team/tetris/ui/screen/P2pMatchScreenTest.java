@@ -29,10 +29,13 @@ class P2pMatchScreenTest {
                 var s = assertInstanceOf(P2pMatchScreen.class, sr.current());
                 var c = assertInstanceOf(P2pMatchScreen.class, cr.current());
                 assertEquals(round, s.match().matchId());
-                assertEquals(88, sr.render().columns());
-                assertTrue(sr.render().text().contains("레벨 0"));
+                var playing = sr.render();
+                assertEquals(78, playing.columns());
+                assertEquals(2, playing.rowText(playing.rows() - 2).split("└" + "─".repeat(10) + "┘", -1).length - 1);
+                assertTrue(playing.rowText(playing.rows() - 1).contains("떨어뜨리기"));
+                assertTrue(sr.render().text().contains("LV 0"));
                 assertEquals(2, sr.render().text().split("NEXT", -1).length - 1);
-                assertNotNull(sr.render().tileAt(2, 3)); assertNotNull(sr.render().tileAt(46, 3));
+                assertNotNull(sr.render().tileAt(2, 3)); assertNotNull(sr.render().tileAt(41, 3));
                 // 실제 paint 콜백과 3단계 화면 크기에서도 넓은 프레임을 그릴 수 있다.
                 for (var size : team.tetris.application.model.Settings.ScreenSize.values()) {
                     var panel = new TextFramePanel(size, sr.render());
@@ -59,9 +62,12 @@ class P2pMatchScreenTest {
                 inputScreen.onKeyReleased(left);
                 sr.focusLost(); cr.update(0); assertFalse(c.match().paused());
                 TestApplication.tap(sr, "ESCAPE"); cr.update(0); assertTrue(c.match().paused());
+                assertTrue(sr.render().rowText(10).contains("일시정지"));
+                assertTrue(sr.render().rowText(12).contains("재개"));
+                assertTrue(cr.render().rowText(12).contains("상대가 재개할 때까지 대기"));
                 TestApplication.tap(sr, sr.settings().keyBindings().get(GameCommand.QUIT_GAME)); cr.update(0);
-                assertEquals("패배", sr.render().rowText(24).strip());
-                assertEquals("승리", cr.render().rowText(24).strip());
+                assertTrue(sr.render().rowText(10).contains("패배"));
+                assertTrue(cr.render().rowText(10).contains("승리"));
                 sr.update(2_000_000_000L); cr.update(2_000_000_000L); cr.update(0);
                 assertInstanceOf(P2pLobbyScreen.class, sr.current());
                 assertInstanceOf(P2pLobbyScreen.class, cr.current());

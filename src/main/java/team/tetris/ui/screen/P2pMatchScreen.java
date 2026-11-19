@@ -79,18 +79,41 @@ public final class P2pMatchScreen implements Screen {
         TextFrame frame = new P2pRenderer(router.palette()).render(match);
         long input = match.inputId(), remoteInput = match.remoteInputId();
         frame.afterPaint(() -> match.painted(input, remoteInput));
+        var palette = router.palette();
+        frame.putRight(frame.columns() - 1, 0, displayKey(GameCommand.PAUSE) + " / "
+                + displayKey(GameCommand.QUIT_GAME) + " 일시정지", palette.dimStyle());
+        frame.put(1, frame.rows() - 1, displayKey(GameCommand.MOVE_LEFT) + " " + displayKey(GameCommand.MOVE_RIGHT)
+                + " 이동 · " + displayKey(GameCommand.ROTATE_CW) + " 회전 · " + displayKey(GameCommand.SOFT_DROP)
+                + " 내리기 · " + displayKey(GameCommand.HARD_DROP) + " 떨어뜨리기", palette.dimStyle());
         if (match.failure().isPresent()) {
-            frame.fill(0, 24, frame.columns(), 2, router.palette().base());
-            frame.putCentered(24, "연결 오류: " + match.failure().orElseThrow(), router.palette().warningStyle());
-            frame.putCentered(25, "잠시 후 P2P 첫 화면 · Enter 바로 돌아가기", router.palette().base());
+            drawOverlay(frame, "연결 오류", match.failure().orElseThrow(), "잠시 후 P2P 첫 화면 · Enter 바로 복귀");
+        } else if (match.result().isPresent()) {
+            String title = switch (match.result().orElseThrow().outcome()) {
+                case DRAW -> "무승부";
+                case SERVER_WINS -> match.role() == MatchMessage.Role.SERVER ? "승리" : "패배";
+                case CLIENT_WINS -> match.role() == MatchMessage.Role.CLIENT ? "승리" : "패배";
+            };
+            String scores = "나 " + match.local().score() + match.remote().map(r -> "  :  " + r.score() + " 상대").orElse("");
+            drawOverlay(frame, title, scores, "잠시 후 대기실로 돌아갑니다");
+        } else if (match.paused()) {
+            drawOverlay(frame, "일시정지", match.pauseOwner() == match.role()
+                    ? displayKey(GameCommand.RESUME) + " 재개" : "상대가 재개할 때까지 대기",
+                    displayKey(GameCommand.QUIT_GAME) + " 기권");
         }
-        frame.putCentered(26, displayKey(GameCommand.MOVE_LEFT) + " " + displayKey(GameCommand.MOVE_RIGHT)
-                + " 이동 · " + displayKey(GameCommand.ROTATE_CW) + " 회전 · " + displayKey(GameCommand.HARD_DROP) + " 떨어뜨리기", router.palette().base());
-        frame.putCentered(27, match.paused()
-                ? displayKey(GameCommand.RESUME) + " 재개 · " + displayKey(GameCommand.QUIT_GAME) + " 기권"
-                : displayKey(GameCommand.PAUSE) + " / " + displayKey(GameCommand.QUIT_GAME) + " 정지", router.palette().base());
         return frame;
     }
+    private void drawOverlay(TextFrame frame, String title, String detail, String hint) {
+        var palette = router.palette();
+        int width = 40;
+        int height = 7;
+        int top = (frame.rows() - height) / 2;
+        frame.shade();
+        frame.box((frame.columns() - width) / 2, top, width, height, palette.borderStyle(), palette.base());
+        frame.putCentered(top + 1, title, palette.accentStyle());
+        frame.putCentered(top + 3, detail, palette.base());
+        frame.putCentered(top + 4, hint, palette.base());
+    }
+
     private String displayKey(GameCommand command) { return KeyNames.display(keys.keyFor(command)); }
     @Override public void onLeave() { match.finishMeasurement(); if (!handedOff) lobby.close(); }
 }

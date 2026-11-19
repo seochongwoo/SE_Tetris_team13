@@ -2,61 +2,60 @@ package team.tetris.ui.render;
 
 import team.tetris.application.network.*;
 import team.tetris.core.Cell;
+import team.tetris.core.Position;
+import team.tetris.ui.DisplayNames;
 import team.tetris.ui.render.palette.*;
 
 /** 두 보드와 NEXT·대기 공격을 같은 격자에 그린다. 로컬/원격 모두 같은 화면 DTO를 사용한다. */
 public final class P2pRenderer {
     private final ColorPalette palette;
+    private final BattleInfoPanel panel;
     private final BoardPainter painter;
     public P2pRenderer(ColorPalette palette) {
         this.palette = palette;
+        panel = new BattleInfoPanel(palette);
         painter = new BoardPainter(palette, 0, 0);
     }
 
     public TextFrame render(P2pMatch match) {
-        var frame = new TextFrame(88, 28, palette.base());
-        frame.putCentered(0, "P2P · " + switch (match.mode()) {
+        // 긴 조작 안내가 1P 받을 줄 미리보기의 아래 테두리를 덮지 않도록 전용 행을 둔다.
+        var frame = new TextFrame(BattleRenderer.COLUMNS, BattleRenderer.ROWS + 1, palette.base());
+        frame.put(BattleRenderer.ONE_LEFT, 0, "P2P 대전 · " + switch (match.mode()) {
             case NORMAL -> "일반";
             case ITEM -> "아이템";
             case TIMED -> "시간제한";
-        } + (match.mode() == MatchMessage.Mode.TIMED
-                ? " · " + ((match.remainingNanos() + 999_999_999L) / 1_000_000_000L) + "초" : "")
-                + (match.lagging() ? " · 네트워크 지연 (랙)" : ""),
-                match.lagging() ? palette.warningStyle() : palette.accentStyle());
-        player(frame, 1, match.local(), "나");
-        match.remote().ifPresentOrElse(state -> player(frame, 45, state, "상대"),
-                () -> frame.put(46, 3, "상대 화면 수신 대기", palette.base()));
-        if (match.paused() && match.result().isEmpty())
-            frame.putCentered(24, "일시정지 · " + (match.pauseOwner() == match.role() ? "나" : "상대") + "만 재개 가능", palette.accentStyle());
-        match.result().ifPresent(result -> {
-            frame.putCentered(24, switch (result.outcome()) {
-                case DRAW -> "무승부";
-                case SERVER_WINS -> match.role() == MatchMessage.Role.SERVER ? "승리" : "패배";
-                case CLIENT_WINS -> match.role() == MatchMessage.Role.CLIENT ? "승리" : "패배";
-            }, palette.accentStyle());
-            frame.putCentered(25, "잠시 후 대기실로 돌아갑니다", palette.base());
-        });
+        } + " / " + DisplayNames.of(match.difficulty()), palette.accentStyle());
+        if (match.mode() == MatchMessage.Mode.TIMED) {
+            long seconds = (match.remainingNanos() + 999_999_999L) / 1_000_000_000L;
+            frame.putCentered(0, "남은 시간 " + BattleRenderer.clock(seconds),
+                    seconds <= BattleRenderer.WARNING_SECONDS ? palette.warningStyle() : palette.base().asBold());
+        }
+        if (match.lagging()) {
+            frame.putRight(frame.columns() - 1, frame.rows() - 1, "네트워크 지연 (랙)", palette.warningStyle());
+        }
+        player(frame, BattleRenderer.ONE_LEFT, match.local(), "나");
+        match.remote().ifPresentOrElse(state -> player(frame, BattleRenderer.TWO_LEFT, state, "상대"),
+                () -> frame.put(BattleRenderer.TWO_LEFT, 3, "상대 화면 수신 대기", palette.dimStyle()));
         return frame;
     }
 
     private void player(TextFrame frame, int left, PlayerState state, String label) {
-        frame.put(left, 1, label, palette.accentStyle());
-        frame.box(left, 2, 22, 22, palette.borderStyle(), palette.base());
-        for (int y = 0; y < 20; y++) for (int x = 0; x < 10; x++)
-            cell(frame, left + 1 + x * 2, 3 + y, PlayerStates.cell(state.board().get(y * 10 + x)));
-        for (var tile : state.active()) if (tile.y() >= 0)
-            cell(frame, left + 1 + tile.x() * 2, 3 + tile.y(), PlayerStates.cell(tile.tile()));
-        int panel = left + 23;
-        frame.put(panel, 2, "NEXT", palette.base());
-        for (var tile : state.next()) cell(frame, panel + tile.x() * 2, 4 + tile.y(), PlayerStates.cell(tile.tile()));
-        frame.put(panel, 7, "점수 " + state.score(), palette.base());
-        frame.put(panel, 8, "레벨 " + (state.level() - 1), palette.base());
-        frame.put(panel, 9, "줄 " + state.clearedLines(), palette.base());
-        frame.put(panel, 10, "2배 " + state.doubleScoreClears(), palette.base());
-        frame.put(panel, 12, "대기 " + state.pendingRows().size(), palette.base());
-        var rows = PlayerStates.rows(state.pendingRows());
-        for (int y = 0; y < rows.size(); y++) for (int x = 0; x < 10; x++)
-            cell(frame, panel + x * 2, 13 + y, rows.get(y).get(x));
+        int top = BattleRenderer.BOARD_TOP;
+        frame.box(left, top, 22, 22, palette.borderStyle(), palette.base());
+        for (int y = 0; y < PlayerState.HEIGHT; y++) {
+            for (int x = 0; x < PlayerState.WIDTH; x++) {
+                cell(frame, left + 1 + x * 2, top + 1 + y,
+                        PlayerStates.cell(state.board().get(y * PlayerState.WIDTH + x)));
+            }
+        }
+        for (var tile : state.active()) {
+            if (tile.y() >= 0) cell(frame, left + 1 + tile.x() * 2, top + 1 + tile.y(), PlayerStates.cell(tile.tile()));
+        }
+        Position[] preview = state.next().stream().map(t -> new Position(t.x(), t.y())).toArray(Position[]::new);
+        painter.drawNext(frame, preview, left + BattleInfoPanel.INFO_OFFSET, BattleInfoPanel.NEXT_TITLE_ROW,
+                (i, x, y) -> cell(frame, x, y, PlayerStates.cell(state.next().get(i).tile())));
+        panel.draw(frame, left, label, state.level() - 1, state.score(), state.clearedLines(),
+                state.doubleScoreClears(), PlayerState.WIDTH, PlayerStates.rows(state.pendingRows()));
     }
 
     private void cell(TextFrame frame, int x, int y, Cell cell) {
