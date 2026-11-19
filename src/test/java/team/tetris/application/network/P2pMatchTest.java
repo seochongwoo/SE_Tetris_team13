@@ -17,7 +17,7 @@ class P2pMatchTest {
         assertEquals(reason, actual.reason());
     }
 
-    @Test void lineClearDiscardsMovementAndHardDrops() {
+    @Test void lineClearReplaysMovementAndHardDropsInOrder() {
         try (var p = new Pair(Mode.NORMAL, twoLines(), empty());
              var control = new Pair(Mode.NORMAL, twoLines(), empty())) {
             p.s.handle(GameCommand.HARD_DROP);
@@ -28,6 +28,9 @@ class P2pMatchTest {
             long duration = team.tetris.application.LineClearAnimation.DURATION_NANOS;
             p.s.update(duration);
             control.s.update(duration);
+            for (int i = 0; i < 6; i++) control.s.handle(GameCommand.MOVE_LEFT);
+            control.s.handle(GameCommand.HARD_DROP);
+            control.s.handle(GameCommand.HARD_DROP);
             assertEquals(control.s.local().active(), p.s.local().active());
             assertEquals(control.s.local().board(), p.s.local().board());
         }
