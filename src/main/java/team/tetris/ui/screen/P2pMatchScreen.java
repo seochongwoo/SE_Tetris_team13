@@ -17,6 +17,8 @@ public final class P2pMatchScreen implements Screen {
     private long now;
     private long resultElapsed;
     private boolean handedOff;
+    private boolean failureShown;
+    private long failureElapsed;
 
     public P2pMatchScreen(ScreenRouter router, P2pLobby lobby, P2pMatch match) {
         this.router = router;
@@ -43,6 +45,13 @@ public final class P2pMatchScreen implements Screen {
         boolean paused = match.paused();
         boolean finished = match.result().isPresent();
         match.update(elapsedNanos);
+        if (match.failure().isPresent()) {
+            repeats.releaseAll();
+            if (failureShown) failureElapsed += Math.min(elapsedNanos, 2_000_000_000L);
+            else { failureShown = true; failureElapsed = 0; router.ignoreHeldKeys(); }
+            if (failureElapsed >= 2_000_000_000L) router.showP2pLobby();
+            return;
+        }
         if (match.paused() != paused || match.result().isPresent()) {
             repeats.releaseAll();
             router.ignoreHeldKeys();
@@ -67,11 +76,11 @@ public final class P2pMatchScreen implements Screen {
         var palette = router.palette();
         frame.putRight(frame.columns() - 1, 0, displayKey(GameCommand.PAUSE) + " / "
                 + displayKey(GameCommand.QUIT_GAME) + " 일시정지", palette.dimStyle());
-        frame.put(1, frame.rows() - 1, displayKey(GameCommand.MOVE_LEFT) + " " + displayKey(GameCommand.MOVE_RIGHT)
+        frame.put(1, frame.rows() - 2, displayKey(GameCommand.MOVE_LEFT) + " " + displayKey(GameCommand.MOVE_RIGHT)
                 + " 이동 · " + displayKey(GameCommand.ROTATE_CW) + " 회전 · " + displayKey(GameCommand.SOFT_DROP)
                 + " 내리기 · " + displayKey(GameCommand.HARD_DROP) + " 떨어뜨리기", palette.dimStyle());
         if (match.failure().isPresent()) {
-            drawOverlay(frame, "연결 오류", match.failure().orElseThrow(), "Enter: P2P 첫 화면");
+            drawOverlay(frame, "연결 오류", match.failure().orElseThrow(), "잠시 후 P2P 첫 화면 · Enter 바로 복귀");
         } else if (match.result().isPresent()) {
             String title = switch (match.result().orElseThrow().outcome()) {
                 case DRAW -> "무승부";
@@ -79,7 +88,11 @@ public final class P2pMatchScreen implements Screen {
                 case CLIENT_WINS -> match.role() == MatchMessage.Role.CLIENT ? "승리" : "패배";
             };
             String scores = "나 " + match.local().score() + match.remote().map(r -> "  :  " + r.score() + " 상대").orElse("");
-            drawOverlay(frame, title, scores, "잠시 후 대기실로 돌아갑니다");
+            if (match.peerDisconnected()) {
+                drawOverlay(frame, title + " · 연결 끊김", match.disconnectReason(), "잠시 후 서버/클라이언트 선택 화면으로 돌아갑니다");
+            } else {
+                drawOverlay(frame, title, scores, "잠시 후 대기실로 돌아갑니다");
+            }
         } else if (match.paused()) {
             drawOverlay(frame, "일시정지", match.pauseOwner() == match.role()
                     ? displayKey(GameCommand.RESUME) + " 재개" : "상대가 재개할 때까지 대기",

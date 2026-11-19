@@ -22,6 +22,7 @@ public final class LobbyTestSupport {
         public final List<MatchEnvelope> sent = new ArrayList<>();
         public Transport peer;
         public boolean closed;
+        public OptionalLong rtt = OptionalLong.empty();
         public String host;
         public void listen(int port) { status = new Status(State.LISTENING, "", port); }
         public void connect(String host, int port) { this.host = host; status = new Status(State.CONNECTING, "", port); }
@@ -32,7 +33,7 @@ public final class LobbyTestSupport {
             if (peer != null) peer.incoming.add(envelope);
         }
         public Optional<MatchEnvelope> poll() { return Optional.ofNullable(incoming.poll()); }
-        public OptionalLong roundTripNanos() { return OptionalLong.empty(); }
+        public OptionalLong roundTripNanos() { return rtt; }
         public void close() { closed = true; status = new Status(State.CLOSED, "", 0); }
     }
 }

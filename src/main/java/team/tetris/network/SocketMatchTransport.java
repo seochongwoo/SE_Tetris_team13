@@ -23,6 +23,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import team.tetris.application.network.MatchEnvelope;
 import team.tetris.application.network.MatchMessage;
+import team.tetris.application.network.NetworkPolicy;
 import team.tetris.application.network.MatchMessage.*;
 import team.tetris.application.port.MatchTransport;
 
@@ -120,6 +121,7 @@ public final class SocketMatchTransport implements MatchTransport {
         peer.setSoTimeout(0);
         synchronized (this) {
             if (terminal()) return;
+            ping.connected();
             status = new Status(State.CONNECTED, "", peer.getLocalPort());
             workers.execute(() -> writeLoop(out));
             workers.execute(this::heartbeatLoop);
@@ -164,11 +166,22 @@ public final class SocketMatchTransport implements MatchTransport {
 
     private void heartbeatLoop() {
         long id = 1;
+        long lastPing = System.nanoTime() - NetworkPolicy.PING_INTERVAL_NANOS;
         try {
             while (!terminal()) {
-                enqueue(new MatchEnvelope(0, id, new Ping(id)));
-                id++;
-                Thread.sleep(1_000);
+                if (ping.timedOut()) {
+                    synchronized (this) {
+                        if (!terminal()) terminate(State.FAILED, NetworkPolicy.NO_RESPONSE);
+                    }
+                    return;
+                }
+                long now = System.nanoTime();
+                if (now - lastPing >= NetworkPolicy.PING_INTERVAL_NANOS) {
+                    enqueue(new MatchEnvelope(0, id, new Ping(id)));
+                    id++;
+                    lastPing = now;
+                }
+                Thread.sleep(NetworkPolicy.CHECK_INTERVAL_MILLIS);
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -197,6 +210,12 @@ public final class SocketMatchTransport implements MatchTransport {
 
     @Override
     public OptionalLong roundTripNanos() { return ping.latest(); }
+
+    @Override
+    public boolean lagging() { return status.state() == State.CONNECTED && ping.lagging(); }
+
+    /** 패키지 내 수명주기 테스트에서 모든 작업의 실제 종료를 확인한다. */
+    boolean workersTerminated() { return workers.isTerminated(); }
 
     private boolean terminal() { return status.state() == State.CLOSED || status.state() == State.FAILED; }
 

@@ -3,6 +3,7 @@ package team.tetris.application.network;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.function.Function;
 import team.tetris.application.*;
 import team.tetris.application.model.GameMode;
@@ -70,10 +71,18 @@ public final class P2pMatch {
     public long matchId() { return started.matchId(); }
     public long remainingNanos() { return remaining; }
     public boolean peerDisconnected() { return connection.transport().status().peerDisconnected(); }
+    public String disconnectReason() {
+        String detail = connection.transport().status().detail();
+        return detail.isBlank() ? "상대 연결이 종료되었습니다" : detail;
+    }
     public boolean paused() { return pauseOwner != null; }
     public Role pauseOwner() { return pauseOwner; }
     public Optional<Result> result() { return Optional.ofNullable(result); }
     public Optional<String> failure() { return Optional.ofNullable(failure); }
+    public OptionalLong roundTripNanos() {
+        return failure != null ? OptionalLong.empty() : connection.transport().roundTripNanos();
+    }
+    public boolean lagging() { return failure == null && connection.transport().lagging(); }
     public PlayerState local() {
         if (result != null && result.server() != null) return role() == Role.SERVER ? result.server() : result.client();
         return PlayerStates.from(local.snapshot(), incoming.pending(), result != null || expired() || defeated());
@@ -138,17 +147,19 @@ public final class P2pMatch {
     }
 
     private void receive() {
-        if (result != null || failure != null) return; // 다음 LOBBY는 로비가 읽어야 한다.
+        if (failure != null) return;
         var status = connection.transport().status();
         if (status.peerDisconnected()) {
+            if (result != null) return;
             boolean serverWins = (role() == Role.SERVER) != leaving;
             result = new Result(serverWins ? Outcome.SERVER_WINS : Outcome.CLIENT_WINS, EndReason.LEFT);
             return;
         }
         if (status.state() == MatchTransport.State.FAILED || status.state() == MatchTransport.State.CLOSED) {
-            failure = status.detail().isBlank() ? "상대 연결이 종료되었습니다" : status.detail();
+            fail(status.detail().isBlank() ? "상대 연결이 종료되었습니다" : status.detail());
             return;
         }
+        if (result != null) return; // 연결 감시는 결과 연출 중에도 유지하되 다음 LOBBY는 로비가 읽는다.
         // 한 프레임의 작업량 제한. 거부 메시지도 MatchConnection에서 제한한다.
         for (int count = 0; count < 256 && result == null; count++) {
             var next = connection.receive();
@@ -231,6 +242,11 @@ public final class P2pMatch {
     private void send(MatchMessage message) {
         if (failure != null) return;
         try { connection.send(started.matchId(), message); }
-        catch (RuntimeException error) { if (!peerDisconnected()) failure = "전송 실패: " + error.getMessage(); }
+        catch (RuntimeException error) { if (!peerDisconnected()) fail("전송 실패: " + error.getMessage()); }
+    }
+
+    private void fail(String reason) {
+        failure = reason;
+        connection.close();
     }
 }

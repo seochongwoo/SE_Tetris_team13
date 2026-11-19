@@ -1,18 +1,42 @@
 package team.tetris.ui.screen;
 
-import java.util.List;
 import java.awt.image.BufferedImage;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.OptionalLong;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import team.tetris.application.GameCommand;
 import team.tetris.application.model.Difficulty;
+import team.tetris.application.model.Settings;
 import team.tetris.application.network.*;
 import team.tetris.application.network.MatchMessage.*;
+import team.tetris.application.port.StorageException;
 import team.tetris.ui.TestApplication;
 import team.tetris.ui.render.TextFramePanel;
 import static org.junit.jupiter.api.Assertions.*;
 
 class P2pMatchScreenTest {
+    @Test void numpadKeyHintsAndLagWarningAreBothVisible() throws StorageException {
+        var app = new TestApplication();
+        var defaults = Settings.defaults();
+        var keys = new EnumMap<>(defaults.keyBindings());
+        keys.put(GameCommand.MOVE_LEFT, "NUMPAD4");
+        keys.put(GameCommand.MOVE_RIGHT, "NUMPAD6");
+        keys.put(GameCommand.ROTATE_CW, "NUMPAD8");
+        keys.put(GameCommand.SOFT_DROP, "NUMPAD2");
+        keys.put(GameCommand.HARD_DROP, "NUMPAD0");
+        app.settings().update(new Settings(defaults.screenSize(), keys, false));
+        try (var pair = new P2pMatchTestSupport.Pair(Mode.NORMAL, null, null)) {
+            pair.st.rtt = OptionalLong.of(250_000_000L);
+            var frame = new P2pMatchScreen(app.router(), pair.server, pair.s).render();
+            assertTrue(frame.rowText(frame.rows() - 2).contains(
+                    "NUMPAD4 NUMPAD6 이동 · NUMPAD8 회전 · NUMPAD2 내리기 · NUMPAD0 떨어뜨리기"));
+            assertTrue(frame.rowText(frame.rows() - 1).contains("네트워크 지연 (랙) 250 ms"));
+        }
+    }
+
     @ParameterizedTest @EnumSource(Mode.class)
     void routersRenderTwoBoardsResultReturnAndSecondGame(Mode mode) {
         var st = new LobbyTestSupport.Transport(); var ct = new LobbyTestSupport.Transport();
@@ -31,8 +55,8 @@ class P2pMatchScreenTest {
                 assertEquals(round, s.match().matchId());
                 var playing = sr.render();
                 assertEquals(78, playing.columns());
-                assertEquals(2, playing.rowText(playing.rows() - 2).split("└" + "─".repeat(10) + "┘", -1).length - 1);
-                assertTrue(playing.rowText(playing.rows() - 1).contains("떨어뜨리기"));
+                assertEquals(2, playing.rowText(playing.rows() - 3).split("└" + "─".repeat(10) + "┘", -1).length - 1);
+                assertTrue(playing.rowText(playing.rows() - 2).contains("떨어뜨리기"));
                 assertTrue(sr.render().text().contains("LV 0"));
                 assertEquals(2, sr.render().text().split("NEXT", -1).length - 1);
                 assertNotNull(sr.render().tileAt(2, 3)); assertNotNull(sr.render().tileAt(41, 3));

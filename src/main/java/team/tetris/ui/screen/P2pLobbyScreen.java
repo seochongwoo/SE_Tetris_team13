@@ -7,6 +7,7 @@ import team.tetris.ui.DisplayNames;
 import team.tetris.ui.ScreenRouter;
 import team.tetris.ui.input.KeyNames;
 import team.tetris.ui.render.Backdrop;
+import team.tetris.ui.render.P2pRenderer;
 import team.tetris.ui.render.TextFrame;
 import team.tetris.ui.render.TextStyle;
 
@@ -22,6 +23,8 @@ public final class P2pLobbyScreen implements Screen {
     private String error = "";
     private boolean invalidCharacter;
     private boolean handedOff;
+    private boolean failureShown;
+    private long failureElapsed;
     private long clockNanos;
 
     public P2pLobbyScreen(ScreenRouter router, P2pLobby lobby) {
@@ -35,12 +38,16 @@ public final class P2pLobbyScreen implements Screen {
         if (key.equals("ESCAPE")) {
             if (clientEntry || lobby.stage() != P2pLobby.Stage.CHOICE) {
                 lobby.reset(); clientEntry = false; error = ""; addressPage = 0;
+                failureShown = false; failureElapsed = 0;
                 router.ignoreHeldKeys();
             } else router.showMenu();
             return;
         }
         if (lobby.stage() == P2pLobby.Stage.FAILED) {
-            if (key.equals("ENTER")) { lobby.reset(); clientEntry = false; error = ""; router.ignoreHeldKeys(); }
+            if (key.equals("ENTER")) {
+                lobby.reset(); clientEntry = false; error = "";
+                failureShown = false; failureElapsed = 0; router.ignoreHeldKeys();
+            }
             return;
         }
         if (lobby.stage() == P2pLobby.Stage.CHOICE) {
@@ -109,6 +116,14 @@ public final class P2pLobbyScreen implements Screen {
     @Override public void update(long elapsedNanos) {
         clockNanos += elapsedNanos;
         lobby.update();
+        if (lobby.stage() == P2pLobby.Stage.FAILED) {
+            if (failureShown) failureElapsed += Math.min(elapsedNanos, 2_000_000_000L);
+            else { failureShown = true; failureElapsed = 0; router.ignoreHeldKeys(); }
+            if (failureElapsed >= 2_000_000_000L) {
+                lobby.reset(); clientEntry = false; error = ""; addressPage = 0;
+                router.ignoreHeldKeys();
+            }
+        } else { failureShown = false; failureElapsed = 0; }
         handoffStartedMatch().ifPresent(started -> router.startP2pMatch(lobby, started));
     }
     /** 경기 화면으로 전환하기 직전에 호출. 연결 정리는 이후 경기 화면의 책임이다. */
@@ -185,8 +200,9 @@ public final class P2pLobbyScreen implements Screen {
             frame.putCentered(11, "양쪽 준비 완료", palette.base());
             frame.putCentered(13, "경기 연결 준비됨", palette.base());
         } else if (lobby.stage() == P2pLobby.Stage.FAILED) {
-            frame.addPlate(1, 17, TextFrame.COLUMNS - 2, 3);
-            frame.putCentered(18, "Enter 다시 접속", palette.base());
+            frame.addPlate(1, 16, TextFrame.COLUMNS - 2, 4);
+            frame.putCentered(17, "잠시 후 P2P 첫 화면으로", palette.base());
+            frame.putCentered(18, "Enter 바로 돌아가기", palette.base());
         }
         boolean hasWarning = !lobby.recent().warning().isEmpty();
         int footerTop = hasWarning ? 20 : 21;
@@ -198,6 +214,7 @@ public final class P2pLobbyScreen implements Screen {
                 ? "↑↓ 선택 · Enter 확인 · Esc 돌아가기"
                 : "Esc 돌아가기";
         frame.putCentered(22, hint, palette.dimStyle());
+        P2pRenderer.drawLatency(frame, palette, lobby.roundTripNanos(), lobby.lagging());
         return frame;
     }
 

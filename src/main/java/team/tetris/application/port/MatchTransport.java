@@ -28,6 +28,12 @@ public interface MatchTransport extends AutoCloseable {
     /** 로컬 단조 시계로 잰 최근 ping RTT. 입력→화면 지연 측정과는 다르다. */
     OptionalLong roundTripNanos();
 
+    /** 최근 RTT 또는 아직 응답하지 않은 ping이 200ms를 초과하면 true. */
+    default boolean lagging() {
+        return status().state() == State.CONNECTED
+                && roundTripNanos().orElse(0) > team.tetris.application.network.NetworkPolicy.LAG_NANOS;
+    }
+
     @Override
     void close();
 }
