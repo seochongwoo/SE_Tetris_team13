@@ -135,6 +135,30 @@ class BattleScreenTest {
     }
 
     @Test
+    void battleKeysChangedInTheSettingsAreUsedInTheNextBattle() throws Exception {
+        // 카드 18: 설정 화면에서 바꾼 대전 키로 조작한다. 바꾸기 전 키는 더 이상 조작이 아니다.
+        var settings = team.tetris.application.model.Settings.defaults();
+        router.updateSettings(settings.withBattleKeys(settings.battleKeys()
+                .with(1, team.tetris.application.GameCommand.MOVE_LEFT, "F")
+                .with(2, team.tetris.application.GameCommand.MOVE_RIGHT, "NUMPAD6")));
+        router.startBattle(GameMode.NORMAL);
+        Position one = origin(BattlePlayer.ONE);
+        Position two = origin(BattlePlayer.TWO);
+
+        tap("A");
+        tap(KeyNames.RIGHT);
+        assertEquals(one, origin(BattlePlayer.ONE));
+        assertEquals(two, origin(BattlePlayer.TWO));
+
+        tap("F");
+        tap("NUMPAD6");
+        assertEquals(one.translate(-1, 0), origin(BattlePlayer.ONE));
+        assertEquals(two.translate(1, 0), origin(BattlePlayer.TWO));
+        String help = router.render().rowText(team.tetris.ui.render.TextFrame.ROWS - 1);
+        assertTrue(help.contains("1P F D W S") && help.contains("2P ← NUMPAD6"), help);
+    }
+
+    @Test
     void holdingKeysAtTheSameTimeRepeatsForBothPlayers() {
         // H3-06: 두 명이 동시에 누르고 있어도 서로의 반복이 끊기지 않는다.
         router.startBattle(GameMode.NORMAL);
