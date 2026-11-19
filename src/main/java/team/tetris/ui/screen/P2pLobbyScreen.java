@@ -19,6 +19,7 @@ public final class P2pLobbyScreen implements Screen {
     private int addressPage;
     private String input = "";
     private String error = "";
+    private boolean invalidCharacter;
     private boolean handedOff;
 
     public P2pLobbyScreen(ScreenRouter router, P2pLobby lobby) {
@@ -47,12 +48,14 @@ public final class P2pLobbyScreen implements Screen {
                         int size = lobby.recent().addresses().size();
                         if (size > 0) {
                             recentCursor = Math.floorMod(recentCursor + (key.equals("UP") ? -1 : 1), size);
+                            invalidCharacter = false;
                             input = lobby.recent().addresses().get(recentCursor);
                         }
                     }
-                    case KeyNames.BACK_SPACE -> { if (!input.isEmpty()) input = input.substring(0, input.length() - 1); }
-                    case "DELETE" -> input = "";
+                    case KeyNames.BACK_SPACE -> { invalidCharacter = false; if (!input.isEmpty()) input = input.substring(0, input.length() - 1); }
+                    case "DELETE" -> { input = ""; invalidCharacter = false; }
                     case "ENTER" -> {
+                        invalidCharacter = false;
                         try { lobby.connect(input); clientEntry = false; error = ""; router.ignoreHeldKeys(); }
                         catch (IllegalArgumentException invalid) { error = invalid.getMessage(); }
                     }
@@ -63,7 +66,7 @@ public final class P2pLobbyScreen implements Screen {
                     case "UP", "DOWN" -> roleCursor = 1 - roleCursor;
                     case "ENTER" -> {
                         if (roleCursor == 0) lobby.host();
-                        else clientEntry = true;
+                        else { clientEntry = true; invalidCharacter = false; }
                         router.ignoreHeldKeys();
                     }
                     default -> { }
@@ -96,8 +99,9 @@ public final class P2pLobbyScreen implements Screen {
     }
 
     @Override public void onCharTyped(char value) {
-        if (clientEntry && lobby.stage() == P2pLobby.Stage.CHOICE && input.length() < 15
-                && ((value >= '0' && value <= '9') || value == '.')) input += value;
+        if (!clientEntry || lobby.stage() != P2pLobby.Stage.CHOICE || Character.isISOControl(value)) return;
+        invalidCharacter = (value < '0' || value > '9') && value != '.';
+        if (!invalidCharacter && input.length() < 15) input += value;
     }
 
     @Override public void update(long elapsedNanos) { lobby.update(); }
@@ -124,6 +128,7 @@ public final class P2pLobbyScreen implements Screen {
                 frame.put(2, 20, "↑↓ 선택 · Enter 확인", palette.base());
             } else {
                 frame.put(2, 9, "서버 IPv4: " + input + "_", palette.base());
+                if (invalidCharacter) frame.put(2, 10, "숫자와 점(.)만 입력할 수 있습니다", palette.warningStyle());
                 frame.put(2, 11, "최근 IP (↑↓ 불러오기)", palette.base());
                 for (int i = 0; i < lobby.recent().addresses().size(); i++)
                     frame.put(4, 12 + i, lobby.recent().addresses().get(i), palette.base());
