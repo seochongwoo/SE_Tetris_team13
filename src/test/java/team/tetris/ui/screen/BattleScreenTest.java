@@ -155,7 +155,7 @@ class BattleScreenTest {
         assertEquals(one.translate(-1, 0), origin(BattlePlayer.ONE));
         assertEquals(two.translate(1, 0), origin(BattlePlayer.TWO));
         String help = router.render().rowText(team.tetris.ui.render.TextFrame.ROWS - 1);
-        assertTrue(help.contains("1P F D W S") && help.contains("2P ← Num6"), help);
+        assertTrue(help.contains("1P F D W S") && help.contains("2P ← NUMPAD6"), help);
     }
 
     @Test
