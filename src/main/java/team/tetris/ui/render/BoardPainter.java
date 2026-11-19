@@ -164,13 +164,21 @@ public final class BoardPainter {
 
     /** "NEXT" 제목을 titleRow에, 그 아래에 다음 블록 상자를 col부터 그린다. */
     public void drawNext(TextFrame frame, Piece next, int col, int titleRow) {
+        Position[] cells = next == null ? new Position[0] : next.shape().cellsAt(0);
+        drawNext(frame, cells, col, titleRow,
+                (i, x, y) -> drawCell(frame, x, y, next.shape(), next.itemAt(i)));
+    }
+
+    @FunctionalInterface
+    interface PreviewCell {
+        void draw(int index, int col, int row);
+    }
+
+    void drawNext(TextFrame frame, Position[] cells, int col, int titleRow, PreviewCell tile) {
         frame.put(col, titleRow, "NEXT", palette.accentStyle());
         int boxTop = titleRow + 1;
         frame.box(col, boxTop, NEXT_BOX_WIDTH, NEXT_BOX_HEIGHT, palette.borderStyle(), palette.base());
-        if (next == null) {
-            return;
-        }
-        Position[] cells = next.shape().cellsAt(0);
+        if (cells.length == 0) return;
         int minX = Integer.MAX_VALUE;
         int maxX = Integer.MIN_VALUE;
         int minY = Integer.MAX_VALUE;
@@ -186,8 +194,7 @@ public final class BoardPainter {
         int startCol = col + 1 + (innerWidth - (maxX - minX + 1) * CELL_WIDTH) / 2;
         int startRow = boxTop + 1 + (innerHeight - (maxY - minY + 1)) / 2;
         for (int i = 0; i < cells.length; i++) {
-            drawCell(frame, startCol + (cells[i].x() - minX) * CELL_WIDTH, startRow + (cells[i].y() - minY),
-                    next.shape(), next.itemAt(i));
+            tile.draw(i, startCol + (cells[i].x() - minX) * CELL_WIDTH, startRow + (cells[i].y() - minY));
         }
     }
 
