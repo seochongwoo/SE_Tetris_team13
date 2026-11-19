@@ -4,6 +4,7 @@ import java.util.Optional;
 import java.util.function.Function;
 import team.tetris.application.*;
 import team.tetris.application.model.GameMode;
+import team.tetris.application.model.Difficulty;
 import team.tetris.application.network.MatchMessage.*;
 import team.tetris.application.port.MatchTransport;
 import team.tetris.core.EnginePhase;
@@ -58,6 +59,7 @@ public final class P2pMatch {
 
     public Role role() { return connection.role(); }
     public Mode mode() { return started.configuration().mode(); }
+    public Difficulty difficulty() { return started.configuration().difficulty(); }
     public long matchId() { return started.matchId(); }
     public long remainingNanos() { return remaining; }
     public boolean peerDisconnected() { return connection.transport().status().peerDisconnected(); }
