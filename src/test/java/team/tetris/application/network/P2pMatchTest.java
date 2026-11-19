@@ -35,16 +35,19 @@ class P2pMatchTest {
 
     @Test void delayedResultRestoresBothViewsToServerDecisionSnapshot() {
         try (var p = new Pair(Mode.TIMED, null, null)) {
-            p.s.update(60_000_000_000L);
-            assertTrue(p.s.result().isPresent());
-            var serverView = p.s.local();
-            var clientAtDecision = p.s.remote().orElseThrow();
-            // 결과가 네트워크에서 지연되는 동안 클라이언트는 아직 진행 중이다.
-            var delayed = new java.util.ArrayList<>(p.ct.incoming);
-            p.ct.incoming.clear();
             p.c.handle(GameCommand.HARD_DROP);
-            assertTrue(p.c.local().score() > clientAtDecision.score());
-            p.ct.incoming.addAll(delayed);
+            var clientAtDecision = p.c.local();
+            var delayed = new java.util.ArrayList<>(p.st.incoming);
+            p.st.incoming.clear();
+            p.s.update(60_000_000_000L);
+            assertTrue(p.s.result().isEmpty());
+            p.st.incoming.addAll(delayed);
+            p.c.update(0);
+            p.c.handle(GameCommand.HARD_DROP);
+            assertEquals(clientAtDecision, p.c.local());
+            p.s.update(0);
+            var serverView = p.s.local();
+            assertEquals(Outcome.CLIENT_WINS, p.s.result().orElseThrow().outcome());
             p.c.update(0);
             assertEquals(p.s.result(), p.c.result());
             assertEquals(clientAtDecision, p.c.local());
@@ -148,6 +151,21 @@ class P2pMatchTest {
             assertEquals(before, p.s.local().board());
             p.s.handle(GameCommand.RESUME); p.s.handle(GameCommand.HARD_DROP);
             assertTrue(p.s.local().pendingRows().isEmpty());
+        }
+    }
+
+    @Test void clientStopsAtLocalTimeLimitEvenWhenServerNoticeIsDelayed() {
+        try (var p = new Pair(Mode.TIMED, null, null)) {
+            p.s.update(59_999_999_999L);
+            p.c.update(0);
+            p.c.handle(GameCommand.SOFT_DROP);
+            p.c.update(1);
+            var frozen = p.c.local();
+            p.c.handle(GameCommand.HARD_DROP);
+            assertEquals(frozen, p.c.local());
+            p.s.update(1);
+            p.pump();
+            assertEquals(frozen.score(), p.s.result().orElseThrow().client().score());
         }
     }
 

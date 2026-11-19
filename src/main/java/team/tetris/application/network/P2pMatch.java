@@ -18,9 +18,11 @@ public final class P2pMatch {
     private final AttackQueue incoming = new AttackQueue(10);
     private final SinglePlayerSession local;
     private PlayerState remote;
+    private boolean finalStateReceived;
     private Role pauseOwner;
     private Result result;
     private long remaining;
+    private long localTimeLeft;
     private long attackId;
     private boolean leaving;
     private String failure;
@@ -46,6 +48,7 @@ public final class P2pMatch {
         this.started = started;
         connection = started.connection();
         remaining = started.configuration().timeLimitSeconds() * 1_000_000_000L;
+        localTimeLeft = remaining;
         local = new SinglePlayerSession(engines.apply(incoming), scoring, speed,
                 started.configuration().mode() == Mode.ITEM ? GameMode.ITEM : GameMode.NORMAL,
                 started.configuration().difficulty());
@@ -69,7 +72,7 @@ public final class P2pMatch {
     public Optional<String> failure() { return Optional.ofNullable(failure); }
     public PlayerState local() {
         if (result != null && result.server() != null) return role() == Role.SERVER ? result.server() : result.client();
-        return PlayerStates.from(local.snapshot(), incoming.pending(), result != null || defeated());
+        return PlayerStates.from(local.snapshot(), incoming.pending(), result != null || expired() || defeated());
     }
     public Optional<PlayerState> remote() { return Optional.ofNullable(remote); }
 
@@ -97,7 +100,7 @@ public final class P2pMatch {
                 }
             }
             default -> {
-                if (paused() || defeated() || (mode() == Mode.TIMED && remaining == 0)) return;
+                if (paused() || defeated() || localTimeExpired()) return;
                 if (local.snapshot().lineClearAnimation() != null) return;
                 apply(command, receivedNanos);
                 publish();
@@ -113,8 +116,9 @@ public final class P2pMatch {
         if (result != null || failure != null) return;
         // 재개 메시지를 받기 전 정지 상태에서 흐른 시간은 진행에 포함하지 않는다.
         if (!paused() && !wasPaused && !leaving) {
-            long elapsed = mode() == Mode.TIMED ? Math.min(elapsedNanos, remaining) : elapsedNanos;
-            if (!defeated()) local.update(elapsed);
+            long elapsed = mode() == Mode.TIMED ? Math.min(elapsedNanos, localTimeLeft) : elapsedNanos;
+            if (!defeated() && !localTimeExpired()) local.update(elapsed);
+            if (mode() == Mode.TIMED) localTimeLeft -= elapsed;
             if (role() == Role.SERVER && mode() == Mode.TIMED) remaining -= elapsed;
         }
         decide();
@@ -139,9 +143,21 @@ public final class P2pMatch {
             if (next.isEmpty()) break;
             switch (next.get().message()) {
                 case State state -> {
+                    if (finalStateReceived) break;
                     remote = state.player();
                     remoteInputId = state.inputId();
-                    if (role() == Role.CLIENT) remaining = state.remainingNanos();
+                    if (role() == Role.CLIENT) {
+                        boolean alreadyExpired = expired();
+                        remaining = state.remainingNanos();
+                        localTimeLeft = Math.min(localTimeLeft, remaining);
+                        if (expired() && !alreadyExpired) send(new FinalState(local()));
+                    }
+                }
+                case FinalState finalState -> {
+                    if (expired() && !finalStateReceived) {
+                        remote = finalState.player();
+                        finalStateReceived = true;
+                    }
                 }
                 case Attack attack -> incoming.add(PlayerStates.rows(attack.rows()));
                 case Painted painted -> { if (latency != null) latency.remotePainted(painted.inputId()); }
@@ -166,6 +182,9 @@ public final class P2pMatch {
         // 프레임의 로컬 패배와 함께 판정할 수 있도록 update에서 decide한다.
     }
 
+    private boolean localTimeExpired() { return mode() == Mode.TIMED && localTimeLeft == 0; }
+    private boolean expired() { return mode() == Mode.TIMED && remaining == 0; }
+
     private boolean defeated() { return local.snapshot().engine().phase() == EnginePhase.GAME_OVER; }
 
     private void apply(GameCommand command, long receivedNanos) {
@@ -179,7 +198,7 @@ public final class P2pMatch {
         boolean otherLost = remote != null && remote.defeated();
         if (defeated() || otherLost) finish(defeated() && otherLost ? Outcome.DRAW
                 : defeated() ? Outcome.CLIENT_WINS : Outcome.SERVER_WINS, EndReason.TOP_OUT);
-        else if (mode() == Mode.TIMED && remaining == 0 && remote != null) {
+        else if (expired() && finalStateReceived) {
             int comparison = Long.compare(local.snapshot().score(), remote.score());
             finish(comparison == 0 ? Outcome.DRAW : comparison > 0 ? Outcome.SERVER_WINS : Outcome.CLIENT_WINS, EndReason.TIME_LIMIT);
         }
