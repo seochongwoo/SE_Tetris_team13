@@ -81,6 +81,18 @@ class P2pNetworkFailureScreenTest {
         } finally { sr.requestExit(); cr.requestExit(); sl.close(); cl.close(); }
     }
 
+    @org.junit.jupiter.api.Test void peerDisconnectShowsOutcomeReasonAndDestination() {
+        try (var pair = new P2pMatchTestSupport.Pair(Mode.NORMAL, null, null)) {
+            var screen = new P2pMatchScreen(new TestApplication().router(), pair.server, pair.s);
+            pair.st.status = new MatchTransport.Status(MatchTransport.State.FAILED, "상대 연결 종료", 0, true);
+            screen.update(0);
+            String overlay = screen.render().text();
+            assertTrue(overlay.contains("승리"));
+            assertTrue(overlay.contains("상대 연결 종료"));
+            assertTrue(overlay.contains("서버/클라이언트 선택"));
+        }
+    }
+
     @ParameterizedTest @EnumSource(value = MatchTransport.State.class, names = {"CONNECTING", "HANDSHAKING"})
     void connectionErrorsAlsoAutoReturnAndCanBeAcknowledgedEarly(MatchTransport.State state) {
         var transport = new Transport();

@@ -43,7 +43,7 @@ class MessageCodecTest {
     void allMessageTypesRoundTripIncludingSixCellWeightAndItemAttributes() throws Exception {
         List<MatchMessage> messages = List.of(new Hello(1, Role.SERVER),
                 new Lobby(1, Mode.TIMED, Difficulty.HARD, 180), new Ready(1, true), new Start(1, Long.MIN_VALUE),
-                new State(player(), 100, 12), new Painted(12), new Attack(3, List.of(1, 5)), new Pause(Role.CLIENT, true),
+                new State(player(), 100, 12), new FinalState(player()), new Painted(12), new Attack(3, List.of(1, 5)), new Pause(Role.CLIENT, true),
                 new Resume(false), new Result(Outcome.DRAW, EndReason.TIME_LIMIT),
                 new Result(Outcome.SERVER_WINS, EndReason.TOP_OUT, player(), player()), new Leave(), new Ping(9), new Pong(9));
         for (MatchMessage message : messages) {
