@@ -71,11 +71,27 @@ public final class P2pMatchScreen implements Screen {
         }
         frame.putCentered(26, displayKey(GameCommand.MOVE_LEFT) + " " + displayKey(GameCommand.MOVE_RIGHT)
                 + " 이동 · " + displayKey(GameCommand.ROTATE_CW) + " 회전 · " + displayKey(GameCommand.HARD_DROP) + " 떨어뜨리기", router.palette().base());
-        frame.putCentered(27, match.paused()
-                ? displayKey(GameCommand.RESUME) + " 재개 · " + displayKey(GameCommand.QUIT_GAME) + " 기권"
-                : displayKey(GameCommand.PAUSE) + " / " + displayKey(GameCommand.QUIT_GAME) + " 정지", router.palette().base());
+        if (match.paused() && match.failure().isEmpty() && match.result().isEmpty()) {
+            drawOverlay(frame, "일시정지", match.pauseOwner() == match.role()
+                    ? displayKey(GameCommand.RESUME) + " 재개" : "상대가 재개할 때까지 대기",
+                    displayKey(GameCommand.QUIT_GAME) + " 기권");
+        } else if (!match.paused()) {
+            frame.putCentered(27, displayKey(GameCommand.PAUSE) + " / " + displayKey(GameCommand.QUIT_GAME) + " 정지", router.palette().base());
+        }
         return frame;
     }
+    private void drawOverlay(TextFrame frame, String title, String detail, String hint) {
+        var palette = router.palette();
+        int width = 40;
+        int height = 7;
+        int top = (frame.rows() - height) / 2;
+        frame.shade();
+        frame.box((frame.columns() - width) / 2, top, width, height, palette.borderStyle(), palette.base());
+        frame.putCentered(top + 1, title, palette.accentStyle());
+        frame.putCentered(top + 3, detail, palette.base());
+        frame.putCentered(top + 4, hint, palette.base());
+    }
+
     private String displayKey(GameCommand command) { return KeyNames.display(keys.keyFor(command)); }
     @Override public void onLeave() { match.finishMeasurement(); if (!handedOff) lobby.close(); }
 }

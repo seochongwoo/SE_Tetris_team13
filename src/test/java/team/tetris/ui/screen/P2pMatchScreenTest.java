@@ -47,6 +47,9 @@ class P2pMatchScreenTest {
                 assertEquals(s.match().local(), c.match().remote().orElseThrow());
                 sr.focusLost(); cr.update(0); assertFalse(c.match().paused());
                 TestApplication.tap(sr, "ESCAPE"); cr.update(0); assertTrue(c.match().paused());
+                assertTrue(sr.render().rowText(11).contains("일시정지"));
+                assertTrue(sr.render().rowText(13).contains("재개"));
+                assertTrue(cr.render().rowText(13).contains("상대가 재개할 때까지 대기"));
                 TestApplication.tap(sr, sr.settings().keyBindings().get(GameCommand.QUIT_GAME)); cr.update(0);
                 assertEquals("패배", sr.render().rowText(24).strip());
                 assertEquals("승리", cr.render().rowText(24).strip());

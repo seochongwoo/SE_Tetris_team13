@@ -24,8 +24,6 @@ public final class P2pRenderer {
         player(frame, 1, match.local(), "나");
         match.remote().ifPresentOrElse(state -> player(frame, 45, state, "상대"),
                 () -> frame.put(46, 3, "상대 화면 수신 대기", palette.base()));
-        if (match.paused() && match.result().isEmpty())
-            frame.putCentered(24, "일시정지 · " + (match.pauseOwner() == match.role() ? "나" : "상대") + "만 재개 가능", palette.accentStyle());
         match.result().ifPresent(result -> {
             frame.putCentered(24, switch (result.outcome()) {
                 case DRAW -> "무승부";
