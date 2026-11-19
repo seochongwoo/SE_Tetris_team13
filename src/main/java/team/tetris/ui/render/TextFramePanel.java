@@ -291,6 +291,7 @@ public final class TextFramePanel extends JComponent {
                     }
                 }
             }
+            current.painted();
         } finally {
             g.dispose();
         }

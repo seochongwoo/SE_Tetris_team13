@@ -109,6 +109,7 @@ public final class P2pLobbyScreen implements Screen {
     @Override public void update(long elapsedNanos) {
         clockNanos += elapsedNanos;
         lobby.update();
+        handoffStartedMatch().ifPresent(started -> router.startP2pMatch(lobby, started));
     }
     /** 경기 화면으로 전환하기 직전에 호출. 연결 정리는 이후 경기 화면의 책임이다. */
     public java.util.Optional<P2pLobby.StartedMatch> handoffStartedMatch() {

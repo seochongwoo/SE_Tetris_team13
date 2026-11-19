@@ -24,6 +24,7 @@ import team.tetris.ui.render.TextFrame;
 import team.tetris.ui.render.palette.ColorPalette;
 import team.tetris.ui.screen.BattleScreen;
 import team.tetris.ui.screen.GameScreen;
+import team.tetris.ui.screen.BattleScreen;
 import team.tetris.ui.screen.MenuScreen;
 import team.tetris.ui.screen.MenuScreen.MenuItem;
 import team.tetris.ui.screen.NameEntryScreen;
@@ -117,6 +118,16 @@ public final class ScreenRouter {
 
     public void showP2pLobby() {
         show(new P2pLobbyScreen(this, application.newP2pLobby()));
+    }
+
+    public void startP2pMatch(team.tetris.application.network.P2pLobby lobby,
+                               team.tetris.application.network.P2pLobby.StartedMatch started) {
+        show(new team.tetris.ui.screen.P2pMatchScreen(this, lobby, application.newP2pMatch(started)));
+    }
+
+    public void returnToP2pLobby(team.tetris.application.network.P2pLobby lobby) {
+        lobby.returnAfterResult();
+        show(new P2pLobbyScreen(this, lobby));
     }
 
     /** 일반 모드 시작. */

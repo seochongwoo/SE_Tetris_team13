@@ -174,6 +174,21 @@ public final class AppComposition implements ApplicationContext {
     }
 
     @Override
+    public team.tetris.application.network.P2pMatch newP2pMatch(P2pLobby.StartedMatch started) {
+        var difficulty = started.configuration().difficulty();
+        var match = new team.tetris.application.network.P2pMatch(started, incoming -> {
+            PieceSource pieces = new PlainPieceSource(new WeightedRandomGenerator(
+                    PieceWeightPolicy.weightsFor(difficulty), new Random(started.pieceSeed())));
+            if (started.configuration().mode() == team.tetris.application.network.MatchMessage.Mode.ITEM)
+                pieces = new ItemPieceSource(pieces, itemKinds, new Random(ThreadLocalRandom.current().nextLong()));
+            return new PlayerEngine(BOARD_WIDTH, BOARD_HEIGHT, pieces, incoming);
+        }, scoring, speeds.apply(difficulty));
+        if (debug) match.measureLatency(new team.tetris.application.network.InputLatency(System::nanoTime, debugLog,
+                started.configuration().mode() + "," + started.connection().role() + "," + started.matchId()));
+        return match;
+    }
+
+    @Override
     public P2pLobby newP2pLobby() {
         return new P2pLobby(
                 SocketMatchTransport::new, LocalIpv4Addresses::discover,

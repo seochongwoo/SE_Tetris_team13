@@ -132,6 +132,10 @@ public final class TestApplication implements ApplicationContext {
         return lobbies.get();
     }
 
+    @Override public team.tetris.application.network.P2pMatch newP2pMatch(team.tetris.application.network.P2pLobby.StartedMatch started) {
+        return team.tetris.application.network.P2pMatchTestSupport.match(started, null);
+    }
+
     public int exits() {
         return exits;
     }
