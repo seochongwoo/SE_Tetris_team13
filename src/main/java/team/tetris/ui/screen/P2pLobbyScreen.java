@@ -7,6 +7,7 @@ import team.tetris.ui.DisplayNames;
 import team.tetris.ui.ScreenRouter;
 import team.tetris.ui.input.KeyNames;
 import team.tetris.ui.render.Backdrop;
+import team.tetris.ui.render.P2pRenderer;
 import team.tetris.ui.render.TextFrame;
 import team.tetris.ui.render.TextStyle;
 
@@ -203,7 +204,6 @@ public final class P2pLobbyScreen implements Screen {
             frame.putCentered(17, "잠시 후 P2P 첫 화면으로", palette.base());
             frame.putCentered(18, "Enter 바로 돌아가기", palette.base());
         }
-        if (lobby.lagging()) frame.putCentered(2, "네트워크 지연 (랙)", palette.warningStyle());
         boolean hasWarning = !lobby.recent().warning().isEmpty();
         int footerTop = hasWarning ? 20 : 21;
         frame.addPlate(1, footerTop, TextFrame.COLUMNS - 2, TextFrame.ROWS - footerTop);
@@ -214,6 +214,7 @@ public final class P2pLobbyScreen implements Screen {
                 ? "↑↓ 선택 · Enter 확인 · Esc 돌아가기"
                 : "Esc 돌아가기";
         frame.putCentered(22, hint, palette.dimStyle());
+        P2pRenderer.drawLatency(frame, palette, lobby.roundTripNanos(), lobby.lagging());
         return frame;
     }
 

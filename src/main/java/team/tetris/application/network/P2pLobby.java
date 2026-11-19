@@ -2,6 +2,7 @@ package team.tetris.application.network;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 import team.tetris.application.model.Difficulty;
@@ -55,6 +56,9 @@ public final class P2pLobby implements AutoCloseable {
     public boolean isServer() { return connection != null && connection.role() == Role.SERVER; }
     public boolean localReady() { return localReady; }
     public boolean remoteReady() { return remoteReady; }
+    public OptionalLong roundTripNanos() {
+        return connection == null ? OptionalLong.empty() : connection.transport().roundTripNanos();
+    }
     public boolean lagging() { return connection != null && connection.transport().lagging(); }
     public int localPort() { return connection == null ? 0 : connection.transport().status().localPort(); }
 

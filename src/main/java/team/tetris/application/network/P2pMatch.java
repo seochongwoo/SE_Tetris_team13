@@ -1,6 +1,7 @@
 package team.tetris.application.network;
 
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.function.Function;
 import team.tetris.application.*;
 import team.tetris.application.model.GameMode;
@@ -67,6 +68,9 @@ public final class P2pMatch {
     public Role pauseOwner() { return pauseOwner; }
     public Optional<Result> result() { return Optional.ofNullable(result); }
     public Optional<String> failure() { return Optional.ofNullable(failure); }
+    public OptionalLong roundTripNanos() {
+        return failure != null ? OptionalLong.empty() : connection.transport().roundTripNanos();
+    }
     public boolean lagging() { return failure == null && connection.transport().lagging(); }
     public PlayerState local() {
         if (result != null && result.server() != null) return role() == Role.SERVER ? result.server() : result.client();
