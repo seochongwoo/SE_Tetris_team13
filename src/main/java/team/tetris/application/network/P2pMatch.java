@@ -1,5 +1,7 @@
 package team.tetris.application.network;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.Optional;
 import java.util.function.Function;
 import team.tetris.application.*;
@@ -18,6 +20,8 @@ public final class P2pMatch {
     private final AttackQueue incoming = new AttackQueue(10);
     private final SinglePlayerSession local;
     private PlayerState remote;
+    private record BufferedInput(GameCommand command, long receivedNanos) {}
+    private final Deque<BufferedInput> animationInputs = new ArrayDeque<>();
     private boolean finalStateReceived;
     private Role pauseOwner;
     private Result result;
@@ -101,7 +105,10 @@ public final class P2pMatch {
             }
             default -> {
                 if (paused() || defeated() || localTimeExpired()) return;
-                if (local.snapshot().lineClearAnimation() != null) return;
+                if (local.snapshot().lineClearAnimation() != null) {
+                    animationInputs.addLast(new BufferedInput(command, receivedNanos));
+                    return;
+                }
                 apply(command, receivedNanos);
                 publish();
                 decide();
@@ -120,6 +127,11 @@ public final class P2pMatch {
             if (!defeated() && !localTimeExpired()) local.update(elapsed);
             if (mode() == Mode.TIMED) localTimeLeft -= elapsed;
             if (role() == Role.SERVER && mode() == Mode.TIMED) remaining -= elapsed;
+            while (!animationInputs.isEmpty() && !defeated() && !localTimeExpired()
+                    && local.snapshot().lineClearAnimation() == null) {
+                BufferedInput input = animationInputs.removeFirst();
+                apply(input.command(), input.receivedNanos());
+            }
         }
         decide();
         if (result == null) publish();
@@ -211,7 +223,7 @@ public final class P2pMatch {
         send(result);
     }
     private void pause(Role owner) { send(new Pause(owner, false)); applyPause(owner); publish(); }
-    private void applyPause(Role owner) { pauseOwner = owner; local.handle(GameCommand.PAUSE); }
+    private void applyPause(Role owner) { animationInputs.clear(); pauseOwner = owner; local.handle(GameCommand.PAUSE); }
     private void resume() { send(new Resume(false)); applyResume(); }
     private void applyResume() { pauseOwner = null; local.handle(GameCommand.RESUME); }
     private void publish() { send(new State(local(), role() == Role.SERVER ? remaining : -1, inputId)); }
