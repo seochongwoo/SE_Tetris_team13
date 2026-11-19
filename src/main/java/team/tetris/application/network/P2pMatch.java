@@ -93,7 +93,7 @@ public final class P2pMatch {
         long receivedNanos = latency == null ? 0 : latency.now();
         receive();
         decide();
-        if (result != null || failure != null || leaving) return;
+        if (result != null || failure != null || leaving || expired()) return;
         switch (command) {
             case QUIT_GAME -> {
                 leaving = true;
@@ -185,6 +185,7 @@ public final class P2pMatch {
                 case Attack attack -> incoming.add(PlayerStates.rows(attack.rows()));
                 case Painted painted -> { if (latency != null) latency.remotePainted(painted.inputId()); }
                 case Pause pause -> {
+                    if (expired()) break;
                     if (pause.request()) pause(pause.owner());
                     else applyPause(pause.owner());
                 }
@@ -197,7 +198,7 @@ public final class P2pMatch {
                     if (confirmed.server() != null) remote = confirmed.server();
                 }
                 case Leave ignored -> {
-                    if (role() == Role.SERVER) finish(Outcome.SERVER_WINS, EndReason.LEFT);
+                    if (role() == Role.SERVER && !expired()) finish(Outcome.SERVER_WINS, EndReason.LEFT);
                 }
                 default -> { }
             }

@@ -18,8 +18,8 @@ public final class P2pRenderer {
     }
 
     public TextFrame render(P2pMatch match) {
-        // 긴 조작 안내가 1P 받을 줄 미리보기의 아래 테두리를 덮지 않도록 전용 행을 둔다.
-        var frame = new TextFrame(BattleRenderer.COLUMNS, BattleRenderer.ROWS + 1, palette.base());
+        // 받을 줄 미리보기 아래에 조작 안내와 네트워크 지연을 한 행씩 표시한다.
+        var frame = new TextFrame(BattleRenderer.COLUMNS, BattleRenderer.ROWS + 2, palette.base());
         frame.put(BattleRenderer.ONE_LEFT, 0, "P2P 대전 · " + switch (match.mode()) {
             case NORMAL -> "일반";
             case ITEM -> "아이템";

@@ -76,7 +76,7 @@ public final class P2pMatchScreen implements Screen {
         var palette = router.palette();
         frame.putRight(frame.columns() - 1, 0, displayKey(GameCommand.PAUSE) + " / "
                 + displayKey(GameCommand.QUIT_GAME) + " 일시정지", palette.dimStyle());
-        frame.put(1, frame.rows() - 1, displayKey(GameCommand.MOVE_LEFT) + " " + displayKey(GameCommand.MOVE_RIGHT)
+        frame.put(1, frame.rows() - 2, displayKey(GameCommand.MOVE_LEFT) + " " + displayKey(GameCommand.MOVE_RIGHT)
                 + " 이동 · " + displayKey(GameCommand.ROTATE_CW) + " 회전 · " + displayKey(GameCommand.SOFT_DROP)
                 + " 내리기 · " + displayKey(GameCommand.HARD_DROP) + " 떨어뜨리기", palette.dimStyle());
         if (match.failure().isPresent()) {

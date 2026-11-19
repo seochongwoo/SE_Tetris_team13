@@ -172,6 +172,33 @@ class P2pMatchTest {
         }
     }
 
+    @Test void expiredMatchIgnoresPauseAndForfeitWhileAwaitingFinalScore() {
+        try (var p = new Pair(Mode.TIMED, null, null)) {
+            p.s.handle(GameCommand.HARD_DROP);
+            p.s.update(60_000_000_000L);
+            assertEquals(0, p.s.remainingNanos());
+            assertTrue(p.s.local().score() > p.c.local().score());
+
+            p.s.handle(GameCommand.PAUSE);
+            p.s.handle(GameCommand.QUIT_GAME);
+            // 클라이언트가 만료 통지를 읽기 전에 보낸 요청도 서버 마감 후에 도착할 수 있다.
+            p.cs.connection().send(p.c.matchId(), new Pause(Role.CLIENT, true));
+            p.cs.connection().send(p.c.matchId(), new Leave());
+            p.s.update(0);
+            assertFalse(p.s.paused());
+            assertTrue(p.s.result().isEmpty());
+
+            p.c.update(0);
+            int sent = p.ct.sent.size();
+            p.c.handle(GameCommand.PAUSE);
+            p.c.handle(GameCommand.QUIT_GAME);
+            assertEquals(sent, p.ct.sent.size());
+            p.pump();
+            assertResult(Outcome.SERVER_WINS, EndReason.TIME_LIMIT, p.s.result().orElseThrow());
+            assertEquals(p.s.result(), p.c.result());
+        }
+    }
+
     @Test void exactTimeoutUsesScoresAndFreezesFurtherInput() {
         try (var p = new Pair(Mode.TIMED, null, null)) {
             p.c.handle(GameCommand.SOFT_DROP); p.pump();
