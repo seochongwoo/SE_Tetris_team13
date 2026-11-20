@@ -16,7 +16,7 @@ class BattleKeysTest {
 
     @Test
     void theDefaultLayoutGivesEachPlayerTheirOwnKeys() {
-        BattleKeys keys = BattleKeys.defaults(Settings.defaults());
+        BattleKeys keys = BattleKeys.from(Settings.defaults());
 
         assertEquals("W", keys.keyFor(BattlePlayer.ONE, GameCommand.ROTATE_CW));
         assertEquals("A", keys.keyFor(BattlePlayer.ONE, GameCommand.MOVE_LEFT));
@@ -32,7 +32,7 @@ class BattleKeysTest {
 
     @Test
     void everyPlayKeyMapsBackToItsPlayerAndCommandWithoutOverlap() {
-        BattleKeys keys = BattleKeys.defaults(Settings.defaults());
+        BattleKeys keys = BattleKeys.from(Settings.defaults());
         Set<String> used = new HashSet<>();
 
         for (BattlePlayer player : BattlePlayer.values()) {
@@ -52,7 +52,7 @@ class BattleKeysTest {
         bindings.put(GameCommand.PAUSE, "F1");
         bindings.put(GameCommand.RESUME, "F1");
         bindings.put(GameCommand.QUIT_GAME, "Q");
-        BattleKeys keys = BattleKeys.defaults(new Settings(Settings.ScreenSize.MEDIUM, bindings, false));
+        BattleKeys keys = BattleKeys.from(new Settings(Settings.ScreenSize.MEDIUM, bindings, false));
 
         assertEquals("F1", keys.pauseKey());
         assertEquals("F1", keys.resumeKey());
@@ -60,16 +60,29 @@ class BattleKeysTest {
     }
 
     @Test
-    void commonKeysThatClashWithAPlayKeyFallBackToTheDefaults() {
-        // 1인 게임에서 일시정지를 W로 바꿨어도 대전에서는 1P 회전이 막히지 않게 기본 공통 키를 쓴다.
+    void aCommonKeyOnADefaultBattleKeyKeepsTheUsersKeyAndMovesTheBattleKey() {
+        // 카드 18: 1인 게임에서 일시정지를 W로 바꿨다면 그 키를 덮어쓰지 않고, 1P 회전에 대체 키(Q)를 쓴다.
         var bindings = new EnumMap<>(Settings.defaults().keyBindings());
         bindings.put(GameCommand.PAUSE, "W");
         bindings.put(GameCommand.RESUME, "W");
-        BattleKeys keys = BattleKeys.defaults(new Settings(Settings.ScreenSize.MEDIUM, bindings, false));
+        BattleKeys keys = BattleKeys.from(new Settings(Settings.ScreenSize.MEDIUM, bindings, false));
 
-        assertEquals("P", keys.pauseKey());
-        assertEquals("P", keys.resumeKey());
-        assertEquals(KeyNames.ESCAPE, keys.menuKey());
-        assertEquals(BattlePlayer.ONE, keys.bindingFor("W").orElseThrow().player());
+        assertEquals("W", keys.pauseKey());
+        assertEquals("W", keys.resumeKey());
+        assertTrue(keys.bindingFor("W").isEmpty());
+        assertEquals("Q", keys.keyFor(BattlePlayer.ONE, GameCommand.ROTATE_CW));
+        assertEquals(new BattleKeys.Binding(BattlePlayer.ONE, GameCommand.ROTATE_CW), keys.bindingFor("Q").orElseThrow());
+    }
+
+    @Test
+    void changedBattleKeysComeFromTheSettings() {
+        Settings settings = Settings.defaults().withBattleKeys(Settings.defaults().battleKeys()
+                .with(1, GameCommand.HARD_DROP, "F").with(2, GameCommand.HARD_DROP, "SHIFT"));
+        BattleKeys keys = BattleKeys.from(settings);
+
+        assertEquals("F", keys.keyFor(BattlePlayer.ONE, GameCommand.HARD_DROP));
+        assertEquals(new BattleKeys.Binding(BattlePlayer.TWO, GameCommand.HARD_DROP), keys.bindingFor("SHIFT").orElseThrow());
+        assertTrue(keys.bindingFor("SPACE").isEmpty());
+        assertTrue(keys.bindingFor(KeyNames.ENTER).isEmpty());
     }
 }

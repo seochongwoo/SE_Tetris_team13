@@ -12,6 +12,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import team.tetris.application.GameCommand;
 import team.tetris.application.GameSnapshot;
 import team.tetris.application.GameStatus;
 import team.tetris.application.battle.BattlePlayer;
@@ -63,7 +64,7 @@ class BattleRendererTest {
     }
 
     private static BattleRenderer renderer(boolean colorBlind) {
-        return new BattleRenderer(ColorPalette.of(colorBlind), BattleKeys.defaults(Settings.defaults()));
+        return new BattleRenderer(ColorPalette.of(colorBlind), BattleKeys.from(Settings.defaults()));
     }
 
     @Test
@@ -114,6 +115,32 @@ class BattleRendererTest {
 
         assertTrue(help.contains("1P A D W S · Space"), help);
         assertTrue(help.contains("2P ← → ↑ ↓ · Enter"), help);
+    }
+
+    @Test
+    void longKeyNamesInTheHelpRowDoNotRunIntoTheOtherPlayer() {
+        Settings defaults = Settings.defaults();
+        var battle = defaults.battleKeys();
+        for (GameCommand command : List.of(GameCommand.MOVE_LEFT, GameCommand.MOVE_RIGHT, GameCommand.ROTATE_CW,
+                GameCommand.SOFT_DROP, GameCommand.HARD_DROP)) {
+            battle = battle.with(1, command, "CLOSE_BRACKET".substring(0, 6) + command.ordinal() + "_LONG_NAME");
+        }
+        BattleRenderer renderer = new BattleRenderer(ColorPalette.standard(),
+                BattleKeys.from(defaults.withBattleKeys(battle)));
+
+        TextFrame frame = renderer.render(snapshot(board(), board(), List.of()));
+
+        String help = frame.rowText(TextFrame.ROWS - 1);
+        assertTrue(help.contains("2P ← → ↑ ↓ · Enter"), help);
+        assertTrue(help.contains("~"), help);
+        for (int col = BattleRenderer.leftOf(BattlePlayer.TWO) - 1; col >= 0; col--) {
+            if (frame.codePointAt(col, TextFrame.ROWS - 1) != ' ') {
+                assertTrue(col < BattleRenderer.leftOf(BattlePlayer.TWO) - 1, "1P 안내와 2P 안내 사이에 빈칸");
+                break;
+            }
+        }
+        assertEquals("ab", BattleRenderer.clip("ab", 2));
+        assertEquals("a~", BattleRenderer.clip("abc", 2));
     }
 
     @Test
