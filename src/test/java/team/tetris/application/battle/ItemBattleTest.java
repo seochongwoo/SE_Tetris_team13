@@ -224,6 +224,18 @@ class ItemBattleTest {
     @Test
     void itemsFollowEachPlayersOwnClearsWhileThePlainPiecesStayShared() {
         // 안건 ⑰: 기본 블록은 같은 순서, 아이템 블록은 각자 지운 줄 수(10줄마다)에 따라 나온다.
+        // 아이템 종류는 무작위라, 모양이 바뀌는 무게추·폭탄과 블록에 붙는 아이템이 모두 나오도록 시드를 바꿔 본다.
+        java.util.Set<Object> seenShapes = new java.util.HashSet<>();
+        for (int seed = 0; seed < 40; seed++) {
+            seenShapes.add(checkSharedOrder(seed));
+        }
+        assertTrue(seenShapes.contains(team.tetris.core.item.WeightBlock.SHAPE), "무게추가 나온 경우");
+        assertTrue(seenShapes.contains(SoloBlock.SHAPE), "폭탄이 나온 경우");
+        assertTrue(seenShapes.stream().anyMatch(shape -> shape instanceof TetrominoType), "블록에 붙는 아이템");
+    }
+
+    /** ONE만 10줄을 지웠을 때 두 공급자를 20개씩 꺼내 비교한다. ONE의 아이템 블록 모양을 돌려준다. */
+    private static Object checkSharedOrder(int seed) {
         TetrominoType[] cycle = TetrominoType.values();
         SharedPieceSequence sequence = new SharedPieceSequence(new PieceGenerator() {
             private int next;
@@ -241,8 +253,9 @@ class ItemBattleTest {
         // 실제 조립(AppComposition)처럼 두 플레이어의 읽기 도구를 먼저 만든 뒤 각자 아이템 공급자로 감싼다.
         PieceGenerator readerOne = sequence.newReader();
         PieceGenerator readerTwo = sequence.newReader();
-        ItemPieceSource one = new ItemPieceSource(new PlainPieceSource(readerOne), ItemCatalog.all(), new Random(1));
-        ItemPieceSource two = new ItemPieceSource(new PlainPieceSource(readerTwo), ItemCatalog.all(), new Random(2));
+        ItemPieceSource one = new ItemPieceSource(new PlainPieceSource(readerOne), ItemCatalog.all(), new Random(seed));
+        ItemPieceSource two = new ItemPieceSource(new PlainPieceSource(readerTwo), ItemCatalog.all(),
+                new Random(seed + 1000));
 
         one.onLinesCleared(10);
         List<Piece> ones = new ArrayList<>();
@@ -253,21 +266,21 @@ class ItemBattleTest {
         }
 
         int itemPieces = 0;
+        Object itemShape = null;
         for (int i = 0; i < ones.size(); i++) {
             Piece mine = ones.get(i);
             Piece theirs = twos.get(i);
             assertFalse(hasItem(theirs), "줄을 지우지 않은 TWO에게는 아이템이 없다");
             if (hasItem(mine)) {
                 itemPieces++;
+                itemShape = mine.shape();
             } else {
-                assertEquals(theirs.shape(), mine.shape(), "아이템이 아닌 블록은 같은 순서: " + i);
-            }
-            if (!(mine.shape() instanceof TetrominoType)) {
-                // 무게추·폭탄은 원래 나올 블록 대신 나오지만 순서를 밀지 않는다.
-                assertTrue(hasItem(mine));
+                // 무게추·폭탄은 원래 나올 블록 대신 나오지만 뒤의 순서를 밀지 않는다.
+                assertEquals(theirs.shape(), mine.shape(), "시드 " + seed + ", 아이템이 아닌 블록은 같은 순서: " + i);
             }
         }
         assertEquals(1, itemPieces, "10줄에 아이템 1개");
+        return itemShape;
     }
 
     private static boolean hasItem(Piece piece) {
