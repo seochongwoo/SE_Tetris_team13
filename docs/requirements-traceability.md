@@ -1,11 +1,11 @@
 # 요구사항 추적표
 
-1차·2차 요구사항(`TeamProject_Req1.pdf`, `TeamProject_Req2.pdf`)의 항목별로 구현 위치, 검증 테스트, 상태를 정리한 표입니다. 평가 전에 빠진 항목이 없는지 확인하는 체크리스트로 씁니다. 요구사항마다 거치는 파일과 메서드 흐름은 [요구사항별 코드 흐름](requirements-code-map.md)에 있습니다. 구현이 바뀌면 이 표도 함께 고칩니다.
+1·2·3차 요구사항(`TeamProject_Req1.pdf`, `TeamProject_Req2.pdf`, `TeamProject_Req3.pdf`)의 항목별로 구현 위치, 검증 테스트, 상태를 정리한 표입니다. 평가 전에 빠진 항목이 없는지 확인하는 체크리스트로 씁니다. 요구사항마다 거치는 파일과 메서드 흐름은 [요구사항별 코드 흐름](requirements-code-map.md)에 있습니다. 구현이 바뀌면 이 표도 함께 고칩니다.
 
 - 상태: ✅ 충족 / 🔄 진행 중 / ❌ 미구현 / ⚠️ 보완 필요
 - 경로는 `src/main/java/team/tetris/` 기준, 테스트는 `src/test/java/team/tetris/` 아래 클래스 이름입니다.
-- 마지막 확인: 2026-10-23, `release/v2.0.0` (`main` PR #36까지 + 버전 2.0.0·커버리지 검사). 요구사항 원문 PDF(1차 19쪽, 2차 12쪽)와 문장 단위로 대조
-- 검증 수치: Windows 11·Java 21에서 `clean build jacocoTestReport packageZip` 성공, 테스트 575개 통과, 라인 커버리지 94.8% (2,722 / 2,871줄)
+- 마지막 확인: 2026-11-22, `release/v3.0.0` (`main` PR #66까지 + 카드 21·27 + 버전 3.0.0). 1·2차는 2026-10-23에 원문 PDF(1차 19쪽, 2차 12쪽)와 문장 단위로 대조한 뒤 3차 개발 후 다시 확인했고, 3차는 원문 PDF(14쪽)와 [3차 분석](requirements3-analysis.md)의 ID로 대조
+- 검증 수치: Windows 11·Java 21에서 `clean build jacocoTestReport packageZip` 성공, 테스트 880개 통과, 라인 커버리지 96.19% (5,551 / 5,771줄). `SETetris-3.0.0-windows.zip`을 풀어 `SETetris.exe` 실행 확인 (v2.0.0 때는 575개, 94.8%)
 
 ## 1. 1차 요구사항
 
@@ -48,10 +48,10 @@
 | N1-02 | 산출물(코드, 문서, 논의) 추적 관리 (p4, p16) | GitHub 저장소, `docs/`, PR, [프로젝트 진행 기록](project-history.md) | - | ✅ |
 | N1-03 | 이슈와 해결 상황 기록 (p16) | GitHub Issues: 카드 #9~#22·#26, 버그 #27~#35 (`bug` 라벨, 고친 커밋·PR 연결) | - | ✅ |
 | N1-04 | 팀원별 업무 분담 기록 (p16) | 이슈 담당자, GitHub Projects 보드, [백로그 진행 현황](requirements2-backlog.md), [ADR 역할 분담](architecture-decision.md) | - | ✅ |
-| N1-05 | 단위 테스트, 라인 커버리지 50~70% 이상 (p17) | JUnit 5, JaCoCo. 70% 미만이면 build 실패 (`jacocoTestCoverageVerification`) | 전체 575개 | ✅ 94.8% |
+| N1-05 | 단위 테스트, 라인 커버리지 50~70% 이상 (p17) | JUnit 5, JaCoCo. 70% 미만이면 build 실패 (`jacocoTestCoverageVerification`) | 전체 880개 | ✅ 96.19% |
 | N1-06 | 비기능 요구사항 검증 테스트 1개 이상 (p17) | `test/performance` | `ResponsivenessTest` | ✅ |
 | N1-07 | 변경 시마다 테스트를 쉽게 실행하는 체계 (p17) | `gradlew build`(테스트·커버리지 검사 포함), GitHub Actions(`.github/workflows/ci.yml`) | - | ✅ |
-| N1-08 | 배포 패키지를 쉽게 만드는 체계, 아이콘 포함 실행 파일, 명령어 없이 실행 (p18) | `gradlew packageZip` (jpackage, JRE 포함 `SETetris.exe`). 2026-10-23 v2.0.0, 2026-11-01 v2.1.0 생성·실행 확인 | - | ✅ v1.0.0, v2.0.0, v2.1.0 (GitHub Releases) |
+| N1-08 | 배포 패키지를 쉽게 만드는 체계, 아이콘 포함 실행 파일, 명령어 없이 실행 (p18) | `gradlew packageZip` (jpackage, JRE 포함 `SETetris.exe`). 2026-10-23 v2.0.0, 2026-11-01 v2.1.0, 2026-11-22 v3.0.0 생성·실행 확인 | - | ✅ v1.0.0, v2.0.0, v2.1.0, v3.0.0 (GitHub Releases) |
 
 ## 2. 2차 요구사항
 
@@ -97,28 +97,101 @@
 | N2-01 | Trello 등으로 진척 상황·할 일 배정 관리, 팀원 생산성 확인 (p11) | GitHub Projects 보드, 이슈 담당자, [백로그 진행 현황](requirements2-backlog.md) | ✅ (평가 전 보드의 담당자·상태 최신화) |
 | N2-02 | Git·GitHub 버전 관리, 브랜치·PR 정책 (p11) | [프로젝트 관리 규칙](project-management.md), PR #1~#8, #23~#25 | ⚠️ PR #1~#8은 GitHub 리뷰 기록 없음. #23~#25부터 상대방 Review(Approve / Request changes → 수정 → Approve) 기록 |
 | N2-03 | 이슈를 GitHub Issue로 등록하고 해결 내역 추적 (p11) | GitHub Issues: 카드 #9~#22·#26 (PR 본문의 `Closes #번호`로 머지 시 자동 종료), 버그 #27~#35 (발견·원인·해결 커밋 기록) | ✅ |
-| N2-04 | 중간평가 라인 커버리지 50%, 기말 70% (p12) | JaCoCo, 70% 미만이면 build·CI 실패 | ✅ 94.8% |
+| N2-04 | 중간평가 라인 커버리지 50%, 기말 70% (p12) | JaCoCo, 70% 미만이면 build·CI 실패 | ✅ 96.19% (v3.0.0) |
 
-## 3차 요구사항: 카드 22 구현 증거
+## 3. 3차 요구사항
 
-전체 3차 추적표는 카드 28에서 통합한다. 아래는 카드 22의 로컬 구현 범위이며, 상대방 리뷰·PR 머지 전이다.
+3차 요구사항(`TeamProject_Req3.pdf`, 14쪽)의 ID는 [3차 요구사항 분석](requirements3-analysis.md) 1장·2장을 따릅니다. 팀이 정한 해석(안건 ⑩~㉔)은 [미확정 사항](open-questions.md)의 "3차 요구사항 팀 논의 안건"에 있습니다. P2P 항목의 요구사항별 테스트 목록은 [P2P 통신 계약](network-protocol.md) 10장에 더 자세히 있습니다.
 
-| ID / 계약 | 구현 | 테스트 | 범위 |
+### 로컬 대전 모드
+
+| ID | 요구사항 (슬라이드) | 구현 | 테스트 | 상태 |
+| --- | --- | --- | --- | --- |
+| R3-01 | 시작 메뉴에서 대전 모드 선택 (p3) | `ScreenRouter.menuItems()` "대전 모드", `ui/screen/BattleScreen` | `MenuScreenTest`, `BattleScreenTest.theStartMenuLeadsToTheModeChoiceAndIntoABattle` | ✅ PR #60 (#46) |
+| R3-02 | 시작할 때 일반 / 아이템 / 시간제한 선택 (p3) | `BattleScreen` 모드 선택, `application/battle/LocalBattleSession` | `BattleScreenTest.theStartMenuLeadsToTheModeChoiceAndIntoABattle`, `theTimeLimitChoiceStartsAtTwoMinutesAndEscapeGoesBackStepByStep` | ✅ PR #60, #63 |
+| R3-03 | 일반: 각자 진행하고 지운 줄로 상대 공격 (p3) | `LocalBattleSession`(플레이어별 `SinglePlayerSession` 두 개), `core/rule/AttackRule`, `AttackQueue` | `LocalBattleSessionTest.clearingTwoLinesQueuesTheAttackUntilTheOpponentLocksItsNextPiece`, `BattleScreenTest.eachPlayersKeysMoveOnlyTheirOwnPiece` | ✅ PR #59 (#44) |
+| R3-04 | 아이템: 아이템이 나오는 것 외에는 일반과 같음 (p3) | 플레이어별 `ItemPieceSource`, 공유 `SharedPieceSequence` ([아이템 명세서](item-specification.md) 6장) | `ItemBattleTest`, `ItemAttackTest`, `P2pItemAttackTest` | ✅ PR #68 (#48) |
+| R3-05 | 시간제한: 시간이 지나면 점수가 높은 쪽 승리 (p3) | `application/battle/BattleTimer`, 1·2·3분 선택(기본 2분, ⑪), 동점 무승부(⑫) | `LocalBattleSessionTest.inputsCountUntilTheExactMomentTheTimeRunsOutAndNotAfter`, `equalScoresWhenTheTimeRunsOutAreADraw`, `aLossInTheSameFrameAsTheTimeRunningOutWins`, `BattleScreenTest.aTimedBattleShowsTheClockAndEndsByScoreAndARematchKeepsTheLimit` | ✅ PR #63 (#47) |
+| R3-06 | 2줄 이상 지우면 공격, 마지막 블록 칸을 뺀 모양 (p4) | `AttackRule.linesFor` | `AttackRuleTest.anLPieceClearingThreeLinesSendsThoseLinesWithoutItsOwnCells`, `clearingASingleLineDoesNotAttack`, `theRowOrderOfTheClearIsKept` | ✅ PR #58 (#43) |
+| R3-07 | 넘어간 줄을 상대의 받을 줄 영역에 먼저 표시 (p4) | `ui/render/BattleRenderer` 받을 줄 영역 | `BattleRendererTest.waitingAttackLinesAreShownBottomAlignedInTheReceiversArea`, `BattleScreenTest.anAttackIsShownInTheReceiversAreaAndThePlayersInputWaitsForItsOwnClearAnimation` | ✅ PR #60 |
+| R3-08 | 상대가 현재 블록을 처리한 뒤, 다음 블록 전에 보드에 추가 (p4) | `core/PlayerEngine` 고정 → 아이템·줄 삭제 → 공격 줄 추가 → 다음 블록, `core/rule/IncomingLines` | `PlayerEngineAttackLinesTest.attackLinesArriveAfterTheClearAndBeforeTheNextPiece`, `attackLinesAreTakenOnlyWhenAPieceLocks`, `LocalBattleSessionTest.attacksArrivingDuringTheReceiversClearAnimationWaitForItsNextLock` | ✅ PR #57 (#42) |
+| R3-09 | 상대 보드 아래쪽에 모양 그대로 추가 (p5) | `core/Board` 아래 줄 추가, `core/result/PushResult` | `PlayerEngineAttackLinesTest`, `ItemAttackTest.aLineClearOnARowHoldingOnlyThePieceSendsAnEmptyLine` | ✅ PR #57 |
+| R3-10 | 추가된 줄은 회색으로 구분 (p5) | `core/AttackBlock`, `ColorPalette` 회색 + 전용 무늬(색맹 모드 대비, H3-02) | `BattleRendererTest.attackCellsOnTheBoardAreGreyWithTheirOwnPattern` | ✅ PR #57, #60 |
+| R3-11 | 한쪽이 더 쌓을 수 없으면 종료, 다른 쪽 승리 (p5) | `LocalBattleSession` 논리적 패배 판정, 밀려 넘치면 패배(⑩), 같은 프레임 동시 패배는 무승부(⑬) | `LocalBattleSessionTest.attackLinesPushingABlockAboveTheBoardLoseTheGame`, `bothPlayersToppingOutInTheSameFrameIsADraw`, `onlyThePlayerWhoToppedOutInTheFrameLoses`, `PlayerEngineAttackLinesTest.cellsPushedAboveTheBoardEndTheGameWithoutSpawning` | ✅ PR #59 |
+| R3-12 | 승자 표시, 이후는 일반 게임 종료처럼 처리 (p5) | `BattleScreen` 결과 화면(다시 대전 / 메뉴로) | `BattleScreenTest.toppingOutShowsTheWinnerAndARematchStartsAFreshBattle`, `theResultTitlesCoverEveryEnding` | ✅ PR #60 |
+| R3-13 | 대전은 스코어보드에 기록하지 않음 (p5) | `LocalBattleSession`, `P2pMatch`는 기록 서비스를 쓰지 않음 | `BattleScreenTest.forfeitingFromThePauseMenuGivesTheOtherPlayerTheWinAndRecordsNothing`, `P2pMatchSocketTest.realCompositionTwoGamesStatePauseResultAndNoScoreFile` | ✅ |
+| R3-14 | 넘길 수 있는 최대 줄 수 10줄 (p6) | `core/rule/AttackQueue` | `AttackQueueTest.attacksThatAddUpToExactlyTenLinesAreKeptWhole`, `aSingleAttackLargerThanTheQueueKeepsItsTopTenLines` | ✅ PR #58 |
+| R3-15 | 여러 번 공격하면 기존 줄의 아래쪽에 추가 (p6) | `AttackQueue.add` | `AttackQueueTest.newAttacksGoBelowTheWaitingLinesAndTakeEmptiesTheQueue` | ✅ PR #58 |
+| R3-16 | 이미 10줄이면 새 공격은 무시 (p6) | `AttackQueue.add` | `AttackQueueTest.aFullQueueIgnoresNewAttacks` | ✅ PR #58 |
+| R3-17 | 합쳐서 10줄이 넘으면 아래쪽을 잘라냄 (p6) | `AttackQueue.add` | `AttackQueueTest.eightWaitingLinesPlusThreeKeepTheEightAndTheTopTwoOfTheNewAttack`, `concurrentAttacksNeverExceedTheLimitOrLoseAcceptedLines` | ✅ PR #58 |
+| R3-18 | 아이템 사용 규칙은 팀이 정함 (p5) | 안건 ⑭·⑮·⑰·㉔, [아이템 명세서](item-specification.md) 6장 `IT-BAT-01~09` | `ItemAttackTest`, `ItemBattleTest`, `AttackRuleTest` | ✅ PR #68 |
+
+### P2P 대전 모드
+
+| ID | 요구사항 (슬라이드) | 구현 | 테스트 | 상태 |
+| --- | --- | --- | --- | --- |
+| R3-20 | 시작 메뉴에서 P2P 대전, 규칙은 로컬 대전과 같음 (p8) | `ScreenRouter.menuItems()` "P2P 대전", `application/network/P2pMatch` (같은 `AttackRule`·`AttackQueue` 사용) | `MenuScreenTest`, `P2pMatchTest.bothScreensAttackTopOutAndSecondMatch`, `P2pItemAttackTest` | ✅ PR #64 (#51) |
+| R3-21 | 서버 또는 클라이언트 선택, 클라이언트가 서버에 접속 (p8) | `ui/screen/P2pLobbyScreen`, `P2pLobby`, `network/SocketMatchTransport` (TCP 21313) | `SocketMatchTransportTest`, `P2pLobbySocketTest.actualSocketConnectConfigureStartAndRematch` | ✅ PR #61 (#49), #62 (#50) |
+| R3-22 | 서버가 접속용 IP를 화면에 표시하고 대기 (p8) | `network/LocalIpv4Addresses`, `P2pLobbyScreen` (활성 IPv4 전부, 5개 넘으면 페이지) | `P2pLobbyScreenTest.menuServerAddressPagingAndWindowClose` | ✅ PR #62 |
+| R3-23 | 클라이언트가 IP를 입력해 접속 (p8) | `application/network/Ipv4Address`, `P2pLobbyScreen` | `P2pLobbyScreenTest.clientInputValidationConnectionAndServerOnlyConfiguration`, `FileRecentIpRepositoryTest.invalidIpIsRejectedWithoutDns` | ✅ PR #62 |
+| R3-24 | 연결 후 양쪽에 알리고, 서버가 모드 선택 (p8) | `P2pLobby.configure` (모드·시간·난이도) | `P2pLobbyScreenTest.serverControlsDefaultTimeAndReadyResetAndStartedDisplay`, `P2pLobbyTest.difficultyChangeReachesClientAndSurvivesModeChange` | ✅ PR #62 |
+| R3-25 | 양쪽이 모두 '게임 시작'을 눌러야 시작 (p8) | `P2pLobby.ready`, 설정이 바뀌면 양쪽 준비 해제 | `P2pLobbyTest.oneReadyPlayerNeverStartsAndBothStartExactlyOnce`, `configurationChangesClearBothReadyFlagsAndStaleReadyCannotStart` | ✅ PR #62 |
+| R3-26 | 내 화면과 상대 화면이 모두 보이고 실시간 반영 (p9) | `PlayerState`·`PlayerStates`(보드 상태 전송), `ui/render/P2pRenderer`, `ui/screen/P2pMatchScreen` | `P2pMatchTest.bothScreensAttackTopOutAndSecondMatch`, `P2pMatchScreenTest.routersRenderTwoBoardsResultReturnAndSecondGame`, `PlayerStatesTest` | ✅ PR #64 |
+| R3-27 | 끝나면 승패 표시 후 연결 직후 대기 상태로, 다시 시작 가능 (p9) | `P2pMatch` 결과 → `P2pLobby` 재대전 | `P2pLobbyTest.rematchResetsReadinessAndPreservesConnectionSequenceAndMatchIds`, `P2pMatchSocketTest.realCompositionTwoGamesStatePauseResultAndNoScoreFile` | ✅ PR #64 |
+| R3-28 | 전송이 느려지면 랙 표시 (p10) | `network/PingTracker`(RTT 200ms 초과), `MatchTransport.lagging()`, 경기 화면 지연 경고 | `PingTrackerTest`, `SocketMatchTransportTest.delayedPongShowsLagAndNextFastPongRecoversOnRealSocket`, `P2pNetworkFailureScreenTest.lagRecoveryAndDisconnectReturnToChoiceInEveryConnectedPhase` | ✅ PR #65 (#52) |
+| R3-29 | 일정 시간 이상 끊기면 오류를 표시하고 P2P 첫 화면으로 (p10) | 3초 무응답 시 `FAILED`와 한국어 사유, 2초 뒤 첫 화면 | `P2pRecoverySocketTest`, `P2pNetworkFailureScreenTest.peerDisconnectShowsOutcomeReasonAndDestination`, `SocketMatchTransportTest.unresponsiveEstablishedPeerTimesOutCleansWorkersAndReconnectsOnSamePort` | ✅ PR #65, #66 (#53) |
+| R3-30 | 지연·끊김 기준을 팀이 정하고 관리 (p10) | `application/network/NetworkPolicy` (랙 200ms, 끊김 3초, 안건 ㉑), [P2P 통신 계약](network-protocol.md) 9장 | `PingTrackerTest` | ✅ PR #65 |
+| R3-31 | 최근 접속 IP 저장, 클라이언트가 골라 입력 (p10) | `RecentIps`, `storage/FileRecentIpRepository` (5개, 원자적 저장, ㉒) | `FileRecentIpRepositoryTest`, `P2pLobbyTest.connectionStagesAndOnlySuccessfulClientConnectionIsRemembered`, `P2pLobbyScreenTest.selectingRecentIpAndHeldEnterDoNotSkipConnectionSteps` | ✅ PR #62 |
+| R3-32 | 접속 과정을 알 수 있는 메시지 (p10) | `P2pLobby.status()`, `P2pLobbyScreen` (접속 중·확인 중·연결됨·실패 사유) | `P2pLobbyTest.connectionStagesAndOnlySuccessfulClientConnectionIsRemembered`, `P2pLobbyScreenTest.failureShowsReasonAndRetryOrNavigationDisposesTransport`, `P2pNetworkFailureScreenTest.connectionErrorsAlsoAutoReturnAndCanBeAcknowledgedEarly` | ✅ PR #62, #65 |
+
+### 비기능
+
+| ID | 요구사항 (슬라이드) | 구현·근거 | 테스트 | 상태 |
+| --- | --- | --- | --- | --- |
+| N3-01 | 같은 LAN에서 키 입력과 화면 표시 사이 지연 200ms 이하 (p9) | `InputLatency`(입력 → 상대 화면 표시 확인 왕복), `--debug` 로그와 `tools/p2p_latency_report.py`. 측정 절차는 [P2P 통신 계약](network-protocol.md) 8장 | `InputLatencyTest`, 같은 공유기 LAN의 PC 2대 리허설 | ✅ 같은 공유기 망 PC 2대 리허설(2026-11-18)에서 눈에 띄는 지연 없이 동작. 300개 표본 수치는 시연 전 리허설에서 기록 ([P2P 통신 계약](network-protocol.md) 8장) |
+| N3-02 | 네트워크 접속 과정 자동화 테스트 (p10) | 실제 localhost 소켓 테스트, CI(Windows·Java 21)에서 실행 | `SocketMatchTransportTest`, `P2pLobbySocketTest`, `P2pMatchSocketTest`, `P2pRecoverySocketTest` | ✅ PR #66 (#53) |
+| N3-03 | 평가장 네트워크 저하에 대비한 테스트 (p14) | 가짜 통신·가짜 시계로 지연·무응답·회복 재현, 예비 네트워크(휴대폰 핫스팟) | `PingTrackerTest`, `P2pNetworkFailureScreenTest`, `SocketMatchTransportTest.delayedPongShowsLagAndNextFastPongRecoversOnRealSocket` | ✅ 자동화. 실제 저하 환경은 시연 전 핫스팟으로 확인 ([평가 준비](evaluation-guide.md)) |
+
+### 1·2차 요구사항 관련 변경
+
+| ID | 요구사항 | 구현·근거 | 상태 |
 | --- | --- | --- | --- |
-| R3-21 서버/클라이언트 연결 | `MatchTransport`, `SocketMatchTransport` | `SocketMatchTransportTest` | 통신 기반 구현. 선택 화면은 카드 23 |
-| H3-10 통신 호환성 | HELLO, `MessageCodec`, 동일 프로토콜 버전 검사 | `MessageCodecTest`, `SocketMatchTransportTest.handshakeRejectsIncompatibleProtocolsOnBothEnds` | [명시적 통신 계약](network-protocol.md) |
-| 경기 번호·허용 상태·중복 공격 | `MatchEnvelope`, `MatchProtocol` | `MatchProtocolTest`, 소켓 수신→검사 통합 테스트 | 실제 대전 적용은 카드 24 |
-| 수신 실행 흐름·RTT | 큐 기반 `poll()`, `PingTracker` | `SocketMatchTransportTest`, `PingTrackerTest` | RTT는 N3-01의 입력→화면 측정을 대신하지 않음 |
-| N3-02 접속 자동화 | localhost 접속/실패/호환성/재접속 테스트 | `SocketMatchTransportTest` | 로비·경기 중 끊김·랙 UI 검증은 카드 23~26 |
+| U3-01 | 1·2차 비기능 요구사항 평가 강화, 단위 테스트로 충분히 검증 | 1·2장의 모든 항목을 v3.0.0 기준으로 다시 확인 (표의 클래스·테스트가 모두 존재하고 통과). 반응성 `ResponsivenessTest` | ✅ |
+| U3-02 | 기말 라인 커버리지 70% | JaCoCo, 70% 미만이면 build·CI 실패 | ✅ 위 검증 수치 |
+| U3-03 | 코드 리뷰, 리팩토링, 버전관리 | 카드마다 이슈·브랜치·PR(`Closes #번호`). 리팩토링은 별도 PR(#57 core 고정 지점, #60 `BoardPainter` 분리). 상대방 Review 기록: #57, #58, #60, #61, #62, #64, #65, #66 (수정 요청 → 반영 → 승인 포함) | ⚠️ #56, #59, #63, #67은 GitHub Review 없이 머지 (대면 확인) |
+| U3-04 | 팀 아이템 요구사항 명세서 작성 품질 | [아이템 명세서](item-specification.md)를 요구사항 명세 형식(ID, 우선순위, 수용 기준, 관련 테스트)으로 다시 씀 | ✅ 카드 27 (#54) |
+| U3-05 | 1·2·3차 요구사항 모두 평가, 3차 개발 후 재점검 | 이 추적표 (1·2·3장) | ✅ 카드 28 (#55) |
 
-## 3. 남은 작업
+### 파생 요구사항과 설계 고려사항
+
+| ID | 내용 | 구현 | 테스트 | 상태 |
+| --- | --- | --- | --- | --- |
+| H3-01 | 2P 조작 키, 키 설정·저장, 충돌 방지, 기존 설정 보존 | `application/model/BattleKeyBindings`, 설정 파일 형식 3, 1P W A D S Space / 2P ↑ ← → ↓ Enter (⑲) | `BattleKeyBindingsTest`, `BattleKeysTest`, `SettingsScreenTest`, `PropertiesSettingsRepositoryTest` | ✅ PR #67 (#45) |
+| H3-02 | 공격 줄의 색맹 구분 | 공격 칸 전용 무늬 | `BattleRendererTest.attackCellsOnTheBoardAreGreyWithTheirOwnPattern` | ✅ |
+| H3-03 | 공격 줄로 밀려 넘칠 때 패배 기준 (⑩) | 보드 밖으로 밀린 칸이 있으면 패배 | `PlayerEngineAttackLinesTest.cellsPushedAboveTheBoardEndTheGameWithoutSpawning`, `attackLinesThatBlockTheSpawnEndTheGameEvenWithoutOverflow` | ✅ |
+| H3-04 | 동점·동시 종료 (⑫·⑬·㉓) | 무승부, 같은 프레임 판정, 패배가 시간 만료보다 우선 | `LocalBattleSessionTest.bothPlayersToppingOutInTheSameFrameIsADraw`, `aLossInTheSameFrameAsTheTimeRunningOutWins`, `P2pMatchTest.simultaneousDefeatIsDrawAndTimedTieIsDraw` | ✅ |
+| H3-05 | 일시정지와 종료 (⑱) | 양쪽 보드·시계 정지, 정지 중 나가면 패배 | `LocalBattleSessionTest.pausingByEitherPlayerStopsBothBoardsUntilResumed`, `quittingWhilePausedLosesTheGameForTheQuitter`, `P2pMatchTest.pauseOwnerAndServerClockAreAuthoritative` | ✅ |
+| H3-06 | 두 명의 동시 입력·키 반복 독립 | 플레이어별 반복 입력 | `BattleScreenTest.holdingKeysAtTheSameTimeRepeatsForBothPlayers` | ✅ |
+| H3-07 | 두 보드 화면에서도 화면 크기 3단계 | 격자 크기에 맞춘 창 크기 | `BattleRendererTest.bothBoardsAreDrawnSideBySideOnAWiderGrid` | ✅ |
+| H3-08 | Windows 방화벽 | 처음 서버를 열 때 Windows 허용 창에서 허용. 시연 노트북에서 미리 허용 ([평가 준비](evaluation-guide.md)) | PC 2대 리허설 | ✅ |
+| H3-09 | 접속 가능한 IP 표시 | 활성 IPv4를 모두 표시, 페이지 이동 | `P2pLobbyScreenTest.menuServerAddressPagingAndWindowClose` | ✅ |
+| H3-10 | 통신 호환성 | 접속 직후 HELLO로 프로토콜 버전 교환, 다르면 양쪽 거부 | `SocketMatchTransportTest.handshakeRejectsIncompatibleProtocolsOnBothEnds`, `P2pLobbySocketTest.incompatiblePeerFailsWithoutSavingIp` | ✅ |
+| H3-11 | 시간제한 기준 시계 | 서버 시계 기준, 만료 시 양쪽 마감 점수로 판정 | `P2pMatchTest.pauseOwnerAndServerClockAreAuthoritative`, `exactTimeoutUsesScoresAndFreezesFurtherInput`, `clientStopsAtLocalTimeLimitEvenWhenServerNoticeIsDelayed` | ✅ |
+| H3-12 | 양쪽 블록 순서 (⑰) | 기본 블록은 같은 순서, 아이템은 각자 | `SharedPieceSequenceTest`, `ItemBattleTest.itemsFollowEachPlayersOwnClearsWhileThePlainPiecesStayShared` | ✅ |
+| H3-13 | 최근 IP 저장 실패에도 실행 | 파일이 없거나 깨져도 빈 목록으로 계속, 원자적 저장 | `FileRecentIpRepositoryTest.corruptFileFallsBackWithoutOverwriting`, `atomicCommitFailurePreservesPreviousFileAndAllowsSessionToContinue` | ✅ |
+| H3-14 | 대전 종료 후 흐름 | 로컬은 다시 대전 / 메뉴로, P2P는 로비로 | `BattleScreenTest.toppingOutShowsTheWinnerAndARematchStartsAFreshBattle`, `P2pMatchScreenTest.routersRenderTwoBoardsResultReturnAndSecondGame` | ✅ |
+
+도전 과제(CH-1~3)는 요구사항 p12에 따라 `main`에 머지하지 않으므로 이 표에 넣지 않습니다.
+
+## 4. 남은 작업
 
 | 항목 | 관련 ID | 카드 |
 | --- | --- | --- |
-| 앞으로의 PR에 `Closes #번호`와 상대방 Review 기록 | N2-02 | 운영 |
+| 앞으로의 PR에 `Closes #번호`와 상대방 Review 기록 | N2-02, U3-03 | 운영 |
 | 평가 전 GitHub Projects 보드의 담당자·상태 최신화 | N2-01 | 운영 |
+| 시연 전날 시연 노트북 두 대로 배포 zip 실행, 방화벽 허용, 핫스팟 예비 네트워크 확인 | N3-03, H3-08 | 운영 |
 
-## 4. 해석이 필요한 항목
+## 5. 해석이 필요한 항목
 
 요구사항 원문에서 해석이 갈리는 부분은 팀 내부 논의로 정합니다. 안건별 원문, 구현, 결정과 근거는 [미확정 사항](open-questions.md)의 "2차 요구사항 팀 논의 안건"에 기록합니다.
 

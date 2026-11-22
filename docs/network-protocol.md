@@ -153,7 +153,7 @@ PING을 실제 writer가 쓰기 직전에 로컬 `System.nanoTime()`을 저장�
 | 재대전 준비 초기화, 연결·순번 유지, START 이후 메시지 인계 | `P2pLobbyTest`, `P2pLobbyScreenTest.serverControlsDefaultTimeAndReadyResetAndStartedDisplay` |
 | 실제 localhost 세 모드의 접속→설정→양쪽 준비→START→결과 주입→두 번째 START, 비호환 거부 | `P2pLobbySocketTest` |
 
-로컬 Linux/Java 21에서 `./gradlew --offline --no-daemon build jacocoTestReport` 성공: 전체 **737개**(신규 38개), 실패·오류·건너뜀 0개, 라인 커버리지 **95.60%** (4,459 / 4,664). 테스트·커버리지 보고서 경로는 6장과 같다. 실제 Windows Swing 조작·방화벽·두 PC LAN 성능과 원격 CI·상대방 리뷰·PR 머지는 이 로컬 검증에 포함되지 않는다.
+로컬 Linux/Java 21에서 `./gradlew --offline --no-daemon build jacocoTestReport` 성공: 전체 **737개**(신규 38개), 실패·오류·건너뜀 0개, 라인 커버리지 **95.60%** (4,459 / 4,664). 테스트·커버리지 보고서 경로는 6장과 같다. 실제 Windows Swing 조작·방화벽·두 PC LAN 동작은 8장의 리허설 기록에 있다. 카드 23은 PR #62로 머지했다 (2026-11-19).
 
 ## 8. P2P 대전 진행 (카드 24)
 
@@ -185,7 +185,7 @@ PING을 실제 writer가 쓰기 직전에 로컬 `System.nanoTime()`을 저장�
 5. 휴대폰 240fps 촬영으로 키 입력과 두 화면을 함께 담아 일부 표본을 대조한다. `paintComponent` 완료는 OS 합성·모니터 표시 완료와 같지 않으므로 촬영으로 그 차이를 확인한다. 촬영 프레임 1개는 약 4.17ms이며 시작·종료 판독 및 표시 차이에 따른 오차를 함께 기록한다. 단순히 고정 오차값을 가정해 통과시키지 않는다.
 6. 빌드/커밋, PC 두 대의 OS·CPU·RAM·화면 주사율, 유선/Wi-Fi·라우터, 모드·방향·측정 시각, 300개 표본, 최대·p95·평균·초과·누락 수, 촬영 증거·오차를 기록한다. 최대값과 측정 불확실성을 고려해 200ms 이하임을 확인할 수 있을 때만 N3-01 통과. 초과·불확실하면 원인 개선 후 재측정한다.
 
-**현재 실측 상태: 미실행.** 2026-11-12 사용자 확인 결과 두 번째 PC 접근 수단이 없다. localhost 소켓 및 가짜 시계 검증은 N3-01 충족 증거가 아니다.
+**리허설 기록 (2026-11-18)**: 같은 공유기 망의 PC 2대에서 서버·클라이언트로 접속해 대전했고, 접속·조작·두 화면 반영이 눈에 띄는 지연 없이 동작했다. 이 리허설에서는 위 절차의 300개 표본 수치를 기록하지 않았다. 시연 전 리허설(카드 28)에서 같은 절차로 수치를 남기면 판정 근거가 더 분명해진다. localhost 소켓 및 가짜 시계 검증은 N3-01 충족 증거가 아니다.
 
 ### 자동화 증거와 남은 완료 조건
 
@@ -205,7 +205,7 @@ PING을 실제 writer가 쓰기 직전에 로컬 `System.nanoTime()`을 저장�
 
 로컬 Linux/Java 21: `./gradlew --offline --no-daemon build jacocoTestReport` 성공, **777개 테스트**, 실패·오류·건너뜀 0개. 라인 커버리지 **95.42% (5,083 / 5,327)**, 70% 게이트 통과. 보고서: `build/reports/tests/test/index.html`, `build/reports/jacoco/test/html/index.html`.
 
-카드 24는 진행 중이다. 실제 두 PC LAN 실측, 카드 20·21 후속 작업과 최종 통합, 원격 CI·GitHub 담당자/보드 갱신·상대방 리뷰·PR 머지는 실행하지 않았다. 카드 25의 랙/끊김 구현과 검증은 9장에 기록한다.
+카드 24는 PR #64로 머지했다 (2026-11-19). 카드 20·21과의 통합은 같은 공격 규칙과 아이템 공급자를 쓰는 것으로 확인했다 (`P2pItemAttackTest`). 카드 25의 랙/끊김 구현과 검증은 9장에 기록한다.
 
 
 ## 9. 네트워크 문제 처리 (카드 25)
@@ -249,7 +249,7 @@ PING을 실제 writer가 쓰기 직전에 로컬 `System.nanoTime()`을 저장�
 
 로컬 Linux/Java 21: `./gradlew --offline --no-daemon build jacocoTestReport` 성공. 전체 **793개 테스트**(카드 25 신규 16개), 실패·오류·건너뜀 0개. 라인 커버리지 **95.72% (5,148 / 5,378)**, 70% 게이트 통과. 보고서: `build/reports/tests/test/index.html`, `build/reports/jacoco/test/html/index.html`.
 
-기존 CI의 `build jacocoTestReport` 실행 대상에 포함된다. 원격 CI·실제 Windows/LAN 리허설, GitHub 보드 갱신·상대방 리뷰·PR 머지는 이 로컬 작업에서 실행하지 않았다. 백로그의 공통 완료 규칙에 따라 카드 25는 진행 중으로 유지한다.
+기존 CI의 `build jacocoTestReport` 실행 대상에 포함된다. 카드 25는 PR #65로 머지했다 (2026-11-19).
 
 ## 10. 네트워크 자동화 테스트 (카드 26)
 
@@ -260,7 +260,7 @@ N3-02의 접속 자동화와 N3-03의 저하 환경 대비를 카드 22~25 테�
 | 조건 / 요구사항 | 테스트와 확인 내용 |
 | --- | --- |
 | 접속 성공, 설정, 한쪽 준비만으로 시작 금지, 재대전 (N3-02, R3-21~25, R3-27) | [P2pLobbySocketTest](../src/test/java/team/tetris/network/P2pLobbySocketTest.java).`actualSocketConnectConfigureStartAndRematch`: localhost 세 모드, 두 번의 START, 준비 초기화. [P2pLobbyTest](../src/test/java/team/tetris/application/network/P2pLobbyTest.java).`configurationChangesClearBothReadyFlagsAndStaleReadyCannotStart`: 설정 변경과 준비 경합 |
-| 잘못된 IP와 접속 실패 (N3-02, R3-23, R3-31~32) | [P2pLobbyScreenTest](../src/test/java/team/tetris/ui/screen/P2pLobbyScreenTest.java).`clientInputValidationConnectionAndServerOnlyConfiguration`: 잘못된 IPv4 안내 후 수정·접속. [SocketMatchTransportTest](../src/test/java/team/tetris/network/SocketMatchTransportTest.java).`connectionFailuresAndInvalidLifecycleAreObservable`: localhost 연결 거부·포트 충돌. [P2pLobbyTest](../src/test/java/team/tetris/application/network/P2pLobbyTest.java).`failuresCancellationAndPeerLeaveCloseResources`: 실패 IP 미저장 |
+| 잘못된 IP와 접속 실패 (N3-02, R3-23, R3-31~32) | [P2pLobbyScreenTest](../src/test/java/team/tetris/ui/screen/P2pLobbyScreenTest.java).`clientInputValidationConnectionAndServerOnlyConfiguration`: 잘못된 IPv4 안내 후 수정·접속. [SocketMatchTransportTest](../src/test/java/team/tetris/network/SocketMatchTransportTest.java).`connectionFailuresAndInvalidLifecycleAreObservable`: localhost 연결 거부·포트 충돌. [P2pLobbyTest](../src/test/java/team/tetris/application/network/P2pLobbyTest.java).`failuresCancellationAndPeerDisconnectCloseResources`: 실패 IP 미저장 |
 | 비호환 버전 (N3-02, H3-10) | [SocketMatchTransportTest](../src/test/java/team/tetris/network/SocketMatchTransportTest.java).`handshakeRejectsIncompatibleProtocolsOnBothEnds`: 양쪽 거부. [P2pLobbySocketTest](../src/test/java/team/tetris/network/P2pLobbySocketTest.java).`incompatiblePeerFailsWithoutSavingIp`: 로비 실패 안내·IP 미저장 |
 | 접속 중 끊김과 재접속 (N3-02~03, R3-29) | **신규** [P2pRecoverySocketTest](../src/test/java/team/tetris/network/P2pRecoverySocketTest.java).`peerDisconnectDuringHandshakeFailsWithoutSavingIpAndCanReconnect`: 서버/클라이언트 각각 HELLO 전 EOF, IP 미저장·작업 종료, 같은 포트 재접속 후 경기·결과 교환. CONNECTING/HANDSHAKING 화면의 실패·확인은 [P2pNetworkFailureScreenTest](../src/test/java/team/tetris/ui/screen/P2pNetworkFailureScreenTest.java).`connectionErrorsAlsoAutoReturnAndCanBeAcknowledgedEarly` |
 | 로비·경기 중 끊김과 재접속 (N3-02~03, R3-29) | **신규** [P2pRecoverySocketTest](../src/test/java/team/tetris/network/P2pRecoverySocketTest.java).`peerDisconnectInLobbyOrGameStopsSessionAndReconnectsOnSamePort`: 로비/경기 × 양쪽 역할 4개 사례. 실제 EOF → 작업/큐 정리 → 로비에서는 연결 실패, 경기에서는 남은 쪽 승리 및 입력·시간·보드 정지 → 동일 포트에서 준비·점수·대기열·시간 초기화 후 새 경기, 점수 파일 미생성 |
@@ -300,6 +300,6 @@ N3-02의 접속 자동화와 N3-03의 저하 환경 대비를 카드 22~25 테�
 
 2026-11-12 로컬 Linux/Java 21에서 `./gradlew --offline --no-daemon clean build jacocoTestReport` 성공. 전체 **799개 테스트**(신규 6개), 실패·오류·건너뜀 0개. 라인 커버리지 **95.89% (5,157 / 5,378)**, 70% 게이트 통과. 새 테스트 6개만 실행한 검증도 통과했다.
 
-변경은 테스트 추가·검증 문서의 두 로컬 커밋으로 나눠 관리한다. 사용자의 **푸시하지 않음** 지시에 따라 푸시·원격 CI는 실행하지 않았다. 원격 통과는 추후 **해당 변경 커밋의** Windows CI 작업 성공 및 테스트 보고서로 확인하며, 기존 main의 성공 결과로 대신하지 않는다. 카드 26은 원격 CI·상대방 GitHub Review·PR 머지 전까지 진행 중이다.
+카드 26은 PR #66으로 머지했고 해당 커밋의 Windows·Java 21 CI가 통과했다 (2026-11-21).
 
-이 자동화는 **실제 LAN 입력→화면 지연 200ms(N3-01)를 증명하지 않는다.** 카드 24의 실제 PC 두 대 측정과 카드 28의 배포 빌드·방화벽·저하 네트워크 리허설은 별도 완료 조건이다. N3-03의 자동화 준비만 여기서 검증하며 실제 환경 리허설까지 끝났다고 표시하지 않는다.
+이 자동화는 **실제 LAN 입력→화면 지연 200ms(N3-01)를 증명하지 않는다.** 실제 PC 2대 리허설은 8장에 기록한다. 평가장 저하 환경은 시연 전 휴대폰 핫스팟 예비 네트워크로 확인한다 ([평가 준비](evaluation-guide.md)).
