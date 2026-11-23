@@ -405,12 +405,15 @@ final class PixelMenuPainter {
         }
     }
 
-    /** 선택 표시(►) 자리에 작은 T블록을 그리고, 1도트씩 위아래로 까딱이게 한다. */
+    /**
+     * 선택 막대 위의 선택 표시(►) 자리에 작은 T블록을 그리고, 1도트씩 위아래로 까딱이게 한다. 막대 밖의 ►
+     * (하위 페이지 표시, 키 안내)는 글자 그대로 둔다.
+     */
     private static void paintCursors(Graphics2D g, TextFrame frame, Grid grid, long time) {
         int bob = (int) ((time / CURSOR_NANOS) % 2);
         for (int row = 0; row < frame.rows(); row++) {
             for (int col = 0; col < frame.columns(); col++) {
-                if (frame.codePointAt(col, row) != '►') {
+                if (!isCursor(frame, col, row)) {
                     continue;
                 }
                 Rectangle cell = grid.cells(col, row, 1, 1);
@@ -424,6 +427,12 @@ final class PixelMenuPainter {
                 g.fillRect(x, y, 3 * block, 1);
             }
         }
+    }
+
+    /** 선택 막대(바탕색이 있는 칸) 위의 ►만 도트 커서로 그린다. */
+    static boolean isCursor(TextFrame frame, int col, int row) {
+        return frame.codePointAt(col, row) == '►'
+                && !frame.styleAt(col, row).background().equals(frame.styleAt(0, 0).background());
     }
 
     private static Color rgb(int value) {

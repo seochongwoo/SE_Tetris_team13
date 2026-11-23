@@ -329,7 +329,7 @@ public final class TextFramePanel extends JComponent {
         return current.styleAt(col, row).background();
     }
 
-    /** pixelMenu이면 도트 캔버스가 이미 그린 로고 칸(█)과 선택 표시(►)는 건너뛴다. */
+    /** pixelMenu이면 도트 캔버스가 이미 그린 로고 칸(█)과 선택 막대 위의 선택 표시(►)는 건너뛴다. */
     private void paintGlyphs(Graphics2D g, TextFrame current, boolean pixelMenu) {
         Map<Font, Rectangle2D> markerBounds = new HashMap<>(); // 같은 프레임에서는 글꼴별로 한 번만 측정한다.
         for (int row = 0; row < current.rows(); row++) {
@@ -349,7 +349,7 @@ public final class TextFramePanel extends JComponent {
                 if (paintLine(g, codePoint, x, y)) {
                     continue;
                 }
-                if (pixelMenu && (codePoint == '█' || codePoint == '►')) {
+                if (pixelMenu && (codePoint == '█' || PixelMenuPainter.isCursor(current, col, row))) {
                     continue;
                 }
                 if (codePoint == '█') {
