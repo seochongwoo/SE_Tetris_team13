@@ -37,6 +37,8 @@ public final class GameScreen implements Screen {
     static final Rectangle BOARD_AREA = new Rectangle(TextRenderer.BOARD_LEFT, TextRenderer.BOARD_TOP,
             TextRenderer.CELL_WIDTH * 10 + 2, 22);
     private static final String[] PAUSE_ITEMS = {"재개", "메뉴로", "프로그램 종료"};
+    /** 메뉴 키(Esc)로 연 정지인가. 같은 메뉴지만 제목을 "게임 메뉴"로 보여 일시정지 키와 구분한다. */
+    private boolean openedByMenuKey;
     private static final int RESUME_ITEM = 0;
     private static final int QUIT_ITEM = 1;
 
@@ -121,6 +123,9 @@ public final class GameScreen implements Screen {
         if (!repeats.press(key, clockNanos, InputMapper.isRepeatable(command))) {
             return; // 떼지 않은 키가 다시 들어온 것 = OS 자동 반복이므로 무시 (반복은 직접 만든다)
         }
+        if (command == GameCommand.QUIT_GAME || command == GameCommand.PAUSE) {
+            openedByMenuKey = command == GameCommand.QUIT_GAME;
+        }
         pending.add(command == GameCommand.QUIT_GAME ? GameCommand.PAUSE : command);
     }
 
@@ -171,6 +176,7 @@ public final class GameScreen implements Screen {
     public void onFocusLost() {
         clearPendingInput();
         if (!finished && session.snapshot().status() == GameStatus.RUNNING) {
+            openedByMenuKey = false;
             pending.add(GameCommand.PAUSE);
         }
     }
@@ -263,7 +269,7 @@ public final class GameScreen implements Screen {
         int width = 22;
         int top = 7;
         frame.box(left, top, width, 10, palette.borderStyle(), palette.base());
-        frame.putCentered(left, left + width, top + 1, "일시정지", palette.accentStyle());
+        frame.putCentered(left, left + width, top + 1, openedByMenuKey ? "게임 메뉴" : "일시정지", palette.accentStyle());
         for (int i = 0; i < PAUSE_ITEMS.length; i++) {
             int row = top + 3 + i;
             if (i == pauseCursor) {

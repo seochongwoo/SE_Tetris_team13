@@ -107,7 +107,7 @@ public final class ScreenRouter {
     /** 시작 메뉴 항목. 메뉴를 추가하려면 여기에 한 줄을 더한다. */
     public List<MenuItem> menuItems() {
         return List.of(
-                new MenuItem("게임 시작", this::startGame),
+                new MenuItem("일반 모드", this::startGame),
                 new MenuItem("아이템 모드", this::startItemGame),
                 new MenuItem("대전 모드", this::showBattleModes),
                 new MenuItem("P2P 대전", this::showP2pLobby),
