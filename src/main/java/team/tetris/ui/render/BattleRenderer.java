@@ -19,9 +19,12 @@ import team.tetris.ui.render.palette.ColorPalette;
  *
  * <pre>
  * 0행        모드·난이도                                       공통 키 안내
- * 1~22행     [1P 보드][1P 정보·받을 줄]  [2P 보드][2P 정보·받을 줄]
- * 23행       1P 조작 키                  2P 조작 키
+ * 1~23행     [1P 보드][1P 정보·받을 줄]  [2P 보드][2P 정보·받을 줄]
+ * 24행       1P 조작 키                  2P 조작 키
  * </pre>
+ *
+ * <p>두 플레이어는 보드 테두리와 이름의 색으로 구분한다 ({@link ColorPalette#playerStyle(int)}). P2P 경기
+ * 화면({@link P2pRenderer})도 같은 배치와 색을 쓴다.
  *
  * <p>받을 줄 영역은 상대가 보낸 공격 줄이 보드에 들어가기 전에 먼저 보여 주는 곳이다 (R3-07). 줄은
  * 보드에 들어갈 모양 그대로, 맨 아래 줄이 보드 맨 아래에 붙을 줄이 되도록 아래에 맞춰 그린다.
@@ -29,12 +32,15 @@ import team.tetris.ui.render.palette.ColorPalette;
 public final class BattleRenderer {
 
     public static final int COLUMNS = 78;
-    public static final int ROWS = TextFrame.ROWS;
+    /** 받을 줄 상자가 23행까지 내려오므로 조작 안내는 그 아래 한 줄을 더 쓴다. */
+    public static final int ROWS = TextFrame.ROWS + 1;
     static final int BOARD_TOP = 1;
     /** 플레이어 영역의 왼쪽 열: 보드(22) + 1칸 + 정보(14) = 37칸씩, 사이에 2칸. */
     static final int ONE_LEFT = 1;
     static final int TWO_LEFT = 40;
-    private static final int HELP_ROW = ROWS - 1;
+    static final int HELP_ROW = ROWS - 1;
+    /** 보드 테두리를 포함한 높이: 20줄 + 위아래 테두리. */
+    static final int BOARD_OUTER_HEIGHT = 22;
     private final BattleInfoPanel panel;
     private final ColorPalette palette;
     private final BattleKeys keys;
@@ -73,30 +79,54 @@ public final class BattleRenderer {
             frame.putCentered(0, "남은 시간 " + clock(timer.remainingSeconds()),
                     timer.remainingSeconds() <= WARNING_SECONDS ? palette.warningStyle() : palette.base().asBold());
         }
-        String common = KeyNames.display(keys.pauseKey()) + " 일시정지  " + KeyNames.display(keys.menuKey()) + " 메뉴";
-        frame.putRight(COLUMNS - 1, 0, common, palette.dimStyle());
+        drawCommonKeys(frame, palette, KeyNames.display(keys.pauseKey()), KeyNames.display(keys.menuKey()));
+    }
+
+    /** 오른쪽 위의 공통 키 안내. 로컬 대전과 P2P가 같은 문구를 쓴다. */
+    public static void drawCommonKeys(TextFrame frame, ColorPalette palette, String pauseKey, String menuKey) {
+        frame.putRight(COLUMNS - 1, 0, pauseKey + " 일시정지  " + menuKey + " 메뉴", palette.dimStyle());
     }
 
     private void drawPlayer(TextFrame frame, BattlePlayer player, GameSnapshot game, List<List<Cell>> pending) {
         int left = leftOf(player);
         BoardPainter board = boardOf(player);
         board.drawPlayfield(frame, game, false);
+        frame.outline(left, BOARD_TOP, BoardPainter.outerWidth(game.engine().board()[0].length), BOARD_OUTER_HEIGHT,
+                palette.playerStyle(player.ordinal()));
         board.drawNext(frame, game.engine().nextPiece(), left + BattleInfoPanel.INFO_OFFSET, BattleInfoPanel.NEXT_TITLE_ROW);
-        panel.draw(frame, left, label(player), game.level(), game.score(), game.clearedLines(),
+        panel.draw(frame, left, label(player), palette.playerStyle(player.ordinal()), game.level(), game.score(), game.clearedLines(),
                 game.doubleScoreClears(), game.engine().board()[0].length, pending);
         drawHelp(frame, player, left);
     }
 
     private void drawHelp(TextFrame frame, BattlePlayer player, int left) {
-        StringBuilder text = new StringBuilder(label(player)).append(' ');
-        for (GameCommand command : List.of(GameCommand.MOVE_LEFT, GameCommand.MOVE_RIGHT, GameCommand.ROTATE_CW,
-                GameCommand.SOFT_DROP)) {
-            text.append(KeyNames.display(keys.keyFor(player, command))).append(' ');
+        String text = controls(KeyNames.display(keys.keyFor(player, GameCommand.MOVE_LEFT)),
+                KeyNames.display(keys.keyFor(player, GameCommand.MOVE_RIGHT)),
+                KeyNames.display(keys.keyFor(player, GameCommand.ROTATE_CW)),
+                KeyNames.display(keys.keyFor(player, GameCommand.SOFT_DROP)),
+                KeyNames.display(keys.keyFor(player, GameCommand.HARD_DROP)));
+        drawControls(frame, palette, player.ordinal(), left, text);
+    }
+
+    /** 조작 안내 한 줄: 키 뒤에 하는 일을 붙인다. 플레이어 영역(37칸) 안에 들어가게 짧은 말을 쓴다. */
+    public static String controls(String left, String right, String rotate, String softDrop, String hardDrop) {
+        return left + " " + right + " 이동  " + rotate + " 회전  " + softDrop + " 내림  " + hardDrop + " 낙하";
+    }
+
+    /** 조작 안내를 그 플레이어 영역의 맨 아래 줄에 플레이어 색으로 그린다. 길면 자기 영역에서 자른다. */
+    public static void drawControls(TextFrame frame, ColorPalette palette, int playerIndex, int left, String text) {
+        drawControls(frame, palette, playerIndex, left, text, (playerIndex == 0 ? TWO_LEFT - 1 : COLUMNS) - left);
+    }
+
+    /** limit칸까지 쓸 수 있는 조작 안내. P2P는 상대 안내가 없으므로 줄 전체를 쓴다. */
+    public static void drawControls(TextFrame frame, ColorPalette palette, int playerIndex, int left, String text,
+                                    int limit) {
+        TextStyle style = palette.playerStyle(playerIndex);
+        // 묶음 사이를 두 칸 띄우되, 자리가 모자라면 한 칸으로 줄인 뒤에도 넘치는 부분만 자른다.
+        if (TextFrame.displayWidth(text) > limit) {
+            text = text.replace("  ", " ");
         }
-        text.append("· ").append(KeyNames.display(keys.keyFor(player, GameCommand.HARD_DROP)));
-        // 바꾼 키 이름이 길어도 상대 쪽 안내를 덮지 않게 자기 영역에서 자른다.
-        int limit = (player == BattlePlayer.ONE ? leftOf(BattlePlayer.TWO) - 1 : COLUMNS) - left;
-        frame.put(left, HELP_ROW, clip(text.toString(), limit), palette.dimStyle());
+        frame.put(left, HELP_ROW, clip(text, limit), new TextStyle(style.foreground(), style.background(), false));
     }
 
     /** 화면 폭 기준으로 width칸까지만 남긴다. 잘렸으면 끝을 ~로 표시한다. */

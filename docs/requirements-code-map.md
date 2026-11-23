@@ -62,7 +62,7 @@ GameScreen.update(경과 시간)
 | --- | --- |
 | 첫 화면 | `ScreenRouter` 생성자 → `showMenu()` → `ui/screen/MenuScreen` |
 | 게임 이름 | `MenuScreen.drawTitle`: "TETRIS"를 블록 문자로 그림 |
-| 메뉴 항목 | `ScreenRouter.menuItems()`: 게임 시작, 아이템 모드, 설정, 스코어보드, 종료 |
+| 메뉴 항목 | `ScreenRouter.menuItems()`: 일반 모드, 아이템 모드, 대전 모드, P2P 대전, 설정, 스코어보드, 종료 |
 | 이동과 선택 | `MenuScreen.onKeyPressed`: ↑↓ → `move`, Enter → 선택한 `MenuItem.action().run()` |
 | 사용 가능 키 표시 | 다른 키를 누르면 `showKeyHint` → 화면 아래 "사용할 수 있는 키: ↑ ↓ Enter" |
 | 메뉴 추가 구조 | `menuItems()`에 `new MenuItem("이름", 동작)` 한 줄 추가 |
@@ -72,7 +72,7 @@ GameScreen.update(경과 시간)
 ### R1-05~08 보드, 블록 생성, 줄 삭제, 화면 구성
 
 ```
-메뉴 "게임 시작" → ScreenRouter.startGame
+메뉴 "일반 모드" → ScreenRouter.startGame
   → AppComposition.newGame(GameMode.NORMAL)
        → generatorFor(난이도)  = core/rule/WeightedRandomGenerator(application/PieceWeightPolicy.weightsFor(난이도))
        → core/rule/PlainPieceSource(생성기)
@@ -241,7 +241,7 @@ SinglePlayerSession.accept(EngineStep)
 
 ```
 설정 화면 "난이도" ←→ → SettingsScreen.adjust(DIFFICULTY) → Settings.difficulty 저장 (settings.properties schemaVersion 2)
-메뉴 "게임 시작" → AppComposition.newGame
+메뉴 "일반 모드" → AppComposition.newGame
   difficulty = settings.loadOrDefault().value().difficulty()   ← 시작할 때 고정
   → generatorFor(difficulty): PieceWeightPolicy.weightsFor → I블록 12/10/8, 나머지 10
   → speeds.apply(difficulty) = new SpeedPolicy(difficulty): 레벨당 80/100/120ms 감소

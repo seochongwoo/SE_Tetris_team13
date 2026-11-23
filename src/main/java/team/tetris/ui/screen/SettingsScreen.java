@@ -13,6 +13,7 @@ import team.tetris.application.port.StorageException;
 import team.tetris.ui.DisplayNames;
 import team.tetris.ui.ScreenRouter;
 import team.tetris.ui.input.KeyNames;
+import team.tetris.ui.render.MenuTheme;
 import team.tetris.ui.render.TextFrame;
 import team.tetris.ui.render.TextStyle;
 import team.tetris.ui.render.palette.ColorPalette;
@@ -79,6 +80,8 @@ public final class SettingsScreen implements Screen {
     private static final int KEY_VALUE_COL = 25;
 
     private final ScreenRouter router;
+    /** 배경 구름이 흘러가도록 쌓는 시간. */
+    private long clockNanos;
     private int cursor;
     private boolean editingKeys;
     private int keyCursor;
@@ -445,13 +448,18 @@ public final class SettingsScreen implements Screen {
     // ---- 그리기 ----
 
     @Override
+    public void update(long elapsedNanos) {
+        clockNanos += elapsedNanos;
+    }
+
+    @Override
     public TextFrame render() {
         ColorPalette palette = router.palette();
         Settings settings = router.settings();
         TextFrame frame = TextFrame.blank(palette.base());
+        MenuTheme.panels(frame, clockNanos, 3, 21);
         frame.putCentered(1, editingKeys ? "조작 키 설정" : editingBattleKeys ? "대전 조작 키" : "설정",
                 palette.accentStyle());
-        rule(frame, 2, palette);
         if (editingKeys) {
             renderKeyPage(frame, palette, settings);
         } else if (editingBattleKeys) {
@@ -472,11 +480,12 @@ public final class SettingsScreen implements Screen {
         } else if (message != null) {
             frame.putCentered(MESSAGE_ROW, message, messageIsError ? palette.warningStyle() : palette.accentStyle());
         }
+        // 아래 상자 안쪽(양옆 테두리 안)에 들어가도록 묶음 사이를 한 칸씩 띄운다.
         frame.putCentered(TextFrame.ROWS - 2, editingKeys
-                ? "↑↓ 이동  Enter 키 바꾸기  Esc 뒤로"
+                ? "↑↓ 이동 · Enter 키 바꾸기 · Esc 뒤로"
                 : editingBattleKeys
-                ? "↑↓ 이동  ◄ ► 1P·2P  Enter 변경  Esc 뒤로"
-                : "◄ ► 변경  ↑↓ 이동  Enter 선택  Esc 뒤로", palette.dimStyle());
+                ? "↑↓ 이동 ◄► 1P·2P Enter 변경 Esc 뒤로"
+                : "◄► 변경 ↑↓ 이동 Enter 선택 Esc 뒤로", palette.dimStyle());
         return frame;
     }
 

@@ -140,6 +140,10 @@ public final class P2pLobbyScreen implements Screen {
         var frame = TextFrame.blank(palette.base());
         frame.setBackdrop(Backdrop.cathedral(clockNanos));
         frame.addPlate(1, 0, TextFrame.COLUMNS - 2, 8);
+        boolean hasWarning = !lobby.recent().warning().isEmpty();
+        int footerTop = hasWarning ? 20 : 21;
+        // 본문 상자를 아래 안내 상자에 바로 붙여, 사이로 배경 그림이 조각나 보이지 않게 한다.
+        int bodyRows = footerTop - 8;
         frame.putCentered(1, "P2P 대전 로비", palette.accentStyle());
         frame.put(2, 3, "포트: " + P2pLobby.PORT, palette.dimStyle());
         String prompt = clientEntry ? "접속할 서버의 IPv4 주소를 입력하세요" : lobby.status();
@@ -158,7 +162,7 @@ public final class P2pLobbyScreen implements Screen {
                     frame.putCentered(row, i == 0 ? "서버" : "클라이언트", style);
                 }
             } else {
-                frame.addPlate(1, 8, TextFrame.COLUMNS - 2, 12);
+                frame.addPlate(1, 8, TextFrame.COLUMNS - 2, bodyRows);
                 frame.put(2, 9, "서버 IPv4: " + input + "_", palette.base());
                 if (invalidCharacter) frame.put(2, 10, "숫자와 점(.)만 입력할 수 있습니다", palette.warningStyle());
                 frame.put(2, 11, "최근 IP (↑↓ 불러오기)", palette.base());
@@ -167,7 +171,7 @@ public final class P2pLobbyScreen implements Screen {
                 frame.put(2, 18, "Delete 지우기 · Enter 접속", palette.base());
             }
         } else if (lobby.stage() == P2pLobby.Stage.CONNECTING && lobby.isServer()) {
-            frame.addPlate(1, 8, TextFrame.COLUMNS - 2, 12);
+            frame.addPlate(1, 8, TextFrame.COLUMNS - 2, bodyRows);
             frame.put(2, 9, "상대 PC에서 입력할 IPv4:", palette.base());
             var addresses = lobby.addresses();
             if (addresses.isEmpty()) {
@@ -179,22 +183,24 @@ public final class P2pLobbyScreen implements Screen {
             }
             frame.put(2, 18, "같은 PC 테스트: 127.0.0.1", palette.base());
         } else if (lobby.stage() == P2pLobby.Stage.LOBBY) {
-            frame.addPlate(1, 8, TextFrame.COLUMNS - 2, 12);
+            frame.addPlate(1, 8, TextFrame.COLUMNS - 2, bodyRows);
+            boolean server = lobby.isServer();
             lobby.configuration().ifPresent(config -> {
-                String mode = switch (config.mode()) { case NORMAL -> "일반"; case ITEM -> "아이템"; case TIMED -> "시간제한"; };
-                frame.put(2, 9, "모드: " + mode, palette.base());
-                frame.put(2, 10, "난이도: " + DisplayNames.of(config.difficulty()), palette.base());
-                if (config.mode() == Mode.TIMED) frame.put(21, 10, "제한시간: " + config.timeLimitSeconds() / 60 + "분", palette.base());
+                optionRow(frame, 9, "모드", MODE_NAMES, config.mode().ordinal(), server);
+                optionRow(frame, 10, "난이도", DIFFICULTY_NAMES, config.difficulty().ordinal(), server);
+                if (config.mode() == Mode.TIMED) {
+                    optionRow(frame, 11, "제한시간", TIME_NAMES, config.timeLimitSeconds() / 60 - 1, server);
+                }
             });
             frame.put(2, 13, "나: " + (lobby.localReady() ? "준비 완료" : "대기"), lobby.localReady() ? palette.accentStyle() : palette.base());
             frame.put(2, 14, "상대: " + (lobby.remoteReady() ? "준비 완료" : "대기"), lobby.remoteReady() ? palette.accentStyle() : palette.base());
-            if (lobby.isServer()) {
-                frame.put(2, 16, "←→ 모드 · ↑↓ 난이도", palette.base());
-                if (lobby.configuration().filter(config -> config.mode() == Mode.TIMED).isPresent())
-                    frame.put(26, 16, "< > 제한시간", palette.base());
-                frame.put(2, 17, "설정 변경 시 양쪽 준비 해제", palette.base());
-            } else frame.put(2, 17, "서버가 경기 설정을 선택합니다", palette.base());
-            if (!lobby.localReady()) frame.putCentered(18, "Enter 준비", palette.accentStyle());
+            if (server) {
+                boolean timed = lobby.configuration().filter(config -> config.mode() == Mode.TIMED).isPresent();
+                frame.put(2, 16, "←→ 모드 · ↑↓ 난이도" + (timed ? " · < > 제한시간" : ""), palette.dimStyle());
+                frame.put(2, 17, "설정을 바꾸면 양쪽 준비가 해제됩니다", palette.dimStyle());
+            } else frame.put(2, 17, "서버가 경기 설정을 선택합니다", palette.dimStyle());
+            frame.putCentered(18, lobby.localReady() ? "상대가 게임 시작을 누르면 시작합니다" : "Enter 게임 시작",
+                    lobby.localReady() ? palette.base() : palette.accentStyle());
         } else if (lobby.stage() == P2pLobby.Stage.STARTED) {
             frame.addPlate(8, 10, 28, 5);
             frame.putCentered(11, "양쪽 준비 완료", palette.base());
@@ -204,8 +210,6 @@ public final class P2pLobbyScreen implements Screen {
             frame.putCentered(17, "잠시 후 P2P 첫 화면으로", palette.base());
             frame.putCentered(18, "Enter 바로 돌아가기", palette.base());
         }
-        boolean hasWarning = !lobby.recent().warning().isEmpty();
-        int footerTop = hasWarning ? 20 : 21;
         frame.addPlate(1, footerTop, TextFrame.COLUMNS - 2, TextFrame.ROWS - footerTop);
         if (hasWarning) {
             frame.put(2, 21, lobby.recent().warning(), palette.warningStyle());
@@ -213,9 +217,35 @@ public final class P2pLobbyScreen implements Screen {
         String hint = lobby.stage() == P2pLobby.Stage.CHOICE && !clientEntry
                 ? "↑↓ 선택 · Enter 확인 · Esc 돌아가기"
                 : "Esc 돌아가기";
-        frame.putCentered(22, hint, palette.dimStyle());
-        P2pRenderer.drawLatency(frame, palette, lobby.roundTripNanos(), lobby.lagging());
+        // 지연 표시가 있으면 안내는 왼쪽, 지연은 오른쪽에 둔다. 바깥 테두리 위에 겹치지 않게 같은 줄에 넣는다.
+        if (P2pRenderer.hasLatency(lobby.roundTripNanos(), lobby.lagging())) {
+            frame.put(3, 22, hint, palette.dimStyle());
+            P2pRenderer.drawLatency(frame, palette, lobby.roundTripNanos(), lobby.lagging(), 22, TextFrame.COLUMNS - 3);
+        } else {
+            frame.putCentered(22, hint, palette.dimStyle());
+        }
         return frame;
+    }
+
+    private static final java.util.List<String> MODE_NAMES = java.util.List.of("일반", "아이템", "시간제한");
+    private static final java.util.List<String> DIFFICULTY_NAMES = java.util.Arrays.stream(Difficulty.values())
+            .map(DisplayNames::of).toList();
+    private static final java.util.List<String> TIME_NAMES = java.util.List.of("1분", "2분", "3분");
+    /** 선택지 이름이 시작하는 열. 가장 긴 이름표("제한시간")보다 오른쪽. */
+    private static final int OPTION_LEFT = 13;
+
+    /** 설정 화면처럼 선택지를 모두 보여 주고 현재 값을 [ ]로 강조한다. 클라이언트는 바꿀 수 없어 흐리게 둔다. */
+    private void optionRow(TextFrame frame, int row, String label, java.util.List<String> names, int selected,
+                           boolean editable) {
+        var palette = router.palette();
+        frame.put(2, row, label, palette.base());
+        int col = OPTION_LEFT;
+        for (int i = 0; i < names.size(); i++) {
+            boolean chosen = i == selected;
+            String text = chosen ? "[" + names.get(i) + "]" : " " + names.get(i) + " ";
+            TextStyle style = chosen ? (editable ? palette.accentStyle() : palette.base().asBold()) : palette.dimStyle();
+            col = frame.put(col, row, text, style) + 1;
+        }
     }
 
     private static void wrapped(TextFrame frame, int row, String text, TextStyle style, int rows) {

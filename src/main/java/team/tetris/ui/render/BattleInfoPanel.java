@@ -23,10 +23,10 @@ final class BattleInfoPanel {
         this.palette = palette;
     }
 
-    void draw(TextFrame frame, int left, String label, int level, long score, int clearedLines,
+    void draw(TextFrame frame, int left, String label, TextStyle labelStyle, int level, long score, int clearedLines,
               int doubleScoreClears, int width, List<List<Cell>> pending) {
         int info = left + INFO_OFFSET;
-        frame.put(info, BattleRenderer.BOARD_TOP, label, palette.accentStyle().asBold());
+        frame.put(info, BattleRenderer.BOARD_TOP, label, labelStyle);
         frame.putRight(info + INFO_WIDTH, BattleRenderer.BOARD_TOP, "LV " + level, palette.dimStyle());
         if (doubleScoreClears > 0) {
             // 점수 2배 아이템($)이 남은 줄 삭제 횟수. 점수 줄에 두면 네 자리 이상 점수를 덮으므로

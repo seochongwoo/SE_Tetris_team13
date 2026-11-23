@@ -57,13 +57,17 @@ class P2pLobbyScreenTest {
         transport.incoming.add(new MatchEnvelope(0, 1, new Lobby(1, Mode.TIMED, Difficulty.HARD, 180)));
         router.update(1);
         assertTrue(router.render().text().contains("연결됨"));
-        assertTrue(router.render().text().contains("난이도: 어려움"));
-        assertTrue(router.render().text().contains("3분"));
+        assertTrue(row("난이도").contains("[어려움]"), row("난이도"));
+        assertTrue(row("모드").contains("[시간제한]"), row("모드"));
+        assertTrue(row("제한시간").contains("[3분]"), row("제한시간"));
+        assertTrue(router.render().text().contains("서버가 경기 설정을 선택합니다"));
+        assertTrue(router.render().text().contains("Enter 게임 시작"));
         tap("LEFT"); tap("UP");
         assertEquals(Mode.TIMED, lobby.configuration().orElseThrow().mode());
         assertEquals(180, lobby.configuration().orElseThrow().timeLimitSeconds());
         tap("ENTER");
         assertTrue(router.render().text().contains("나: 준비 완료"));
+        assertTrue(router.render().text().contains("상대가 게임 시작을 누르면 시작합니다"));
         tap("ESCAPE");
         assertTrue(transport.closed); assertEquals(P2pLobby.Stage.CHOICE, lobby.stage());
         tap("ESCAPE"); assertInstanceOf(MenuScreen.class, router.current());
@@ -71,20 +75,22 @@ class P2pLobbyScreenTest {
 
     @Test void serverControlsDefaultTimeAndReadyResetAndStartedDisplay() {
         enter(); tap("ENTER"); transport.connected(); router.update(1);
-        assertTrue(router.render().text().contains("난이도: 보통"));
+        assertTrue(row("난이도").contains("[보통]"), row("난이도"));
+        assertTrue(row("모드").contains("[일반]"), row("모드"));
         tap("RIGHT");
         assertEquals(Mode.ITEM, lobby.configuration().orElseThrow().mode());
         tap("RIGHT");
-        assertTrue(router.render().text().lines().anyMatch(line -> line.matches(".*난이도: 보통 +제한시간: 2분.*")));
+        assertTrue(row("제한시간").contains("[2분]"), row("제한시간"));
+        assertTrue(router.render().text().contains("< > 제한시간"));
         tap("ENTER"); tap("UP");
         assertFalse(lobby.localReady());
         assertEquals(Difficulty.HARD, lobby.configuration().orElseThrow().difficulty());
         tap("DOWN");
         assertEquals(Difficulty.NORMAL, lobby.configuration().orElseThrow().difficulty());
         tap("PERIOD");
-        assertTrue(router.render().text().contains("3분"));
+        assertTrue(row("제한시간").contains("[3분]"), row("제한시간"));
         tap("COMMA"); tap("COMMA");
-        assertTrue(router.render().text().contains("1분"));
+        assertTrue(row("제한시간").contains("[1분]"), row("제한시간"));
         tap("ENTER");
         long revision = lobby.configuration().orElseThrow().revision();
         transport.incoming.add(new MatchEnvelope(0, 1, new Ready(revision, true)));
@@ -120,5 +126,11 @@ class P2pLobbyScreenTest {
         assertEquals(P2pLobby.Stage.CHOICE, lobby.stage());
         router.showMenu();
         assertEquals(P2pLobby.Stage.CLOSED, lobby.stage());
+    }
+
+    /** label로 시작하는 로비 설정 줄. */
+    private String row(String label) {
+        return router.render().text().lines().filter(line -> line.strip().startsWith(label + " "))
+                .findFirst().orElse("");
     }
 }

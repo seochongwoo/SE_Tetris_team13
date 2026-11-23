@@ -27,7 +27,11 @@ public final class TextRenderer implements Renderer {
     static final int NEXT_TITLE_ROW = MODE_ROW + 2;
 
     private static final int STATS_TOP = NEXT_TITLE_ROW + BoardPainter.NEXT_BOX_HEIGHT + 2;
-    private static final int HELP_TOP = STATS_TOP + 6;
+    /** 오른쪽 정보 영역의 끝 열(포함하지 않음). 숫자는 이 끝에 맞춘다. */
+    private static final int PANEL_RIGHT = TextFrame.COLUMNS - 1;
+    /** 점수 세 줄 아래 한 줄을 띄운 조작 안내 제목, 그 아래 안내 여섯 줄. */
+    static final int HELP_TITLE_ROW = STATS_TOP + 4;
+    private static final int HELP_TOP = HELP_TITLE_ROW + 1;
 
     private record Help(String label, List<GameCommand> commands) {
     }
@@ -83,19 +87,30 @@ public final class TextRenderer implements Renderer {
         frame.put(PANEL_LEFT, MODE_ROW, mode + " / " + DisplayNames.of(snapshot.difficulty()), palette.accentStyle());
         drawStat(frame, row, "SCORE", Long.toString(snapshot.score()));
         if (snapshot.doubleScoreClears() > 0) {
-            // 점수 2배 아이템($)이 남은 줄 삭제 횟수
-            frame.put(PANEL_LEFT + 6, row, "x2 (" + snapshot.doubleScoreClears() + ")", palette.accentStyle());
+            // 점수 2배 아이템($)이 남은 줄 삭제 횟수는 SCORE 바로 옆에 둔다 (아이템 명세 IT-D-05). 점수가 아주
+            // 길어 겹치면 NEXT 제목 줄 오른쪽으로 옮긴다.
+            String doubled = "x2 (" + snapshot.doubleScoreClears() + ")";
+            int scoreLeft = PANEL_RIGHT - TextFrame.displayWidth(Long.toString(snapshot.score()));
+            int doubledLeft = PANEL_LEFT + "SCORE".length() + 1;
+            if (doubledLeft + TextFrame.displayWidth(doubled) < scoreLeft) {
+                frame.put(doubledLeft, row, doubled, palette.accentStyle());
+            } else {
+                frame.putRight(PANEL_RIGHT, NEXT_TITLE_ROW, doubled, palette.accentStyle());
+            }
         }
-        drawStat(frame, row + 2, "LEVEL", Integer.toString(snapshot.level()));
-        drawStat(frame, row + 4, "LINES", Integer.toString(snapshot.clearedLines()));
+        drawStat(frame, row + 1, "LEVEL", Integer.toString(snapshot.level()));
+        drawStat(frame, row + 2, "LINES", Integer.toString(snapshot.clearedLines()));
     }
 
+    /** 이름은 왼쪽, 값은 오른쪽 끝에 맞춘 한 줄 (대전 화면의 정보 영역과 같은 모양). */
     private void drawStat(TextFrame frame, int row, String label, String value) {
         frame.put(PANEL_LEFT, row, label, palette.dimStyle());
-        frame.put(PANEL_LEFT, row + 1, value, palette.base().asBold());
+        frame.putRight(PANEL_RIGHT, row, value, palette.base().asBold());
     }
 
     private void drawHelp(TextFrame frame) {
+        frame.put(PANEL_LEFT, HELP_TITLE_ROW, "조작", palette.dimStyle());
+        frame.put(PANEL_LEFT + 5, HELP_TITLE_ROW, "─".repeat(PANEL_RIGHT - PANEL_LEFT - 5), palette.dimStyle());
         int row = HELP_TOP;
         for (Help help : HELP) {
             StringBuilder keyText = new StringBuilder();

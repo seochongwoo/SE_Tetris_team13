@@ -1,6 +1,7 @@
 package team.tetris.ui.screen;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -105,7 +106,8 @@ class GameScreenTest {
 
         assertEquals(GameStatus.PAUSED, status(game));
         String text = router.render().text();
-        assertTrue(text.contains("일시정지"));
+        assertTrue(router.render().rowText(8).contains("일시정지"));
+        assertFalse(text.contains("게임 메뉴"));
         assertTrue(text.contains("재개"));
         assertTrue(text.contains("메뉴로"));
         assertTrue(text.contains("프로그램 종료"));
@@ -121,6 +123,10 @@ class GameScreenTest {
         router.keyReleased("ESCAPE");
         router.update(FRAME);
         assertEquals(GameStatus.PAUSED, status(game));
+        // 같은 메뉴지만 Esc로 열면 제목이 "게임 메뉴"다. P로 열면 "일시정지".
+        // 메뉴 상자 제목 줄(보드 위 7행 상자의 첫 줄). 오른쪽 조작 안내의 "P 일시정지"와 구분한다.
+        assertTrue(router.render().rowText(8).contains("게임 메뉴"), router.render().rowText(8));
+        assertFalse(router.render().rowText(8).contains("일시정지"));
 
         router.keyPressed("ESCAPE");
         router.update(FRAME);

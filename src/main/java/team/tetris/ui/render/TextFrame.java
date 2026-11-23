@@ -167,6 +167,27 @@ public final class TextFrame {
     }
 
     /** 테두리 상자를 그리고 안쪽을 inside 스타일 공백으로 채운다. */
+    /** 안쪽은 그대로 두고 테두리 선만 다시 그린다 (이미 그린 상자의 테두리 색 바꾸기). */
+    public void outline(int col, int row, int width, int height, TextStyle border) {
+        if (width < 2 || height < 2) {
+            throw new IllegalArgumentException("Box must be at least 2x2");
+        }
+        int right = col + width - 1;
+        int bottom = row + height - 1;
+        put(col, row, "┌", border);
+        put(right, row, "┐", border);
+        put(col, bottom, "└", border);
+        put(right, bottom, "┘", border);
+        for (int x = col + 1; x < right; x++) {
+            put(x, row, "─", border);
+            put(x, bottom, "─", border);
+        }
+        for (int y = row + 1; y < bottom; y++) {
+            put(col, y, "│", border);
+            put(right, y, "│", border);
+        }
+    }
+
     public void box(int col, int row, int width, int height, TextStyle border, TextStyle inside) {
         if (width < 2 || height < 2) {
             throw new IllegalArgumentException("Box must be at least 2x2");

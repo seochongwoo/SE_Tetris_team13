@@ -1,6 +1,7 @@
 package team.tetris.ui.render;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -78,7 +79,7 @@ class BattleRendererTest {
         TextFrame frame = renderer.render(snapshot(one, two, List.of()));
 
         assertEquals(BattleRenderer.COLUMNS, frame.columns());
-        assertEquals(TextFrame.ROWS, frame.rows());
+        assertEquals(BattleRenderer.ROWS, frame.rows());
         BoardPainter left = renderer.boardOf(BattlePlayer.ONE);
         BoardPainter right = renderer.boardOf(BattlePlayer.TWO);
         assertEquals(ColorPalette.standard().block(TetrominoType.O),
@@ -111,10 +112,37 @@ class BattleRendererTest {
     @Test
     void controlsForEachPlayerAreListedUnderTheirBoard() {
         TextFrame frame = renderer(false).render(snapshot(board(), board(), List.of()));
-        String help = frame.rowText(TextFrame.ROWS - 1);
+        String help = frame.rowText(BattleRenderer.ROWS - 1);
 
-        assertTrue(help.contains("1P A D W S · Space"), help);
-        assertTrue(help.contains("2P ← → ↑ ↓ · Enter"), help);
+        assertTrue(help.contains("A D 이동  W 회전  S 내림  Space 낙하"), help);
+        assertTrue(help.contains("← → 이동 ↑ 회전 ↓ 내림 Enter 낙하"), help);
+        // 안내는 각자 보드 아래에서 시작하고, 플레이어 색으로 그린다.
+        assertEquals('A', frame.codePointAt(BattleRenderer.leftOf(BattlePlayer.ONE), BattleRenderer.ROWS - 1));
+        assertEquals(ColorPalette.standard().playerStyle(0).foreground(),
+                frame.styleAt(BattleRenderer.leftOf(BattlePlayer.ONE), BattleRenderer.ROWS - 1).foreground());
+        assertEquals(ColorPalette.standard().playerStyle(1).foreground(),
+                frame.styleAt(BattleRenderer.leftOf(BattlePlayer.TWO), BattleRenderer.ROWS - 1).foreground());
+    }
+
+    @Test
+    void eachPlayersBoardBorderAndNameUseTheirOwnColorInBothPalettes() {
+        for (ColorPalette palette : List.of(ColorPalette.standard(), ColorPalette.colorBlindFriendly())) {
+            BattleRenderer renderer = new BattleRenderer(palette, BattleKeys.from(Settings.defaults()));
+            TextFrame frame = renderer.render(snapshot(board(), board(), List.of()));
+            var one = palette.playerStyle(0).foreground();
+            var two = palette.playerStyle(1).foreground();
+            assertTrue(!one.equals(two));
+            int left = BattleRenderer.leftOf(BattlePlayer.ONE);
+            int right = BattleRenderer.leftOf(BattlePlayer.TWO);
+            // 보드 테두리의 네 모서리와 이름("1P"/"2P")
+            assertEquals(one, frame.styleAt(left, 1).foreground());
+            assertEquals(one, frame.styleAt(left + 21, 22).foreground());
+            assertEquals(two, frame.styleAt(right, 1).foreground());
+            assertEquals(two, frame.styleAt(right + 21, 22).foreground());
+            assertEquals(one, frame.styleAt(left + 23, 1).foreground());
+            assertEquals(two, frame.styleAt(right + 23, 1).foreground());
+        }
+        assertThrows(IllegalArgumentException.class, () -> ColorPalette.standard().playerStyle(2));
     }
 
     @Test
@@ -130,11 +158,11 @@ class BattleRendererTest {
 
         TextFrame frame = renderer.render(snapshot(board(), board(), List.of()));
 
-        String help = frame.rowText(TextFrame.ROWS - 1);
-        assertTrue(help.contains("2P ← → ↑ ↓ · Enter"), help);
+        String help = frame.rowText(BattleRenderer.ROWS - 1);
+        assertTrue(help.contains("← → 이동 ↑ 회전 ↓ 내림 Enter 낙하"), help);
         assertTrue(help.contains("~"), help);
         for (int col = BattleRenderer.leftOf(BattlePlayer.TWO) - 1; col >= 0; col--) {
-            if (frame.codePointAt(col, TextFrame.ROWS - 1) != ' ') {
+            if (frame.codePointAt(col, BattleRenderer.ROWS - 1) != ' ') {
                 assertTrue(col < BattleRenderer.leftOf(BattlePlayer.TWO) - 1, "1P 안내와 2P 안내 사이에 빈칸");
                 break;
             }

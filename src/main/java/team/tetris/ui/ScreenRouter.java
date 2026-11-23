@@ -100,14 +100,20 @@ public final class ScreenRouter {
     public void showMenu() {
         debugSession().filter(debug -> debug.result().isEmpty())
                 .ifPresent(debug -> debug.handle(team.tetris.application.GameCommand.QUIT_GAME));
-        show(new MenuScreen(this, menuItems()));
+        show(new MenuScreen(this, menuItems(), MENU_GROUP_STARTS));
         debugSetupHistory.clear();
     }
+
+    /**
+     * 시작 메뉴에서 새 묶음이 시작하는 항목 번호: 1인 게임(일반·아이템) / 대전(로컬·P2P) / 설정·기록·종료.
+     * 묶음 사이에 빈 줄을 두어 항목이 붙어 보이지 않게 한다. 메뉴를 추가하면 함께 맞춘다.
+     */
+    public static final java.util.Set<Integer> MENU_GROUP_STARTS = java.util.Set.of(2, 4);
 
     /** 시작 메뉴 항목. 메뉴를 추가하려면 여기에 한 줄을 더한다. */
     public List<MenuItem> menuItems() {
         return List.of(
-                new MenuItem("게임 시작", this::startGame),
+                new MenuItem("일반 모드", this::startGame),
                 new MenuItem("아이템 모드", this::startItemGame),
                 new MenuItem("대전 모드", this::showBattleModes),
                 new MenuItem("P2P 대전", this::showP2pLobby),
@@ -157,7 +163,7 @@ public final class ScreenRouter {
     public static final Duration DEFAULT_TIME_LIMIT = Duration.ofMinutes(2);
 
     public void showBattleModes() {
-        show(new MenuScreen(this, battleModeItems(), this::showMenu));
+        show(new MenuScreen(this, "대전 모드 선택", battleModeItems(), this::showMenu, 0));
     }
 
     /** 시간제한 대전의 시간 선택. 커서는 기본 2분에서 시작한다. */
@@ -172,7 +178,8 @@ public final class ScreenRouter {
     }
 
     public void showTimeLimits() {
-        show(new MenuScreen(this, timeLimitItems(), this::showBattleModes, TIME_LIMITS.indexOf(DEFAULT_TIME_LIMIT)));
+        show(new MenuScreen(this, "제한 시간 선택", timeLimitItems(), this::showBattleModes,
+                TIME_LIMITS.indexOf(DEFAULT_TIME_LIMIT)));
     }
 
     /** 한 컴퓨터에서 두 명이 하는 대전 시작. 결과는 스코어보드에 기록하지 않는다. */

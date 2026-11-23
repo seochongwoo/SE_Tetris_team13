@@ -5,6 +5,7 @@ import team.tetris.application.EndGameView.Stage;
 import team.tetris.application.GameResult;
 import team.tetris.ui.ScreenRouter;
 import team.tetris.ui.input.KeyNames;
+import team.tetris.ui.render.MenuTheme;
 import team.tetris.ui.render.TextFrame;
 import team.tetris.ui.render.palette.ColorPalette;
 
@@ -19,6 +20,8 @@ public final class NameEntryScreen implements Screen {
     public static final int MAX_NAME_LENGTH = 12;
 
     private final ScreenRouter router;
+    /** 배경 구름이 흘러가도록 쌓는 시간. */
+    private long clockNanos;
     private final GameResult result;
     private final StringBuilder name = new StringBuilder();
     private EndGameView view;
@@ -109,9 +112,15 @@ public final class NameEntryScreen implements Screen {
     }
 
     @Override
+    public void update(long elapsedNanos) {
+        clockNanos += elapsedNanos;
+    }
+
+    @Override
     public TextFrame render() {
         ColorPalette palette = router.palette();
         TextFrame frame = TextFrame.blank(palette.base());
+        MenuTheme.panels(frame, clockNanos, 7, 21);
         frame.putCentered(3, "GAME OVER", palette.warningStyle());
         frame.putCentered(5, "점수 " + result.score(), palette.base().asBold());
 
