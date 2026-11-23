@@ -102,6 +102,20 @@ public record ColorPalette(
         return new TextStyle(warning, background, true);
     }
 
+    /**
+     * 대전에서 플레이어를 구분하는 색 (0 = 1P·나, 1 = 2P·상대). 보드 테두리와 이름에 쓴다. 색맹 모드는
+     * 적록·청황 색맹에서도 구분되는 하늘색·주황 조합(Okabe-Ito)을 쓴다.
+     */
+    public TextStyle playerStyle(int index) {
+        if (index < 0 || index > 1) {
+            throw new IllegalArgumentException("Player index must be 0 or 1: " + index);
+        }
+        Color color = colorBlind
+                ? (index == 0 ? new Color(86, 180, 233) : new Color(230, 159, 0))
+                : (index == 0 ? new Color(90, 170, 255) : new Color(255, 120, 110));
+        return new TextStyle(color, background, true);
+    }
+
     public TextStyle borderStyle() {
         return new TextStyle(border, background, false);
     }

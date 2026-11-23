@@ -21,6 +21,7 @@ import team.tetris.ui.input.BattleKeys;
 import team.tetris.ui.input.InputMapper;
 import team.tetris.ui.input.KeyNames;
 import team.tetris.ui.input.RepeatController;
+import team.tetris.ui.render.BattleOverlay;
 import team.tetris.ui.render.BattleRenderer;
 import team.tetris.ui.render.TextFrame;
 import team.tetris.ui.render.palette.ColorPalette;
@@ -314,7 +315,7 @@ public final class BattleScreen implements Screen {
         BattleSnapshot snapshot = session.snapshot();
         TextFrame frame = renderer.render(snapshot);
         if (settingsWarning != null) {
-            frame.put(1, TextFrame.ROWS - 1, settingsWarning, palette.warningStyle());
+            frame.put(1, BattleRenderer.ROWS - 2, settingsWarning, palette.warningStyle());
         }
         Optional<BattleResult> result = session.result();
         if (result.isPresent()) {
@@ -353,43 +354,17 @@ public final class BattleScreen implements Screen {
     /** 각 보드 위쪽에 승리·패배를 표시한다. */
     private void drawOutcomeTags(TextFrame frame, BattleResult result) {
         for (BattlePlayer player : BattlePlayer.values()) {
-            String tag;
             if (result.winner() == player) {
-                tag = "WIN";
+                BattleOverlay.outcomeTag(frame, palette, BattleRenderer.leftOf(player), "WIN", true);
             } else if (result.winner() == player.opponent() || result.draw()) {
-                tag = result.draw() ? "DRAW" : "LOSE";
-            } else {
-                continue;
+                BattleOverlay.outcomeTag(frame, palette, BattleRenderer.leftOf(player), result.draw() ? "DRAW" : "LOSE",
+                        false);
             }
-            // 블록 타일(두 칸) 경계에 맞춰야 반쪽 남은 타일이 글자로 보이지 않는다: 보드 칸 2~7을 덮는다.
-            int left = BattleRenderer.leftOf(player) + 1 + 2 * 2;
-            frame.box(left, 3, 12, 3, palette.borderStyle(), palette.base());
-            frame.putCentered(left, left + 12, 4, tag,
-                    result.winner() == player ? palette.accentStyle() : palette.warningStyle());
         }
     }
 
     /** 화면 가운데 메뉴 상자. 메뉴 조작 키 안내를 맨 아래에 둔다. */
     private void drawMenu(TextFrame frame, String title, String subtitle, List<String> items) {
-        int width = 32;
-        int extra = subtitle == null ? 0 : 1;
-        int height = items.size() + 6 + extra;
-        int col = (BattleRenderer.COLUMNS - width) / 2;
-        int top = (TextFrame.ROWS - height) / 2;
-        frame.box(col, top, width, height, palette.borderStyle(), palette.base());
-        frame.putCentered(col, col + width, top + 1, title, palette.accentStyle());
-        if (subtitle != null) {
-            frame.putCentered(col, col + width, top + 2, subtitle, palette.base());
-        }
-        for (int i = 0; i < items.size(); i++) {
-            int row = top + 3 + extra + i;
-            if (i == cursor) {
-                frame.fill(col + 1, row, width - 2, 1, palette.highlightStyle());
-                frame.putCentered(col, col + width, row, "► " + items.get(i), palette.highlightStyle());
-            } else {
-                frame.putCentered(col, col + width, row, items.get(i), palette.base());
-            }
-        }
-        frame.putCentered(col, col + width, top + height - 2, "↑↓ / W S 이동 · Enter 선택", palette.dimStyle());
+        BattleOverlay.dialog(frame, palette, title, subtitle, items, cursor, "↑↓ / W S 이동 · Enter 선택");
     }
 }
