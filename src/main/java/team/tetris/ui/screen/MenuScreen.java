@@ -61,6 +61,11 @@ public final class MenuScreen implements Screen {
     private final List<MenuItem> items;
     /** 패널 맨 위에 보일 제목. 무엇을 고르는 화면인지 알려 준다. 시작 메뉴는 null. */
     private final String heading;
+    /**
+     * 새 묶음이 시작하는 항목 번호. 항목이 많아 한 줄 간격으로 붙을 때 묶음 사이에 빈 줄을 하나 둔다
+     * (시작 메뉴: 1인 게임 / 대전 / 기타).
+     */
+    private final java.util.Set<Integer> groupStarts;
     /** Esc로 돌아갈 곳. 시작 메뉴처럼 돌아갈 곳이 없으면 null. */
     private final Runnable back;
     private int cursor;
@@ -68,7 +73,12 @@ public final class MenuScreen implements Screen {
     private long clockNanos;
 
     public MenuScreen(ScreenRouter router, List<MenuItem> items) {
-        this(router, items, null);
+        this(router, items, (Runnable) null);
+    }
+
+    /** 묶음 사이를 띄우는 시작 메뉴. groupStarts는 새 묶음이 시작하는 항목 번호다. */
+    public MenuScreen(ScreenRouter router, List<MenuItem> items, java.util.Set<Integer> groupStarts) {
+        this(router, null, items, null, 0, groupStarts);
     }
 
     /** 하위 메뉴: back이 있으면 Esc로 돌아간다. */
@@ -83,8 +93,19 @@ public final class MenuScreen implements Screen {
 
     /** 제목이 있는 하위 메뉴 (예: 대전 모드 선택, 제한 시간). */
     public MenuScreen(ScreenRouter router, String heading, List<MenuItem> items, Runnable back, int cursor) {
+        this(router, heading, items, back, cursor, java.util.Set.of());
+    }
+
+    private MenuScreen(ScreenRouter router, String heading, List<MenuItem> items, Runnable back, int cursor,
+                       java.util.Set<Integer> groupStarts) {
         this.router = Objects.requireNonNull(router, "router");
         this.heading = heading;
+        this.groupStarts = java.util.Set.copyOf(groupStarts);
+        for (int start : this.groupStarts) {
+            if (start <= 0 || start >= items.size()) {
+                throw new IllegalArgumentException("Group must start inside the menu: " + start);
+            }
+        }
         this.back = back;
         this.items = List.copyOf(items);
         if (this.items.isEmpty()) {
@@ -150,16 +171,16 @@ public final class MenuScreen implements Screen {
 
         // 대성당은 왼쪽, 메뉴는 오른쪽 하늘의 패널 위에 둔다.
         boolean titled = heading != null;
-        int itemsTop = itemsTop(items.size(), titled);
+        int itemsTop = rowOf(0);
         int panelRight = PANEL_LEFT + PANEL_WIDTH;
         int headerRows = titled ? HEADING_ROWS : 0;
-        frame.addPlate(PANEL_LEFT, itemsTop - 1 - headerRows, PANEL_WIDTH, panelHeight(items.size()) + headerRows);
+        frame.addPlate(PANEL_LEFT, itemsTop - 1 - headerRows, PANEL_WIDTH, panelHeight(items.size(), gapRows()) + headerRows);
         if (titled) {
             frame.putCentered(PANEL_LEFT + 1, panelRight - 1, itemsTop - headerRows, heading, palette.accentStyle());
         }
         frame.addPlate(1, HINT_ROW, TextFrame.COLUMNS - 2, 1);
         for (int i = 0; i < items.size(); i++) {
-            int row = itemsTop + i * itemSpacing(items.size());
+            int row = rowOf(i);
             String label = items.get(i).label();
             if (i == cursor) {
                 frame.fill(PANEL_LEFT + 1, row, PANEL_WIDTH - 2, 1, palette.highlightStyle());
@@ -209,8 +230,26 @@ public final class MenuScreen implements Screen {
         return itemCount * 2 + 1 <= skyRows ? 2 : 1;
     }
 
-    private static int panelHeight(int itemCount) {
-        return (itemCount - 1) * itemSpacing(itemCount) + 3; // 첫 항목과 위아래 여백 포함
+    private static int panelHeight(int itemCount, int gapRows) {
+        return (itemCount - 1) * itemSpacing(itemCount) + gapRows + 3; // 첫 항목과 위아래 여백 포함
+    }
+
+    /** 묶음 사이 빈 줄 수. 두 줄 간격일 때는 이미 띄어져 있으므로 넣지 않는다. */
+    private int gapRows() {
+        return itemSpacing(items.size()) == 1 ? groupStarts.size() : 0;
+    }
+
+    /** index번째 항목이 놓이는 행. */
+    int rowOf(int index) {
+        int gaps = 0;
+        if (gapRows() > 0) {
+            for (int start : groupStarts) {
+                if (start <= index) {
+                    gaps++;
+                }
+            }
+        }
+        return itemsTop(items.size(), heading != null, gapRows()) + index * itemSpacing(items.size()) + gaps;
     }
 
     /** 하늘 영역 안에서 메뉴를 세로로 가운데 정렬한다. */
@@ -220,9 +259,14 @@ public final class MenuScreen implements Screen {
 
     /** 제목이 있으면 제목 줄까지 포함한 패널 전체를 가운데 정렬한다. */
     static int itemsTop(int itemCount, boolean titled) {
+        return itemsTop(itemCount, titled, 0);
+    }
+
+    private static int itemsTop(int itemCount, boolean titled, int gapRows) {
         int headerRows = titled ? HEADING_ROWS : 0;
         int panelRows = GROUND_ROW - PANEL_TOP;
-        return PANEL_TOP + 1 + headerRows + Math.floorDiv(panelRows - panelHeight(itemCount) - headerRows, 2);
+        return PANEL_TOP + 1 + headerRows
+                + Math.floorDiv(panelRows - panelHeight(itemCount, gapRows) - headerRows, 2);
     }
 
     private static void drawTitle(TextFrame frame, ColorPalette palette) {

@@ -137,8 +137,7 @@ class MenuScreenTest {
     @Test
     void menuSitsOnAPanelBelowTheSkyWithOneHintBandAboveTheBottomEdge() {
         var frame = router.render();
-        int items = menu().items().size();
-        int itemsTop = MenuScreen.itemsTop(items);
+        int itemsTop = menu().rowOf(0);
 
         var panel = frame.plates().stream().filter(plate -> plate.x == MenuScreen.PANEL_LEFT).findFirst().orElseThrow();
         assertTrue(panel.y > 6); // 부제 아래
@@ -180,6 +179,25 @@ class MenuScreenTest {
     }
 
     @Test
+    void theStartMenuLeavesABlankRowBetweenItsGroups() {
+        // 일반·아이템 / 대전·P2P / 설정·스코어보드·종료 사이에 빈 줄을 둔다.
+        var frame = router.render();
+        List<Integer> rows = java.util.stream.IntStream.range(0, menu().items().size()).map(menu()::rowOf)
+                .boxed().toList();
+        assertEquals(List.of(1, 2, 1, 2, 1, 1), java.util.stream.IntStream.range(1, rows.size())
+                .map(i -> rows.get(i) - rows.get(i - 1)).boxed().toList());
+        for (int i = 0; i < rows.size(); i++) {
+            assertTrue(frame.rowText(rows.get(i)).contains(menu().items().get(i).label()));
+        }
+        for (int gapAfter : List.of(1, 3)) {
+            assertTrue(frame.rowText(rows.get(gapAfter) + 1).substring(MenuScreen.PANEL_LEFT + 1,
+                    MenuScreen.PANEL_LEFT + MenuScreen.PANEL_WIDTH - 1).isBlank());
+        }
+        assertThrows(IllegalArgumentException.class,
+                () -> new MenuScreen(router, menu().items(), java.util.Set.of(0)));
+    }
+
+    @Test
     void wrongKeyHintReplacesTheHintBand() {
         tap("A");
 
@@ -191,7 +209,7 @@ class MenuScreenTest {
 
     @Test
     void selectionMarkerStaysWhileTimePasses() {
-        int row = MenuScreen.itemsTop(menu().items().size());
+        int row = menu().rowOf(0);
 
         router.update(1_234_000_000L);
 
