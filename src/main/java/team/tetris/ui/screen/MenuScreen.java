@@ -54,8 +54,13 @@ public final class MenuScreen implements Screen {
     /** 키캡 바탕색. 도트 화면에서는 윗변이 밝고 아랫변이 어두운 키캡으로 그려진다. */
     private static final Color KEYCAP = new Color(196, 198, 214);
 
+    /** 하위 메뉴 제목과 항목 사이의 줄 수 (제목 한 줄 + 빈 줄). */
+    private static final int HEADING_ROWS = 2;
+
     private final ScreenRouter router;
     private final List<MenuItem> items;
+    /** 패널 맨 위에 보일 제목. 무엇을 고르는 화면인지 알려 준다. 시작 메뉴는 null. */
+    private final String heading;
     /** Esc로 돌아갈 곳. 시작 메뉴처럼 돌아갈 곳이 없으면 null. */
     private final Runnable back;
     private int cursor;
@@ -73,7 +78,13 @@ public final class MenuScreen implements Screen {
 
     /** cursor 항목을 고른 상태로 시작하는 하위 메뉴 (기본값이 첫 항목이 아닐 때). */
     public MenuScreen(ScreenRouter router, List<MenuItem> items, Runnable back, int cursor) {
+        this(router, null, items, back, cursor);
+    }
+
+    /** 제목이 있는 하위 메뉴 (예: 대전 모드 선택, 제한 시간). */
+    public MenuScreen(ScreenRouter router, String heading, List<MenuItem> items, Runnable back, int cursor) {
         this.router = Objects.requireNonNull(router, "router");
+        this.heading = heading;
         this.back = back;
         this.items = List.copyOf(items);
         if (this.items.isEmpty()) {
@@ -91,6 +102,10 @@ public final class MenuScreen implements Screen {
 
     public List<MenuItem> items() {
         return items;
+    }
+
+    public java.util.Optional<String> heading() {
+        return java.util.Optional.ofNullable(heading);
     }
 
     @Override
@@ -134,9 +149,14 @@ public final class MenuScreen implements Screen {
         frame.putCentered(TITLE_TOP + 5, "SE Tetris · Team 13", light);
 
         // 대성당은 왼쪽, 메뉴는 오른쪽 하늘의 패널 위에 둔다.
-        int itemsTop = itemsTop(items.size());
+        boolean titled = heading != null;
+        int itemsTop = itemsTop(items.size(), titled);
         int panelRight = PANEL_LEFT + PANEL_WIDTH;
-        frame.addPlate(PANEL_LEFT, itemsTop - 1, PANEL_WIDTH, panelHeight(items.size()));
+        int headerRows = titled ? HEADING_ROWS : 0;
+        frame.addPlate(PANEL_LEFT, itemsTop - 1 - headerRows, PANEL_WIDTH, panelHeight(items.size()) + headerRows);
+        if (titled) {
+            frame.putCentered(PANEL_LEFT + 1, panelRight - 1, itemsTop - headerRows, heading, palette.accentStyle());
+        }
         frame.addPlate(1, HINT_ROW, TextFrame.COLUMNS - 2, 1);
         for (int i = 0; i < items.size(); i++) {
             int row = itemsTop + i * itemSpacing(items.size());
@@ -195,8 +215,14 @@ public final class MenuScreen implements Screen {
 
     /** 하늘 영역 안에서 메뉴를 세로로 가운데 정렬한다. */
     static int itemsTop(int itemCount) {
+        return itemsTop(itemCount, false);
+    }
+
+    /** 제목이 있으면 제목 줄까지 포함한 패널 전체를 가운데 정렬한다. */
+    static int itemsTop(int itemCount, boolean titled) {
+        int headerRows = titled ? HEADING_ROWS : 0;
         int panelRows = GROUND_ROW - PANEL_TOP;
-        return PANEL_TOP + 1 + Math.floorDiv(panelRows - panelHeight(itemCount), 2);
+        return PANEL_TOP + 1 + headerRows + Math.floorDiv(panelRows - panelHeight(itemCount) - headerRows, 2);
     }
 
     private static void drawTitle(TextFrame frame, ColorPalette palette) {

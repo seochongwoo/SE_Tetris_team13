@@ -157,7 +157,7 @@ public final class ScreenRouter {
     public static final Duration DEFAULT_TIME_LIMIT = Duration.ofMinutes(2);
 
     public void showBattleModes() {
-        show(new MenuScreen(this, battleModeItems(), this::showMenu));
+        show(new MenuScreen(this, "대전 모드 선택", battleModeItems(), this::showMenu, 0));
     }
 
     /** 시간제한 대전의 시간 선택. 커서는 기본 2분에서 시작한다. */
@@ -172,7 +172,8 @@ public final class ScreenRouter {
     }
 
     public void showTimeLimits() {
-        show(new MenuScreen(this, timeLimitItems(), this::showBattleModes, TIME_LIMITS.indexOf(DEFAULT_TIME_LIMIT)));
+        show(new MenuScreen(this, "제한 시간 선택", timeLimitItems(), this::showBattleModes,
+                TIME_LIMITS.indexOf(DEFAULT_TIME_LIMIT)));
     }
 
     /** 한 컴퓨터에서 두 명이 하는 대전 시작. 결과는 스코어보드에 기록하지 않는다. */

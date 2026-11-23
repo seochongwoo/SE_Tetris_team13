@@ -156,6 +156,30 @@ class MenuScreenTest {
     }
 
     @Test
+    void subMenusShowWhatIsBeingChosenAboveTheirItemsInsideThePanel() {
+        // 대전 모드와 제한 시간 선택은 시작 메뉴와 같은 상자를 쓰므로 무엇을 고르는지 제목으로 알려 준다.
+        for (Runnable open : List.<Runnable>of(router::showBattleModes, router::showTimeLimits)) {
+            open.run();
+            var screen = (MenuScreen) router.current();
+            String heading = screen.heading().orElseThrow();
+            var frame = router.render();
+            int itemsTop = MenuScreen.itemsTop(screen.items().size(), true);
+            var panel = frame.plates().stream().filter(plate -> plate.x == MenuScreen.PANEL_LEFT).findFirst()
+                    .orElseThrow();
+            assertTrue(frame.rowText(itemsTop - 2).contains(heading), frame.rowText(itemsTop - 2));
+            assertTrue(panel.y < itemsTop - 2 && panel.y > 6, "제목도 상자 안, 부제 아래");
+            assertTrue(panel.y + panel.height <= 21, "배경의 땅 위");
+            assertTrue(frame.rowText(itemsTop + 2 * screen.cursor()).contains("►"));
+        }
+        router.showBattleModes();
+        assertEquals("대전 모드 선택", ((MenuScreen) router.current()).heading().orElseThrow());
+        router.showTimeLimits();
+        assertEquals("제한 시간 선택", ((MenuScreen) router.current()).heading().orElseThrow());
+        router.showMenu();
+        assertTrue(menu().heading().isEmpty(), "시작 메뉴는 게임 이름이 제목");
+    }
+
+    @Test
     void wrongKeyHintReplacesTheHintBand() {
         tap("A");
 
