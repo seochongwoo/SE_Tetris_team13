@@ -101,10 +101,11 @@ public final class BattleScreen implements Screen {
         this.keys = BattleKeys.from(settings);
         this.repeats = repeats;
         this.palette = ColorPalette.of(settings.colorBlindMode());
-        this.computer = againstComputer ? new ComputerPlayer() : null;
+        this.computer = againstComputer ? ComputerPlayer.forDifficulty(session.snapshot().difficulty()) : null;
         this.computerIntervalNanos = ComputerPlayer.intervalNanos(session.snapshot().difficulty());
         this.renderer = new BattleRenderer(palette, keys, againstComputer
-                ? "컴퓨터가 " + seconds(computerIntervalNanos) + "초마다 키를 누릅니다" : null);
+                ? "컴퓨터가 " + seconds(computerIntervalNanos) + "초마다 "
+                        + (computer.looksAhead() ? "누르고 NEXT까지 봄" : "키를 누릅니다") : null);
         this.settingsWarning = started.settings().error().isPresent()
                 ? "설정을 읽지 못해 기본값으로 진행합니다" : null;
         for (BattlePlayer player : BattlePlayer.values()) {

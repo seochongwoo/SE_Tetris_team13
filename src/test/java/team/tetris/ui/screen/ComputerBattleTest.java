@@ -164,4 +164,14 @@ class ComputerBattleTest {
         tap(KeyNames.ENTER);
         assertEquals(1, app.exits());
     }
+
+    @Test
+    void onHardTheComputerPressesEveryHalfSecondAndSaysItLooksAtTheNextPiece() throws Exception {
+        app.settings().update(team.tetris.application.model.Settings.defaults().withDifficulty(Difficulty.HARD));
+        ScreenRouter hard = app.router();
+        hard.startComputerBattle(GameMode.NORMAL);
+        String help = hard.render().rowText(BattleRenderer.ROWS - 1);
+        assertTrue(help.contains("컴퓨터가 0.5초마다 누르고 NEXT까지 봄"), help);
+        assertFalse(help.contains("~"), "잘리지 않는다");
+    }
 }
