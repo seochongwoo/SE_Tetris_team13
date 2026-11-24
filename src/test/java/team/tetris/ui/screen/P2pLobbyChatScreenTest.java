@@ -63,8 +63,9 @@ class P2pLobbyChatScreenTest {
     @Test
     void tabOpensChatAndEnterSendsKoreanTextToTheOtherLobby() {
         connect();
-        assertTrue(server.render().text().contains("채팅: Tab을 눌러 상대와 이야기하세요"));
-        assertTrue(server.render().text().contains("Tab 채팅 · Esc 돌아가기"));
+        assertTrue(server.render().text().contains("아직 메시지가 없습니다"));
+        assertTrue(server.render().text().contains("Tab을 눌러 메시지 입력"));
+        assertTrue(server.render().text().contains("Enter 게임 시작 · Tab 채팅 · Esc 나가기"));
         assertFalse(server.acceptsTextInput());
 
         TestApplication.tap(server, "TAB");
@@ -74,16 +75,18 @@ class P2pLobbyChatScreenTest {
         TestApplication.tap(server, KeyNames.BACK_SPACE);
         type(server, "!");
         assertEquals("안녕 g!", screen(server).chatInput());
-        assertTrue(server.render().text().contains("> 안녕 g!_"));
-        assertTrue(server.render().text().contains("Enter 보내기 · Esc 닫기"));
+        assertTrue(server.render().text().contains("› 안녕 g!▏"), "입력 줄과 깜빡이는 커서");
+        server.update(team.tetris.ui.screen.P2pLobbyScreen.CURSOR_BLINK_NANOS);
+        assertTrue(server.render().text().contains("› 안녕 g! "), "커서가 꺼진 순간");
+        assertTrue(server.render().text().contains("Enter 보내기 · Esc 닫기 · 한/영 한글"));
 
         TestApplication.tap(server, KeyNames.ENTER);
         client.update(0);
 
         assertFalse(screen(server).chatOpen());
         assertFalse(serverLobby.localReady(), "채팅을 보낸 Enter는 게임 시작이 아니다");
-        assertTrue(server.render().text().contains("나: 안녕 g!"));
-        assertTrue(client.render().text().contains("상대: 안녕 g!"), client.render().text());
+        assertTrue(server.render().text().contains("나 안녕 g!"));
+        assertTrue(client.render().text().contains("상대 안녕 g!"), client.render().text());
     }
 
     @Test
@@ -123,9 +126,9 @@ class P2pLobbyChatScreenTest {
         // 입력 줄이 닫혀 있으면 최근 CHAT_ROWS(4)줄을 보여 준다.
         assertFalse(text.contains("line 1"), text);
         for (int i = 2; i <= 5; i++) {
-            assertTrue(text.contains("상대: line " + i), text);
+            assertTrue(text.contains("상대 line " + i), text);
         }
-        assertFalse(text.contains("나: 가가"), "오래된 내 줄은 밀려난다");
+        assertFalse(text.contains("나 가가"), "오래된 내 줄은 밀려난다");
     }
 
     @Test
@@ -134,6 +137,7 @@ class P2pLobbyChatScreenTest {
         TestApplication.tap(server, "TAB");
         assertFalse(screen(server).chatOpen());
         assertFalse(server.render().text().contains("Tab 채팅"));
+        assertFalse(server.render().text().contains("Tab을 눌러 메시지 입력"));
     }
 
     @Test

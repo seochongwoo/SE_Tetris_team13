@@ -66,7 +66,7 @@ class P2pLobbyScreenTest {
         assertEquals(Mode.TIMED, lobby.configuration().orElseThrow().mode());
         assertEquals(180, lobby.configuration().orElseThrow().timeLimitSeconds());
         tap("ENTER");
-        assertTrue(router.render().text().contains("나: 준비 완료"));
+        assertTrue(router.render().text().contains("나 ● 준비 완료"));
         assertTrue(router.render().text().contains("상대가 게임 시작을 누르면 시작합니다"));
         tap("ESCAPE");
         assertTrue(transport.closed); assertEquals(P2pLobby.Stage.CHOICE, lobby.stage());
