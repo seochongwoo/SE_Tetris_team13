@@ -45,7 +45,8 @@ class MessageCodecTest {
                 new Lobby(1, Mode.TIMED, Difficulty.HARD, 180), new Ready(1, true), new Start(1, Long.MIN_VALUE),
                 new State(player(), 100, 12), new FinalState(player()), new Painted(12), new Attack(3, List.of(1, 5)), new Pause(Role.CLIENT, true),
                 new Resume(false), new Result(Outcome.DRAW, EndReason.TIME_LIMIT),
-                new Result(Outcome.SERVER_WINS, EndReason.TOP_OUT, player(), player()), new Leave(), new Ping(9), new Pong(9));
+                new Result(Outcome.SERVER_WINS, EndReason.TOP_OUT, player(), player()), new Leave(), new Ping(9), new Pong(9),
+                new Chat("안녕 hello 123!"));
         for (MatchMessage message : messages) {
             var envelope = new MatchEnvelope(12, 37, message);
             assertEquals(envelope, decode(encode(envelope)));
@@ -91,6 +92,10 @@ class MessageCodecTest {
     @Test
     void rejectsUnknownTypeEnumInvalidBooleanAndUnboundedRowCount() throws Exception {
         assertThrows(IOException.class, () -> decode(frame("BOGUS", out -> {})));
+        // 채팅도 받은 쪽에서 다시 검사한다: 빈 글, 30글자 초과, 줄바꿈은 형식 오류다.
+        assertThrows(IOException.class, () -> decode(frame("CHAT", out -> out.writeUTF("  "))));
+        assertThrows(IOException.class, () -> decode(frame("CHAT", out -> out.writeUTF("가".repeat(31)))));
+        assertThrows(IOException.class, () -> decode(frame("CHAT", out -> out.writeUTF("a" + (char) 10 + "b"))));
         assertThrows(IOException.class, () -> decode(frame("HELLO", out -> {out.writeInt(1); out.writeUTF("BOGUS");})));
         assertThrows(IOException.class, () -> decode(frame("READY", out -> {out.writeLong(1); out.writeByte(2);})));
         assertThrows(IOException.class, () -> decode(frame("ATTACK", out -> {out.writeLong(1); out.writeInt(Integer.MAX_VALUE);})));

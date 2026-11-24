@@ -46,6 +46,7 @@ public final class MessageCodec {
                 if (m.server() != null) { writePlayer(out, m.server()); writePlayer(out, m.client()); }
             }
             case Leave ignored -> out.writeUTF("LEAVE");
+            case Chat m -> { out.writeUTF("CHAT"); out.writeUTF(m.text()); }
             case Ping m -> { out.writeUTF("PING"); out.writeLong(m.id()); }
             case Pong m -> { out.writeUTF("PONG"); out.writeLong(m.id()); }
         }
@@ -82,6 +83,7 @@ public final class MessageCodec {
                     yield bool(in) ? new Result(outcome, reason, readPlayer(in), readPlayer(in)) : new Result(outcome, reason);
                 }
                 case "LEAVE" -> new Leave();
+                case "CHAT" -> new Chat(in.readUTF());
                 case "PING" -> new Ping(in.readLong());
                 case "PONG" -> new Pong(in.readLong());
                 default -> throw new IOException("Unknown message type");

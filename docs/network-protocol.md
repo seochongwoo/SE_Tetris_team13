@@ -14,7 +14,7 @@
 
 ## 2. 호환성과 프레임 형식
 
-카드 22의 호환성 정책은 **동일한 프로토콜 버전 허용**이다. 앱 빌드 문자열은 비교하지 않는다. 현재 `MatchMessage.PROTOCOL_VERSION = 3` (시간 만료 시 FINAL_STATE 확인 추가)이며 메시지 필드·의미·상태 계약을 비호환으로 바꾸면 이 번호를 올린다. 양쪽은 접속 직후 `HELLO(version, role)`를 전송한다. 상대가 반대 역할이며 버전이 같아야 `CONNECTED`가 된다. HELLO 이전의 게임 메시지, 재차 HELLO, 버전/역할 불일치는 연결 실패다.
+카드 22의 호환성 정책은 **동일한 프로토콜 버전 허용**이다. 앱 빌드 문자열은 비교하지 않는다. 현재 `MatchMessage.PROTOCOL_VERSION = 4` (3: 시간 만료 시 FINAL_STATE 확인 추가, 4: 로비 채팅 CHAT 추가)이며 메시지 필드·의미·상태 계약을 비호환으로 바꾸면 이 번호를 올린다. 양쪽은 접속 직후 `HELLO(version, role)`를 전송한다. 상대가 반대 역할이며 버전이 같아야 `CONNECTED`가 된다. HELLO 이전의 게임 메시지, 재차 HELLO, 버전/역할 불일치는 연결 실패다.
 
 Java 객체 직렬화 대신 다음 순서의 binary frame을 사용한다. 구현은 `MessageCodec`이다.
 
@@ -34,6 +34,7 @@ Java 객체 직렬화 대신 다음 순서의 binary frame을 사용한다. 구�
 | HELLO | version int32, role 문자열 | 양쪽 / HANDSHAKING에서 최초 한 번, matchId=0 |
 | LOBBY | revision int64, mode 문자열, difficulty 문자열, timeLimitSeconds int32 | 서버 / LOBBY·RESULT. 새 revision은 이전보다 커야 하며 양쪽 준비를 해제. RESULT에서는 로비로 복귀 |
 | READY | revision int64, ready boolean | 양쪽 / LOBBY. 현재 설정 revision에 대한 준비 또는 해제 |
+| CHAT | text 문자열 | 양쪽 / LOBBY, matchId=0. 앞뒤 공백을 뺀 1~30글자, 제어 문자 금지. 경기 중에 도착하면 버린다 (도전 과제 CH-2) |
 | START | revision int64, pieceSeed int64 | 서버 / LOBBY. 현재 설정에 양쪽 준비 완료, 이전보다 큰 matchId 필요. PLAYING으로 전환 |
 | STATE | player (아래 형식), remainingNanos int64, inputId int64 | 양쪽 / PLAYING·PAUSED. 송신자 자신의 화면·논리적 패배. 서버는 남은 시간 0 이상(시간제한 외 모드는 0), 클라이언트는 -1 |
 | FINAL_STATE | player | 클라이언트 / 시간제한 경기. 서버의 남은 시간 0을 확인한 뒤 마감 화면을 한 번 전송 |
@@ -72,7 +73,7 @@ Tile은 shape 문자열 다음 item 문자열이다. shape는 `EMPTY/I/O/T/S/Z/J
 
 ## 4. 경기 번호·순서·중복
 
-- LOBBY/READY 및 transport 제어 메시지는 matchId=0. START는 이전 경기보다 큰 양수. STATE/FINAL_STATE/ATTACK/PAUSE/RESUME/RESULT/PAINTED는 현재 경기 번호. LEAVE도 현재 경기 번호를 쓴다. 로비에서 나가면 소켓을 닫고 상대는 연결 종료를 감지한다.
+- LOBBY/READY/CHAT 및 transport 제어 메시지는 matchId=0. START는 이전 경기보다 큰 양수. STATE/FINAL_STATE/ATTACK/PAUSE/RESUME/RESULT/PAINTED는 현재 경기 번호. LEAVE도 현재 경기 번호를 쓴다. 로비에서 나가면 소켓을 닫고 상대는 연결 종료를 감지한다.
 - sequence는 **application 메시지의 송신자별 연결 전체 순번**이다. 1에서 시작하고 재대전에도 리셋하지 않는다. 로컬 발신 전과 원격 수신 후 동일한 `MatchProtocol.accept(sender, envelope)`를 호출한다. sender는 연결 역할에서 결정하며 payload로 임의 지정하지 않는다.
 - HELLO/PING/PONG은 어댑터 전용이다. HELLO의 sequence는 1, heartbeat는 id를 sequence에도 사용한다. application의 순번 검사와 별개이며 `poll()`로 나오지 않는다.
 - 이미 승인한 sequence 이하의 메시지 및 현재 경기에서 이미 승인한 eventId 이하의 ATTACK은 `DUPLICATE`. 다른 경기 메시지는 `STALE_MATCH`. 틀린 상태/권한/설정은 각각 `WRONG_STATE` / `WRONG_SENDER` / `STALE_CONFIGURATION`이다. 거부 시 게임과 검사기 상태는 바뀌지 않는다.
