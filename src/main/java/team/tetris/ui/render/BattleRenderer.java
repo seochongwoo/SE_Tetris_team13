@@ -44,20 +44,23 @@ public final class BattleRenderer {
     private final BattleInfoPanel panel;
     private final ColorPalette palette;
     private final BattleKeys keys;
-    /** 2P를 컴퓨터가 조작하면 그 안내 문구 (도전 과제 CH-1), 사람이면 null. */
+    /** 컴퓨터가 조작하는 쪽 (도전 과제 CH-1). 두 사람이 하면 null. */
+    private final BattlePlayer computerSide;
+    /** 컴퓨터 쪽 조작 키 대신 보여 줄 안내 문구. */
     private final String computerNote;
 
     public BattleRenderer(ColorPalette palette, BattleKeys keys) {
-        this(palette, keys, null);
+        this(palette, keys, null, null);
     }
 
     /**
-     * @param computerNote null이 아니면 2P를 컴퓨터가 조작한다. 2P 이름을 "{@value #COMPUTER_LABEL}"로 쓰고
-     *                     2P 조작 키 대신 이 문구를 보여 준다
+     * @param computerSide null이 아니면 그쪽을 컴퓨터가 조작한다. 이름을 "{@value #COMPUTER_LABEL}"로 쓰고
+     *                     그쪽 조작 키 대신 computerNote를 보여 준다
      */
-    public BattleRenderer(ColorPalette palette, BattleKeys keys, String computerNote) {
+    public BattleRenderer(ColorPalette palette, BattleKeys keys, BattlePlayer computerSide, String computerNote) {
         this.palette = palette;
         this.keys = keys;
+        this.computerSide = computerSide;
         this.computerNote = computerNote;
         panel = new BattleInfoPanel(palette);
     }
@@ -113,7 +116,7 @@ public final class BattleRenderer {
     }
 
     private void drawHelp(TextFrame frame, BattlePlayer player, int left) {
-        if (player == BattlePlayer.TWO && computerNote != null) {
+        if (player == computerSide) {
             drawControls(frame, palette, player.ordinal(), left, computerNote);
             return;
         }
@@ -172,9 +175,9 @@ public final class BattleRenderer {
         return seconds / 60 + ":" + String.format(java.util.Locale.ROOT, "%02d", seconds % 60);
     }
 
-    /** 화면에 쓰는 플레이어 이름. 컴퓨터 대전이면 2P 대신 "컴퓨터". */
+    /** 화면에 쓰는 플레이어 이름. 컴퓨터가 조작하는 쪽은 "컴퓨터". */
     public String nameOf(BattlePlayer player) {
-        return player == BattlePlayer.TWO && computerNote != null ? COMPUTER_LABEL : label(player);
+        return player == computerSide ? COMPUTER_LABEL : label(player);
     }
 
     static String label(BattlePlayer player) {

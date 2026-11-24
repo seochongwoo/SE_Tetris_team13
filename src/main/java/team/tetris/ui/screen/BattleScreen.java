@@ -39,8 +39,9 @@ import team.tetris.ui.render.palette.ColorPalette;
  *       두 사람이 같이 쓰므로 메뉴에서 기권할 플레이어를 고르게 하고, 승패 없이 그만두는 항목도 둔다.</li>
  *   <li>결과가 나오면 승자를 보여 준 뒤 다시 대전 / 메뉴로 / 프로그램 종료를 고른다. 기록은 남기지 않는다
  *       (R3-12, R3-13, H3-14).</li>
- *   <li>컴퓨터 대전(도전 과제 CH-1)이면 2P는 {@link ComputerPlayer}가 정해진 간격마다 키 하나씩 넣는다.
- *       사람의 2P 키는 무시하고, 기권 항목은 1P 하나만 둔다.</li>
+ *   <li>컴퓨터 대전(도전 과제 CH-1)이면 사람이 고른 쪽(1P 또는 2P)의 반대쪽을 {@link ComputerPlayer}가
+ *       정해진 간격마다 키 하나씩 넣어 조작한다. 사람은 고른 쪽의 대전 키를 쓰고, 컴퓨터 쪽 키는 무시한다.
+ *       기권 항목은 사람 하나만 둔다.</li>
  * </ul>
  */
 public final class BattleScreen implements Screen {
@@ -75,35 +76,38 @@ public final class BattleScreen implements Screen {
     private int cursor;
     private boolean resultSeen;
     private boolean left;
-    /** 2P를 조작하는 컴퓨터. 두 사람이 하는 대전이면 null. */
+    /** 컴퓨터. 두 사람이 하는 대전이면 null. */
     private final ComputerPlayer computer;
+    /** 컴퓨터가 조작하는 쪽. 두 사람이 하는 대전이면 null. */
+    private final BattlePlayer computerSide;
     private final long computerIntervalNanos;
     /** 컴퓨터가 마지막으로 키를 누른 뒤 흐른 진행 시간. 정지 중에는 흐르지 않는다. */
     private long computerClockNanos;
 
     public BattleScreen(ScreenRouter router, StartedBattle started) {
-        this(router, started, false);
+        this(router, started, (BattlePlayer) null);
     }
 
-    /** @param againstComputer true면 2P를 컴퓨터가 조작한다 (도전 과제 CH-1) */
-    public BattleScreen(ScreenRouter router, StartedBattle started, boolean againstComputer) {
-        this(router, started, new RepeatController(), againstComputer);
+    /** @param computerSide 컴퓨터가 조작할 쪽 (도전 과제 CH-1). null이면 두 사람이 한다 */
+    public BattleScreen(ScreenRouter router, StartedBattle started, BattlePlayer computerSide) {
+        this(router, started, new RepeatController(), computerSide);
     }
 
     BattleScreen(ScreenRouter router, StartedBattle started, RepeatController repeats) {
-        this(router, started, repeats, false);
+        this(router, started, repeats, null);
     }
 
-    BattleScreen(ScreenRouter router, StartedBattle started, RepeatController repeats, boolean againstComputer) {
+    BattleScreen(ScreenRouter router, StartedBattle started, RepeatController repeats, BattlePlayer computerSide) {
         this.router = Objects.requireNonNull(router, "router");
         this.session = started.session();
         Settings settings = started.settings().value();
         this.keys = BattleKeys.from(settings);
         this.repeats = repeats;
         this.palette = ColorPalette.of(settings.colorBlindMode());
-        this.computer = againstComputer ? ComputerPlayer.forDifficulty(session.snapshot().difficulty()) : null;
+        this.computerSide = computerSide;
+        this.computer = computerSide != null ? ComputerPlayer.forDifficulty(session.snapshot().difficulty()) : null;
         this.computerIntervalNanos = ComputerPlayer.intervalNanos(session.snapshot().difficulty());
-        this.renderer = new BattleRenderer(palette, keys, againstComputer
+        this.renderer = new BattleRenderer(palette, keys, computerSide, computerSide != null
                 ? "컴퓨터가 " + seconds(computerIntervalNanos) + "초마다 "
                         + (computer.looksAhead() ? "누르고 NEXT까지 봄" : "키를 누릅니다") : null);
         this.settingsWarning = started.settings().error().isPresent()
@@ -127,12 +131,17 @@ public final class BattleScreen implements Screen {
         return keys;
     }
 
-    /** 2P를 컴퓨터가 조작하는지. */
+    /** 컴퓨터와 하는 대전인지. */
     public boolean againstComputer() {
         return computer != null;
     }
 
-    /** 일시정지 메뉴 항목. 컴퓨터 대전에서는 기권할 사람이 1P뿐이다. */
+    /** 컴퓨터가 조작하는 쪽. 두 사람이 하면 empty. */
+    public Optional<BattlePlayer> computerSide() {
+        return Optional.ofNullable(computerSide);
+    }
+
+    /** 일시정지 메뉴 항목. 컴퓨터 대전에서는 기권할 사람이 하나뿐이다. */
     List<String> pauseItems() {
         return computer != null ? COMPUTER_PAUSE_ITEMS : PAUSE_ITEMS;
     }
@@ -169,7 +178,7 @@ public final class BattleScreen implements Screen {
             return;
         }
         Optional<BattleKeys.Binding> binding = keys.bindingFor(key);
-        if (binding.isEmpty() || (computer != null && binding.get().player() == BattlePlayer.TWO)) {
+        if (binding.isEmpty() || binding.get().player() == computerSide) {
             return;
         }
         GameCommand command = binding.get().command();
@@ -196,7 +205,7 @@ public final class BattleScreen implements Screen {
         if (computer != null) {
             switch (cursor) {
                 case 0 -> pending.add(new Input(BattlePlayer.ONE, GameCommand.RESUME));
-                case 1 -> pending.add(new Input(BattlePlayer.ONE, GameCommand.QUIT_GAME));
+                case 1 -> pending.add(new Input(computerSide.opponent(), GameCommand.QUIT_GAME));
                 case 2 -> leave(router::showMenu);
                 default -> leave(router::exit);
             }
@@ -232,7 +241,7 @@ public final class BattleScreen implements Screen {
         BattleSnapshot last = session.snapshot();
         java.time.Duration limit = last.timer() == null ? null : java.time.Duration.ofNanos(last.timer().limitNanos());
         if (computer != null) {
-            router.startComputerBattle(last.mode());
+            router.startComputerBattle(last.mode(), computerSide.opponent());
         } else {
             router.startBattle(last.mode(), limit);
         }
@@ -304,7 +313,7 @@ public final class BattleScreen implements Screen {
         if (now.status() == BattleStatus.RUNNING) {
             for (String key : repeats.due(clockNanos)) {
                 keys.bindingFor(key).filter(binding -> InputMapper.isRepeatable(binding.command()))
-                        .filter(binding -> computer == null || binding.player() == BattlePlayer.ONE)
+                        .filter(binding -> binding.player() != computerSide)
                         .ifPresent(binding -> pending.add(new Input(binding.player(), binding.command())));
             }
             pressComputerKey(now, elapsedNanos);
@@ -331,11 +340,12 @@ public final class BattleScreen implements Screen {
             return;
         }
         computerClockNanos = Math.min(computerIntervalNanos, computerClockNanos + elapsedNanos);
-        if (computerClockNanos < computerIntervalNanos || now.two().lineClearAnimation() != null) {
+        if (computerClockNanos < computerIntervalNanos || now.of(computerSide).lineClearAnimation() != null) {
             return;
         }
         computerClockNanos = 0;
-        computer.nextCommand(now.two().engine()).ifPresent(command -> pending.add(new Input(BattlePlayer.TWO, command)));
+        computer.nextCommand(now.of(computerSide).engine())
+                .ifPresent(command -> pending.add(new Input(computerSide, command)));
     }
 
     /** 큐에 쌓인 입력을 순서대로 전달한다. 결과가 나오면 남은 입력은 버린다. */
@@ -390,7 +400,8 @@ public final class BattleScreen implements Screen {
             frame.shade();
             drawOutcomeTags(frame, result.get());
             drawMenu(frame, resultTitle(result.get(), renderer.nameOf(BattlePlayer.ONE), renderer.nameOf(BattlePlayer.TWO)),
-                    scoreLine(result.get(), renderer.nameOf(BattlePlayer.TWO)), RESULT_ITEMS);
+                    scoreLine(result.get(), renderer.nameOf(BattlePlayer.ONE), renderer.nameOf(BattlePlayer.TWO)),
+                    RESULT_ITEMS);
         } else if (snapshot.status() == BattleStatus.PAUSED) {
             frame.shade();
             drawMenu(frame, "일시정지", null, pauseItems());
@@ -420,8 +431,8 @@ public final class BattleScreen implements Screen {
         };
     }
 
-    private static String scoreLine(BattleResult result, String twoName) {
-        return "1P " + result.scoreOne() + "  :  " + result.scoreTwo() + " " + twoName;
+    private static String scoreLine(BattleResult result, String oneName, String twoName) {
+        return oneName + " " + result.scoreOne() + "  :  " + result.scoreTwo() + " " + twoName;
     }
 
     /** 각 보드 위쪽에 승리·패배를 표시한다. */

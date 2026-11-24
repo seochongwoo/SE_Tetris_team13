@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 import team.tetris.application.ApplicationContext;
+import team.tetris.application.battle.BattlePlayer;
 import team.tetris.application.EndGameView;
 import team.tetris.application.GameResult;
 import team.tetris.application.debug.DebugSetup;
@@ -158,11 +159,11 @@ public final class ScreenRouter {
                 new MenuItem("뒤로", this::showMenu));
     }
 
-    /** 컴퓨터 대전의 모드 선택: 일반 / 아이템. */
+    /** 컴퓨터 대전의 모드 선택: 일반 / 아이템. 고른 뒤 내가 할 쪽(1P·2P)을 고른다. */
     public List<MenuItem> computerModeItems() {
         return List.of(
-                new MenuItem("일반 대전", () -> startComputerBattle(GameMode.NORMAL)),
-                new MenuItem("아이템 대전", () -> startComputerBattle(GameMode.ITEM)),
+                new MenuItem("일반 대전", () -> showComputerSides(GameMode.NORMAL)),
+                new MenuItem("아이템 대전", () -> showComputerSides(GameMode.ITEM)),
                 new MenuItem("뒤로", this::showBattleModes));
     }
 
@@ -170,9 +171,27 @@ public final class ScreenRouter {
         show(new MenuScreen(this, "컴퓨터 대전", computerModeItems(), this::showBattleModes, 0));
     }
 
-    /** 2P를 컴퓨터가 조작하는 대전 (도전 과제 CH-1). 키를 누르는 간격은 설정의 난이도를 따른다. */
-    public void startComputerBattle(GameMode mode) {
-        show(new BattleScreen(this, application.newLocalBattle(mode, null), true));
+    /**
+     * 컴퓨터 대전에서 내가 할 쪽. 1P는 왼쪽 보드와 1P 대전 키, 2P는 오른쪽 보드와 2P 대전 키를 쓴다. 로컬 대전이나
+     * P2P에서 쓸 자리와 키로 미리 연습할 수 있다. 메뉴 상자가 좁아 키 이름은 게임 화면 아래에서 보여 준다.
+     */
+    public List<MenuItem> computerSideItems(GameMode mode) {
+        return List.of(
+                new MenuItem("1P · 왼쪽", () -> startComputerBattle(mode, BattlePlayer.ONE)),
+                new MenuItem("2P · 오른쪽", () -> startComputerBattle(mode, BattlePlayer.TWO)),
+                new MenuItem("뒤로", this::showComputerModes));
+    }
+
+    public void showComputerSides(GameMode mode) {
+        show(new MenuScreen(this, "내 자리 선택", computerSideItems(mode), this::showComputerModes, 0));
+    }
+
+    /**
+     * human 쪽은 사람이, 반대쪽은 컴퓨터가 조작하는 대전 (도전 과제 CH-1). 컴퓨터의 실력과 키를 누르는 간격은
+     * 설정의 난이도를 따른다.
+     */
+    public void startComputerBattle(GameMode mode, BattlePlayer human) {
+        show(new BattleScreen(this, application.newLocalBattle(mode, null), human.opponent()));
         debugSetupHistory.clear();
     }
 

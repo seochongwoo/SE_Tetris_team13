@@ -59,15 +59,24 @@ class ComputerBattleTest {
 
         tap(KeyNames.DOWN);
         tap(KeyNames.ENTER);
+        MenuScreen sides = assertInstanceOf(MenuScreen.class, router.current());
+        assertEquals("내 자리 선택", sides.heading().orElseThrow());
+        String sideText = router.render().text();
+        assertTrue(sideText.contains("1P · 왼쪽") && sideText.contains("2P · 오른쪽"), sideText);
+        tap(KeyNames.ENTER);
 
         assertTrue(battle().againstComputer());
+        assertEquals(java.util.Optional.of(BattlePlayer.TWO), battle().computerSide());
         assertEquals(GameMode.ITEM, snapshot().mode());
         String text = router.render().text();
         assertTrue(text.contains(BattleRenderer.COMPUTER_LABEL), text);
         assertTrue(text.contains("컴퓨터가 0.75초마다 키를 누릅니다"), text);
         assertFalse(router.render().rowText(BattleRenderer.ROWS - 1).contains("낙하  ←"), "2P 키 안내 대신 컴퓨터 안내");
 
-        router.showComputerModes();
+        router.showComputerSides(GameMode.NORMAL);
+        tap(KeyNames.UP);
+        tap(KeyNames.ENTER);
+        assertEquals("컴퓨터 대전", ((MenuScreen) router.current()).heading().orElseThrow());
         tap(KeyNames.UP);
         tap(KeyNames.ENTER);
         assertInstanceOf(MenuScreen.class, router.current());
@@ -76,7 +85,7 @@ class ComputerBattleTest {
 
     @Test
     void theComputerMovesTheSecondBoardOneKeyPerIntervalAndIgnoresThe2pKeys() {
-        router.startComputerBattle(GameMode.NORMAL);
+        router.startComputerBattle(GameMode.NORMAL, BattlePlayer.ONE);
         long interval = ComputerPlayer.intervalNanos(snapshot().difficulty());
         Position start = snapshot().two().engine().activePiece().origin();
         int rotation = snapshot().two().engine().activePiece().rotation();
@@ -104,7 +113,7 @@ class ComputerBattleTest {
 
     @Test
     void theComputerOutlastsAnIdlePlayerAndClearsLines() {
-        router.startComputerBattle(GameMode.NORMAL);
+        router.startComputerBattle(GameMode.NORMAL, BattlePlayer.ONE);
         assertEquals(Difficulty.NORMAL, snapshot().difficulty());
 
         run(15L * 60 * 1_000_000_000L);
@@ -120,7 +129,7 @@ class ComputerBattleTest {
 
     @Test
     void thePauseMenuOffersOneForfeitAndARematchStaysAgainstTheComputer() {
-        router.startComputerBattle(GameMode.ITEM);
+        router.startComputerBattle(GameMode.ITEM, BattlePlayer.ONE);
         tap(battle().keys().pauseKey());
         assertEquals(BattleStatus.PAUSED, snapshot().status());
         assertEquals(BattleScreen.COMPUTER_PAUSE_ITEMS, battle().pauseItems());
@@ -147,7 +156,7 @@ class ComputerBattleTest {
 
     @Test
     void pauseMenuItemsOfTheComputerBattleEachDoTheirJob() {
-        router.startComputerBattle(GameMode.NORMAL);
+        router.startComputerBattle(GameMode.NORMAL, BattlePlayer.ONE);
         tap(battle().keys().pauseKey());
         tap(KeyNames.ENTER);
         assertEquals(BattleStatus.RUNNING, snapshot().status(), "재개");
@@ -158,7 +167,7 @@ class ComputerBattleTest {
         tap(KeyNames.ENTER);
         assertInstanceOf(MenuScreen.class, router.current());
 
-        router.startComputerBattle(GameMode.NORMAL);
+        router.startComputerBattle(GameMode.NORMAL, BattlePlayer.ONE);
         tap(battle().keys().pauseKey());
         tap(KeyNames.UP);
         tap(KeyNames.ENTER);
@@ -169,9 +178,66 @@ class ComputerBattleTest {
     void onHardTheComputerPressesEveryHalfSecondAndSaysItLooksAtTheNextPiece() throws Exception {
         app.settings().update(team.tetris.application.model.Settings.defaults().withDifficulty(Difficulty.HARD));
         ScreenRouter hard = app.router();
-        hard.startComputerBattle(GameMode.NORMAL);
+        hard.startComputerBattle(GameMode.NORMAL, BattlePlayer.ONE);
         String help = hard.render().rowText(BattleRenderer.ROWS - 1);
         assertTrue(help.contains("컴퓨터가 0.5초마다 누르고 NEXT까지 봄"), help);
         assertFalse(help.contains("~"), "잘리지 않는다");
+    }
+
+    @Test
+    void playingAs2pPutsTheComputerOnTheLeftAndUsesThe2pKeys() {
+        router.showComputerSides(GameMode.ITEM);
+        tap(KeyNames.DOWN);
+        tap(KeyNames.ENTER);
+        assertEquals(java.util.Optional.of(BattlePlayer.ONE), battle().computerSide());
+        assertEquals(GameMode.ITEM, snapshot().mode());
+
+        // 왼쪽 이름이 컴퓨터이고, 왼쪽 아래에 조작 키 대신 컴퓨터 안내가 나온다.
+        var frame = router.render();
+        assertTrue(frame.rowText(1).substring(0, BattleRenderer.leftOf(BattlePlayer.TWO)).contains("컴퓨터"));
+        String help = frame.rowText(BattleRenderer.ROWS - 1);
+        assertTrue(help.startsWith(" 컴퓨터가 0.75초마다"), help);
+        assertTrue(help.contains("낙하"), "오른쪽에는 2P 키 안내");
+
+        Position one = snapshot().one().engine().activePiece().origin();
+        Position two = snapshot().two().engine().activePiece().origin();
+        tap(battle().keys().keyFor(BattlePlayer.ONE, GameCommand.MOVE_LEFT));
+        assertEquals(one, snapshot().one().engine().activePiece().origin(), "1P 키는 받지 않는다");
+        tap(battle().keys().keyFor(BattlePlayer.TWO, GameCommand.MOVE_LEFT));
+        assertEquals(two.x() - 1, snapshot().two().engine().activePiece().origin().x(), "2P 키로 내 보드를 움직인다");
+
+        // 컴퓨터는 왼쪽 보드를 움직인다.
+        var before = snapshot().one().engine().activePiece();
+        run(2 * ComputerPlayer.intervalNanos(snapshot().difficulty()));
+        assertTrue(before != snapshot().one().engine().activePiece());
+
+        // 기권하면 사람(2P)이 지고, 다시 대전도 같은 자리로 한다.
+        tap(battle().keys().pauseKey());
+        tap(KeyNames.DOWN);
+        tap(KeyNames.ENTER);
+        var result = battle().session().result().orElseThrow();
+        assertEquals(BattlePlayer.ONE, result.winner());
+        String text = router.render().text();
+        assertTrue(text.contains("컴퓨터 승리 (기권승)"), text);
+        assertTrue(text.contains("컴퓨터 " + result.scoreOne() + "  :  " + result.scoreTwo() + " 2P"), text);
+        router.update(BattleScreen.RESULT_INPUT_DELAY_NANOS);
+        tap(KeyNames.ENTER);
+        assertEquals(java.util.Optional.of(BattlePlayer.ONE), battle().computerSide());
+    }
+
+    @Test
+    void theComputerOnTheLeftAlsoBeatsAnIdlePlayer() {
+        router.startComputerBattle(GameMode.NORMAL, BattlePlayer.TWO);
+        run(15L * 60 * 1_000_000_000L);
+        assertEquals(BattlePlayer.ONE, battle().session().result().orElseThrow().winner());
+        assertTrue(snapshot().one().clearedLines() > 0);
+    }
+
+    @Test
+    void twoPeopleStillHaveNoComputer() {
+        router.startBattle(GameMode.NORMAL);
+        assertFalse(battle().againstComputer());
+        assertTrue(battle().computerSide().isEmpty());
+        assertFalse(router.render().text().contains("컴퓨터"));
     }
 }
