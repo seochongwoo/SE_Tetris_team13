@@ -148,13 +148,32 @@ public final class ScreenRouter {
         debugSetupHistory.clear();
     }
 
-    /** 대전 모드 선택: 일반 / 아이템 / 시간제한 (R3-02). */
+    /** 대전 모드 선택: 일반 / 아이템 / 시간제한 (R3-02), 컴퓨터 대전 (도전 과제 CH-1). */
     public List<MenuItem> battleModeItems() {
         return List.of(
                 new MenuItem("일반 대전", () -> startBattle(GameMode.NORMAL)),
                 new MenuItem("아이템 대전", () -> startBattle(GameMode.ITEM)),
                 new MenuItem("시간제한 대전", this::showTimeLimits),
+                new MenuItem("컴퓨터 대전", this::showComputerModes),
                 new MenuItem("뒤로", this::showMenu));
+    }
+
+    /** 컴퓨터 대전의 모드 선택: 일반 / 아이템. */
+    public List<MenuItem> computerModeItems() {
+        return List.of(
+                new MenuItem("일반 대전", () -> startComputerBattle(GameMode.NORMAL)),
+                new MenuItem("아이템 대전", () -> startComputerBattle(GameMode.ITEM)),
+                new MenuItem("뒤로", this::showBattleModes));
+    }
+
+    public void showComputerModes() {
+        show(new MenuScreen(this, "컴퓨터 대전", computerModeItems(), this::showBattleModes, 0));
+    }
+
+    /** 2P를 컴퓨터가 조작하는 대전 (도전 과제 CH-1). 키를 누르는 간격은 설정의 난이도를 따른다. */
+    public void startComputerBattle(GameMode mode) {
+        show(new BattleScreen(this, application.newLocalBattle(mode, null), true));
+        debugSetupHistory.clear();
     }
 
     /** 시간제한 대전에서 고를 수 있는 시간 (안건 ⑪: 1·2·3분, 기본 2분). */

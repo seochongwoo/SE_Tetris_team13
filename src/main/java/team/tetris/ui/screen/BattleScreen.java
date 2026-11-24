@@ -14,6 +14,7 @@ import team.tetris.application.battle.BattleResult;
 import team.tetris.application.battle.BattleSession;
 import team.tetris.application.battle.BattleSnapshot;
 import team.tetris.application.battle.BattleStatus;
+import team.tetris.application.battle.ComputerPlayer;
 import team.tetris.application.battle.StartedBattle;
 import team.tetris.application.model.Settings;
 import team.tetris.ui.ScreenRouter;
@@ -38,6 +39,8 @@ import team.tetris.ui.render.palette.ColorPalette;
  *       두 사람이 같이 쓰므로 메뉴에서 기권할 플레이어를 고르게 하고, 승패 없이 그만두는 항목도 둔다.</li>
  *   <li>결과가 나오면 승자를 보여 준 뒤 다시 대전 / 메뉴로 / 프로그램 종료를 고른다. 기록은 남기지 않는다
  *       (R3-12, R3-13, H3-14).</li>
+ *   <li>컴퓨터 대전(도전 과제 CH-1)이면 2P는 {@link ComputerPlayer}가 정해진 간격마다 키 하나씩 넣는다.
+ *       사람의 2P 키는 무시하고, 기권 항목은 1P 하나만 둔다.</li>
  * </ul>
  */
 public final class BattleScreen implements Screen {
@@ -45,6 +48,7 @@ public final class BattleScreen implements Screen {
     /** 결과가 나온 직후 조작 키가 그대로 결과 메뉴를 고르지 않도록 잠시 입력을 받지 않는다. */
     static final long RESULT_INPUT_DELAY_NANOS = 800_000_000L;
     static final List<String> PAUSE_ITEMS = List.of("재개", "1P 기권", "2P 기권", "그만두고 메뉴로", "프로그램 종료");
+    static final List<String> COMPUTER_PAUSE_ITEMS = List.of("재개", "기권", "그만두고 메뉴로", "프로그램 종료");
     static final List<String> RESULT_ITEMS = List.of("다시 대전", "메뉴로", "프로그램 종료");
     private static final int RESUME_ITEM = 0;
     private static final int FORFEIT_ONE_ITEM = 1;
@@ -71,19 +75,36 @@ public final class BattleScreen implements Screen {
     private int cursor;
     private boolean resultSeen;
     private boolean left;
+    /** 2P를 조작하는 컴퓨터. 두 사람이 하는 대전이면 null. */
+    private final ComputerPlayer computer;
+    private final long computerIntervalNanos;
+    /** 컴퓨터가 마지막으로 키를 누른 뒤 흐른 진행 시간. 정지 중에는 흐르지 않는다. */
+    private long computerClockNanos;
 
     public BattleScreen(ScreenRouter router, StartedBattle started) {
-        this(router, started, new RepeatController());
+        this(router, started, false);
+    }
+
+    /** @param againstComputer true면 2P를 컴퓨터가 조작한다 (도전 과제 CH-1) */
+    public BattleScreen(ScreenRouter router, StartedBattle started, boolean againstComputer) {
+        this(router, started, new RepeatController(), againstComputer);
     }
 
     BattleScreen(ScreenRouter router, StartedBattle started, RepeatController repeats) {
+        this(router, started, repeats, false);
+    }
+
+    BattleScreen(ScreenRouter router, StartedBattle started, RepeatController repeats, boolean againstComputer) {
         this.router = Objects.requireNonNull(router, "router");
         this.session = started.session();
         Settings settings = started.settings().value();
         this.keys = BattleKeys.from(settings);
         this.repeats = repeats;
         this.palette = ColorPalette.of(settings.colorBlindMode());
-        this.renderer = new BattleRenderer(palette, keys);
+        this.computer = againstComputer ? new ComputerPlayer() : null;
+        this.computerIntervalNanos = ComputerPlayer.intervalNanos(session.snapshot().difficulty());
+        this.renderer = new BattleRenderer(palette, keys, againstComputer
+                ? "컴퓨터가 " + seconds(computerIntervalNanos) + "초마다 키를 누릅니다" : null);
         this.settingsWarning = started.settings().error().isPresent()
                 ? "설정을 읽지 못해 기본값으로 진행합니다" : null;
         for (BattlePlayer player : BattlePlayer.values()) {
@@ -103,6 +124,21 @@ public final class BattleScreen implements Screen {
 
     public BattleKeys keys() {
         return keys;
+    }
+
+    /** 2P를 컴퓨터가 조작하는지. */
+    public boolean againstComputer() {
+        return computer != null;
+    }
+
+    /** 일시정지 메뉴 항목. 컴퓨터 대전에서는 기권할 사람이 1P뿐이다. */
+    List<String> pauseItems() {
+        return computer != null ? COMPUTER_PAUSE_ITEMS : PAUSE_ITEMS;
+    }
+
+    /** 0.75 → "0.75", 1.0 → "1". */
+    private static String seconds(long nanos) {
+        return java.math.BigDecimal.valueOf(nanos, 9).stripTrailingZeros().toPlainString();
     }
 
     // ---- 입력 ----
@@ -132,7 +168,7 @@ public final class BattleScreen implements Screen {
             return;
         }
         Optional<BattleKeys.Binding> binding = keys.bindingFor(key);
-        if (binding.isEmpty()) {
+        if (binding.isEmpty() || (computer != null && binding.get().player() == BattlePlayer.TWO)) {
             return;
         }
         GameCommand command = binding.get().command();
@@ -151,11 +187,20 @@ public final class BattleScreen implements Screen {
         } else if (key.equals(keys.resumeKey()) || key.equals(keys.menuKey())) {
             pending.add(new Input(BattlePlayer.ONE, GameCommand.RESUME));
         } else {
-            moveCursor(key, PAUSE_ITEMS.size());
+            moveCursor(key, pauseItems().size());
         }
     }
 
     private void choosePauseItem() {
+        if (computer != null) {
+            switch (cursor) {
+                case 0 -> pending.add(new Input(BattlePlayer.ONE, GameCommand.RESUME));
+                case 1 -> pending.add(new Input(BattlePlayer.ONE, GameCommand.QUIT_GAME));
+                case 2 -> leave(router::showMenu);
+                default -> leave(router::exit);
+            }
+            return;
+        }
         switch (cursor) {
             case RESUME_ITEM -> pending.add(new Input(BattlePlayer.ONE, GameCommand.RESUME));
             case FORFEIT_ONE_ITEM -> pending.add(new Input(BattlePlayer.ONE, GameCommand.QUIT_GAME));
@@ -184,8 +229,12 @@ public final class BattleScreen implements Screen {
     /** 같은 모드·같은 시간제한으로 새 대전. */
     private void rematch() {
         BattleSnapshot last = session.snapshot();
-        router.startBattle(last.mode(),
-                last.timer() == null ? null : java.time.Duration.ofNanos(last.timer().limitNanos()));
+        java.time.Duration limit = last.timer() == null ? null : java.time.Duration.ofNanos(last.timer().limitNanos());
+        if (computer != null) {
+            router.startComputerBattle(last.mode());
+        } else {
+            router.startBattle(last.mode(), limit);
+        }
     }
 
     /** 메뉴 선택: Enter 또는 Space. 두 사람 누구나 고를 수 있다. */
@@ -254,8 +303,10 @@ public final class BattleScreen implements Screen {
         if (now.status() == BattleStatus.RUNNING) {
             for (String key : repeats.due(clockNanos)) {
                 keys.bindingFor(key).filter(binding -> InputMapper.isRepeatable(binding.command()))
+                        .filter(binding -> computer == null || binding.player() == BattlePlayer.ONE)
                         .ifPresent(binding -> pending.add(new Input(binding.player(), binding.command())));
             }
+            pressComputerKey(now, elapsedNanos);
             for (BattlePlayer player : BattlePlayer.values()) {
                 if (now.of(player).lineClearAnimation() == null) {
                     // 연출 중에 보관한 조작을 이번 프레임의 새 입력보다 먼저 전달한다.
@@ -268,6 +319,22 @@ public final class BattleScreen implements Screen {
         if (session.result().isPresent()) {
             showResult(0);
         }
+    }
+
+    /**
+     * 진행 중에 시간이 간격만큼 흐르면 컴퓨터가 키 하나를 누른다. 줄 삭제 연출 중에는 기다렸다가 연출이 끝나면
+     * 바로 누른다. 한 프레임이 길어도 한 번만 눌러 사람처럼 한 번에 한 키씩 넣는다.
+     */
+    private void pressComputerKey(BattleSnapshot now, long elapsedNanos) {
+        if (computer == null) {
+            return;
+        }
+        computerClockNanos = Math.min(computerIntervalNanos, computerClockNanos + elapsedNanos);
+        if (computerClockNanos < computerIntervalNanos || now.two().lineClearAnimation() != null) {
+            return;
+        }
+        computerClockNanos = 0;
+        computer.nextCommand(now.two().engine()).ifPresent(command -> pending.add(new Input(BattlePlayer.TWO, command)));
     }
 
     /** 큐에 쌓인 입력을 순서대로 전달한다. 결과가 나오면 남은 입력은 버린다. */
@@ -321,15 +388,20 @@ public final class BattleScreen implements Screen {
         if (result.isPresent()) {
             frame.shade();
             drawOutcomeTags(frame, result.get());
-            drawMenu(frame, resultTitle(result.get()), scoreLine(result.get()), RESULT_ITEMS);
+            drawMenu(frame, resultTitle(result.get(), renderer.nameOf(BattlePlayer.ONE), renderer.nameOf(BattlePlayer.TWO)),
+                    scoreLine(result.get(), renderer.nameOf(BattlePlayer.TWO)), RESULT_ITEMS);
         } else if (snapshot.status() == BattleStatus.PAUSED) {
             frame.shade();
-            drawMenu(frame, "일시정지", null, PAUSE_ITEMS);
+            drawMenu(frame, "일시정지", null, pauseItems());
         }
         return frame;
     }
 
     static String resultTitle(BattleResult result) {
+        return resultTitle(result, "1P", "2P");
+    }
+
+    static String resultTitle(BattleResult result, String oneName, String twoName) {
         if (result.end() == BattleEnd.ABORTED) {
             return "대전 중단";
         }
@@ -339,7 +411,7 @@ public final class BattleScreen implements Screen {
         if (result.draw()) {
             return "무승부";
         }
-        String winner = result.winner() == BattlePlayer.ONE ? "1P" : "2P";
+        String winner = result.winner() == BattlePlayer.ONE ? oneName : twoName;
         return switch (result.end()) {
             case FORFEIT -> winner + " 승리 (기권승)";
             case TIME_UP -> "시간 종료 · " + winner + " 승리!";
@@ -347,8 +419,8 @@ public final class BattleScreen implements Screen {
         };
     }
 
-    private static String scoreLine(BattleResult result) {
-        return "1P " + result.scoreOne() + "  :  " + result.scoreTwo() + " 2P";
+    private static String scoreLine(BattleResult result, String twoName) {
+        return "1P " + result.scoreOne() + "  :  " + result.scoreTwo() + " " + twoName;
     }
 
     /** 각 보드 위쪽에 승리·패배를 표시한다. */
