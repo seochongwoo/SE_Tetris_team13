@@ -11,7 +11,10 @@ import team.tetris.ui.render.P2pRenderer;
 import team.tetris.ui.render.TextFrame;
 import team.tetris.ui.render.TextStyle;
 
-/** 키보드만으로 접속·설정·준비가 가능한 Swing 독립 로비. */
+/**
+ * 키보드만으로 접속·설정·준비가 가능한 Swing 독립 로비. 연결된 로비에서는 Tab으로 채팅 입력을 열어 상대와
+ * 짧은 메시지를 주고받는다 (도전 과제 CH-2). 채팅을 입력하는 동안만 OS 입력기를 켜 한글을 쓸 수 있다.
+ */
 public final class P2pLobbyScreen implements Screen {
     private final ScreenRouter router;
     private final P2pLobby lobby;
@@ -26,6 +29,13 @@ public final class P2pLobbyScreen implements Screen {
     private boolean failureShown;
     private long failureElapsed;
     private long clockNanos;
+    /** 채팅 입력 줄이 열려 있는지. 열려 있는 동안은 글자를 채팅으로 받고 로비 조작 키는 쓰지 않는다. */
+    private boolean chatOpen;
+    private String chatInput = "";
+    /** 채팅 입력의 최대 화면 폭. "상대: "를 붙여도 한 줄에 들어간다. */
+    static final int CHAT_INPUT_WIDTH = 30;
+    /** 채팅 창에 보여 주는 최근 메시지 줄 수 (최근 IP 경고가 있으면 한 줄 적다). */
+    static final int CHAT_ROWS = chatRows(21);
 
     public P2pLobbyScreen(ScreenRouter router, P2pLobby lobby) {
         this.router = router;
@@ -33,8 +43,44 @@ public final class P2pLobbyScreen implements Screen {
     }
     public P2pLobby lobby() { return lobby; }
     public String input() { return input; }
+    public boolean chatOpen() { return chatOpen; }
+    public String chatInput() { return chatInput; }
+
+    @Override public boolean acceptsTextInput() { return chatOpen; }
+
+    /** 채팅 입력 중의 키: Enter 보내기, Esc 닫기, Backspace 지우기. 다른 키는 무시한다. */
+    private void chatKey(String key) {
+        switch (key) {
+            case "ENTER" -> {
+                lobby.sendChat(chatInput);
+                closeChat();
+            }
+            case "ESCAPE" -> closeChat();
+            case KeyNames.BACK_SPACE -> {
+                if (!chatInput.isEmpty()) {
+                    chatInput = chatInput.substring(0, chatInput.offsetByCodePoints(chatInput.length(), -1));
+                }
+            }
+            default -> { }
+        }
+    }
+
+    private void closeChat() {
+        chatOpen = false;
+        chatInput = "";
+        router.ignoreHeldKeys();
+    }
 
     @Override public void onKeyPressed(String key) {
+        if (chatOpen) {
+            chatKey(key);
+            return;
+        }
+        if (key.equals("TAB") && lobby.canChat()) {
+            chatOpen = true;
+            chatInput = "";
+            return;
+        }
         if (key.equals("ESCAPE")) {
             if (clientEntry || lobby.stage() != P2pLobby.Stage.CHOICE) {
                 lobby.reset(); clientEntry = false; error = ""; addressPage = 0;
@@ -108,6 +154,11 @@ public final class P2pLobbyScreen implements Screen {
     }
 
     @Override public void onCharTyped(char value) {
+        if (chatOpen) {
+            String next = chatInput + value;
+            if (!Character.isISOControl(value) && TextFrame.displayWidth(next) <= CHAT_INPUT_WIDTH) chatInput = next;
+            return;
+        }
         if (!clientEntry || lobby.stage() != P2pLobby.Stage.CHOICE || Character.isISOControl(value)) return;
         invalidCharacter = (value < '0' || value > '9') && value != '.';
         if (!invalidCharacter && input.length() < 15) input += value;
@@ -116,6 +167,7 @@ public final class P2pLobbyScreen implements Screen {
     @Override public void update(long elapsedNanos) {
         clockNanos += elapsedNanos;
         lobby.update();
+        if (chatOpen && !lobby.canChat()) closeChat(); // 연결이 끊기거나 경기가 시작되면 입력을 닫는다.
         if (lobby.stage() == P2pLobby.Stage.FAILED) {
             if (failureShown) failureElapsed += Math.min(elapsedNanos, 2_000_000_000L);
             else { failureShown = true; failureElapsed = 0; router.ignoreHeldKeys(); }
@@ -139,6 +191,10 @@ public final class P2pLobbyScreen implements Screen {
         var palette = router.palette();
         var frame = TextFrame.blank(palette.base());
         frame.setBackdrop(Backdrop.cathedral(clockNanos));
+        if (lobby.stage() == P2pLobby.Stage.LOBBY) {
+            renderConnected(frame);
+            return frame;
+        }
         frame.addPlate(1, 0, TextFrame.COLUMNS - 2, 8);
         boolean hasWarning = !lobby.recent().warning().isEmpty();
         int footerTop = hasWarning ? 20 : 21;
@@ -182,25 +238,6 @@ public final class P2pLobbyScreen implements Screen {
                 frame.put(2, 17, "↑↓ 주소 페이지 " + (addressPage + 1) + "/" + ((addresses.size() + 4) / 5), palette.base());
             }
             frame.put(2, 18, "같은 PC 테스트: 127.0.0.1", palette.base());
-        } else if (lobby.stage() == P2pLobby.Stage.LOBBY) {
-            frame.addPlate(1, 8, TextFrame.COLUMNS - 2, bodyRows);
-            boolean server = lobby.isServer();
-            lobby.configuration().ifPresent(config -> {
-                optionRow(frame, 9, "모드", MODE_NAMES, config.mode().ordinal(), server);
-                optionRow(frame, 10, "난이도", DIFFICULTY_NAMES, config.difficulty().ordinal(), server);
-                if (config.mode() == Mode.TIMED) {
-                    optionRow(frame, 11, "제한시간", TIME_NAMES, config.timeLimitSeconds() / 60 - 1, server);
-                }
-            });
-            frame.put(2, 13, "나: " + (lobby.localReady() ? "준비 완료" : "대기"), lobby.localReady() ? palette.accentStyle() : palette.base());
-            frame.put(2, 14, "상대: " + (lobby.remoteReady() ? "준비 완료" : "대기"), lobby.remoteReady() ? palette.accentStyle() : palette.base());
-            if (server) {
-                boolean timed = lobby.configuration().filter(config -> config.mode() == Mode.TIMED).isPresent();
-                frame.put(2, 16, "←→ 모드 · ↑↓ 난이도" + (timed ? " · < > 제한시간" : ""), palette.dimStyle());
-                frame.put(2, 17, "설정을 바꾸면 양쪽 준비가 해제됩니다", palette.dimStyle());
-            } else frame.put(2, 17, "서버가 경기 설정을 선택합니다", palette.dimStyle());
-            frame.putCentered(18, lobby.localReady() ? "상대가 게임 시작을 누르면 시작합니다" : "Enter 게임 시작",
-                    lobby.localReady() ? palette.base() : palette.accentStyle());
         } else if (lobby.stage() == P2pLobby.Stage.STARTED) {
             frame.addPlate(8, 10, 28, 5);
             frame.putCentered(11, "양쪽 준비 완료", palette.base());
@@ -247,6 +284,109 @@ public final class P2pLobbyScreen implements Screen {
             col = frame.put(col, row, text, style) + 1;
         }
     }
+
+    /** 연결된 로비의 머리 상자 높이. 설정 상자와 채팅 창이 그 아래에 이어진다. */
+    static final int HEADER_ROWS = 5;
+    static final int SETTINGS_TOP = HEADER_ROWS;
+    static final int CHAT_TOP = 12;
+
+    /**
+     * 연결된 로비: 위쪽 제목·연결 상태, 가운데 경기 설정과 준비 상태, 아래쪽 채팅 창 (도전 과제 CH-2).
+     * 채팅 창은 제목 줄, 최근 메시지, 입력 줄로 나눈다. 이름표는 P2P 경기 화면과 같이 나는 1P 색, 상대는 2P 색이다.
+     */
+    private void renderConnected(TextFrame frame) {
+        var palette = router.palette();
+        boolean hasWarning = !lobby.recent().warning().isEmpty();
+        int footerTop = hasWarning ? 20 : 21;
+        int width = TextFrame.COLUMNS - 2;
+        frame.addPlate(1, 0, width, HEADER_ROWS);
+        frame.addPlate(1, SETTINGS_TOP, width, CHAT_TOP - SETTINGS_TOP);
+        frame.addPlate(1, CHAT_TOP, width, footerTop - CHAT_TOP);
+        frame.addPlate(1, footerTop, width, TextFrame.ROWS - footerTop);
+
+        frame.putCentered(1, "P2P 대전 로비", palette.accentStyle());
+        frame.putCentered(2, lobby.status(), palette.base());
+        frame.put(3, 3, "포트 " + P2pLobby.PORT, palette.dimStyle());
+        P2pRenderer.drawLatency(frame, palette, lobby.roundTripNanos(), lobby.lagging(), 3, TextFrame.COLUMNS - 3);
+
+        boolean server = lobby.isServer();
+        lobby.configuration().ifPresent(config -> {
+            optionRow(frame, SETTINGS_TOP + 1, "모드", MODE_NAMES, config.mode().ordinal(), server);
+            optionRow(frame, SETTINGS_TOP + 2, "난이도", DIFFICULTY_NAMES, config.difficulty().ordinal(), server);
+            if (config.mode() == Mode.TIMED) {
+                optionRow(frame, SETTINGS_TOP + 3, "제한시간", TIME_NAMES, config.timeLimitSeconds() / 60 - 1, server);
+            }
+            String help = server ? "←→ 모드 · ↑↓ 난이도" + (config.mode() == Mode.TIMED ? " · < > 제한시간" : "")
+                    : "서버가 경기 설정을 선택합니다";
+            frame.put(3, SETTINGS_TOP + 4, help, palette.dimStyle());
+        });
+        int col = readyBadge(frame, 3, SETTINGS_TOP + 5, "나", 0, lobby.localReady());
+        readyBadge(frame, col + 4, SETTINGS_TOP + 5, "상대", 1, lobby.remoteReady());
+
+        drawChat(frame, footerTop);
+
+        String hint = chatOpen ? "Enter 보내기 · Esc 닫기 · 한/영 한글"
+                : lobby.localReady() ? "상대가 게임 시작을 누르면 시작합니다"
+                : "Enter 게임 시작 · Tab 채팅 · Esc 나가기";
+        if (hasWarning) {
+            frame.put(2, 21, lobby.recent().warning(), palette.warningStyle());
+        }
+        frame.putCentered(22, hint, chatOpen || !lobby.localReady() ? palette.accentStyle() : palette.base());
+    }
+
+    /** "나 ● 준비 완료"처럼 이름(플레이어 색)과 준비 상태를 그린다. 끝난 열을 돌려준다. */
+    private int readyBadge(TextFrame frame, int col, int row, String name, int player, boolean ready) {
+        var palette = router.palette();
+        col = frame.put(col, row, name, palette.playerStyle(player).asBold()) + 1;
+        col = frame.put(col, row, ready ? "●" : "○", ready ? palette.accentStyle() : palette.dimStyle()) + 1;
+        return frame.put(col, row, ready ? "준비 완료" : "대기 중", ready ? palette.accentStyle() : palette.dimStyle());
+    }
+
+    /**
+     * 채팅 창. 제목 줄 아래에 최근 메시지를 쌓고, 맨 아래 줄은 입력 줄이다. 입력 중이면 입력 줄을 강조 막대로
+     * 칠하고 커서를 깜빡인다.
+     */
+    private void drawChat(TextFrame frame, int footerTop) {
+        var palette = router.palette();
+        int titleRow = CHAT_TOP + 1;
+        int inputRow = footerTop - 2;
+        int firstRow = titleRow + 1;
+        int rows = chatRows(footerTop);
+        frame.put(3, titleRow, "채팅", palette.accentStyle());
+        frame.putRight(TextFrame.COLUMNS - 3, titleRow, chatOpen ? "입력 중" : "Tab 입력", palette.dimStyle());
+
+        var lines = lobby.chat();
+        if (lines.isEmpty()) {
+            frame.putCentered(firstRow + rows / 2, "아직 메시지가 없습니다", palette.dimStyle());
+        }
+        int first = Math.max(0, lines.size() - rows);
+        for (int i = first; i < lines.size(); i++) {
+            var line = lines.get(i);
+            int row = firstRow + i - first;
+            String name = line.mine() ? "나" : "상대";
+            int col = frame.put(3, row, name, palette.playerStyle(line.mine() ? 0 : 1).asBold());
+            frame.put(col + 1, row, team.tetris.ui.render.BattleRenderer.clipText(line.text(),
+                    TextFrame.COLUMNS - 4 - col), palette.base());
+        }
+
+        if (chatOpen) {
+            var bar = palette.highlightStyle();
+            frame.fill(2, inputRow, TextFrame.COLUMNS - 4, 1, bar);
+            boolean cursorOn = (clockNanos / CURSOR_BLINK_NANOS) % 2 == 0;
+            frame.put(3, inputRow, "› " + chatInput + (cursorOn ? "▏" : " "), bar);
+        } else {
+            frame.put(3, inputRow, lobby.canChat() ? "Tab을 눌러 메시지 입력" : "연결되면 채팅할 수 있습니다",
+                    palette.dimStyle());
+        }
+    }
+
+    /** 채팅 창에 보이는 메시지 줄 수: 제목 줄과 입력 줄, 그 사이 빈 줄을 뺀 나머지. */
+    static int chatRows(int footerTop) {
+        return footerTop - 2 - 1 - (CHAT_TOP + 2);
+    }
+
+    /** 입력 줄 커서가 깜빡이는 반주기. */
+    static final long CURSOR_BLINK_NANOS = 500_000_000L;
 
     private static void wrapped(TextFrame frame, int row, String text, TextStyle style, int rows) {
         StringBuilder line = new StringBuilder();

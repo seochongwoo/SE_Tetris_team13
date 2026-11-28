@@ -6,7 +6,8 @@ import team.tetris.application.model.Difficulty;
 
 /** 통신용 불변 값. 엔진 객체나 Java 직렬화를 전송하지 않는다. 필드·상태 계약은 docs/network-protocol.md. */
 public sealed interface MatchMessage {
-    int PROTOCOL_VERSION = 3;
+    /** 4: 로비 채팅 CHAT 추가 (도전 과제 CH-2). */
+    int PROTOCOL_VERSION = 4;
 
     enum Role { SERVER, CLIENT }
     enum Mode { NORMAL, ITEM, TIMED }
@@ -77,6 +78,22 @@ public sealed interface MatchMessage {
         }
     }
     record Leave() implements MatchMessage {}
+
+    /**
+     * 로비 채팅 한 줄 (도전 과제 CH-2). 앞뒤 공백을 뺀 1~{@value #MAX_CHAT_LENGTH}글자이고 줄바꿈 같은 제어 문자는
+     * 넣을 수 없다.
+     */
+    record Chat(String text) implements MatchMessage {
+        public static final int MAX_CHAT_LENGTH = 30;
+
+        public Chat {
+            Objects.requireNonNull(text);
+            text = text.strip();
+            if (text.isEmpty() || text.codePointCount(0, text.length()) > MAX_CHAT_LENGTH
+                    || text.codePoints().anyMatch(Character::isISOControl))
+                throw new IllegalArgumentException("Invalid chat text");
+        }
+    }
     record Ping(long id) implements MatchMessage {
         public Ping { positive(id, "ping id"); }
     }

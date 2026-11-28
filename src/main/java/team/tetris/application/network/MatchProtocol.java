@@ -28,7 +28,7 @@ public final class MatchProtocol {
         MatchMessage message = envelope.message();
         if (message instanceof Hello || message instanceof Ping || message instanceof Pong)
             return Decision.WRONG_STATE; // 핸드셰이크/heartbeat는 어댑터가 소비한다.
-        boolean lobby = message instanceof Lobby || message instanceof Ready;
+        boolean lobby = message instanceof Lobby || message instanceof Ready || message instanceof Chat;
         if (lobby ? envelope.matchId() != 0
                 : message instanceof Start ? envelope.matchId() <= matchId
                 : envelope.matchId() != (phase == Phase.LOBBY ? 0 : matchId))
@@ -94,6 +94,8 @@ public final class MatchProtocol {
             case Result ignored -> sender != Role.SERVER ? Decision.WRONG_SENDER
                     : !inMatch() ? Decision.WRONG_STATE : Decision.ACCEPTED;
             case Leave ignored -> phase == Phase.LOBBY ? Decision.WRONG_STATE : Decision.ACCEPTED;
+            // 채팅은 경기 전 로비에서만 주고받는다. 경기 중에 늦게 도착한 채팅은 버린다.
+            case Chat ignored -> phase == Phase.LOBBY ? Decision.ACCEPTED : Decision.WRONG_STATE;
             default -> Decision.WRONG_STATE;
         };
     }

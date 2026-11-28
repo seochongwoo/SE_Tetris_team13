@@ -149,6 +149,11 @@ public final class BattleRenderer {
         frame.put(left, HELP_ROW, clip(text, limit), new TextStyle(style.foreground(), style.background(), false));
     }
 
+    /** 화면 폭 기준으로 width칸까지만 남긴다. 잘렸으면 끝을 ~로 표시한다. 다른 화면도 같은 방식으로 자른다. */
+    public static String clipText(String text, int width) {
+        return clip(text, width);
+    }
+
     /** 화면 폭 기준으로 width칸까지만 남긴다. 잘렸으면 끝을 ~로 표시한다. */
     static String clip(String text, int width) {
         if (TextFrame.displayWidth(text) <= width) {

@@ -14,6 +14,10 @@ public final class P2pLobby implements AutoCloseable {
     public static final int PORT = 21313;
     public enum Stage { CHOICE, CONNECTING, LOBBY, STARTED, FAILED, CLOSED }
     public record StartedMatch(MatchConnection connection, Lobby configuration, long matchId, long pieceSeed) {}
+    /** 채팅 한 줄. mine이면 내가 보낸 것. */
+    public record ChatLine(boolean mine, String text) {}
+    /** 로비가 기억하는 최근 채팅 수. 화면은 그중 마지막 몇 줄만 보여 준다. */
+    public static final int CHAT_HISTORY = 20;
 
     private final Supplier<MatchTransport> transports;
     private final Supplier<List<String>> localAddresses;
@@ -30,6 +34,8 @@ public final class P2pLobby implements AutoCloseable {
     private String status;
     private List<String> addresses = List.of();
     private StartedMatch started;
+    /** 이번 연결에서 주고받은 채팅. 경기를 하고 돌아와도 남고, 새로 연결하면 비운다. */
+    private final java.util.ArrayDeque<ChatLine> chat = new java.util.ArrayDeque<>();
 
     public P2pLobby(Supplier<MatchTransport> transports, Supplier<List<String>> localAddresses,
                     RecentIps recent, Difficulty difficulty, LongSupplier seeds) {
@@ -60,6 +66,36 @@ public final class P2pLobby implements AutoCloseable {
         return connection == null ? OptionalLong.empty() : connection.transport().roundTripNanos();
     }
     public boolean lagging() { return connection != null && connection.transport().lagging(); }
+    public List<ChatLine> chat() { return List.copyOf(chat); }
+
+    /** 채팅을 보낼 수 있는지: 연결되어 경기 설정을 받은 로비에서만 (도전 과제 CH-2). */
+    public boolean canChat() {
+        return stage == Stage.LOBBY && configuration != null
+                && connection.protocol().phase() == MatchProtocol.Phase.LOBBY;
+    }
+
+    /**
+     * 채팅 한 줄을 보낸다. 보낼 수 없는 때이거나 내용이 비었으면 false. 앞뒤 공백은 빼고, 너무 길면
+     * {@link Chat#MAX_CHAT_LENGTH}글자에서 자른다.
+     */
+    public boolean sendChat(String text) {
+        String trimmed = text == null ? "" : text.strip();
+        if (!canChat() || trimmed.isEmpty()) return false;
+        int end = trimmed.offsetByCodePoints(0, Math.min(Chat.MAX_CHAT_LENGTH, trimmed.codePointCount(0, trimmed.length())));
+        Chat message;
+        try { message = new Chat(trimmed.substring(0, end)); }
+        catch (IllegalArgumentException invalid) { return false; }
+        try { connection.send(0, message); }
+        catch (RuntimeException error) { fail(error.getMessage()); return false; }
+        remember(new ChatLine(true, message.text()));
+        return true;
+    }
+
+    private void remember(ChatLine line) {
+        chat.addLast(line);
+        while (chat.size() > CHAT_HISTORY) chat.removeFirst();
+    }
+
     public int localPort() { return connection == null ? 0 : connection.transport().status().localPort(); }
 
     public void host() {
@@ -111,6 +147,7 @@ public final class P2pLobby implements AutoCloseable {
                 switch (envelope.get().message()) {
                     case Lobby config -> applyConfiguration(config);
                     case Ready ready -> remoteReady = ready.ready();
+                    case Chat message -> remember(new ChatLine(false, message.text()));
                     case Start start -> start(envelope.get().matchId(), start);
                     default -> { }
                 }
@@ -202,6 +239,7 @@ public final class P2pLobby implements AutoCloseable {
         started = null;
         localReady = remoteReady = false;
         addresses = List.of();
+        chat.clear();
         status = "서버 또는 클라이언트를 선택하세요";
     }
 
