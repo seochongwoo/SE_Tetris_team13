@@ -44,12 +44,28 @@ public final class BattleRenderer {
     private final BattleInfoPanel panel;
     private final ColorPalette palette;
     private final BattleKeys keys;
+    /** 컴퓨터가 조작하는 쪽 (도전 과제 CH-1). 두 사람이 하면 null. */
+    private final BattlePlayer computerSide;
+    /** 컴퓨터 쪽 조작 키 대신 보여 줄 안내 문구. */
+    private final String computerNote;
 
     public BattleRenderer(ColorPalette palette, BattleKeys keys) {
+        this(palette, keys, null, null);
+    }
+
+    /**
+     * @param computerSide null이 아니면 그쪽을 컴퓨터가 조작한다. 이름을 "{@value #COMPUTER_LABEL}"로 쓰고
+     *                     그쪽 조작 키 대신 computerNote를 보여 준다
+     */
+    public BattleRenderer(ColorPalette palette, BattleKeys keys, BattlePlayer computerSide, String computerNote) {
         this.palette = palette;
         this.keys = keys;
+        this.computerSide = computerSide;
+        this.computerNote = computerNote;
         panel = new BattleInfoPanel(palette);
     }
+
+    public static final String COMPUTER_LABEL = "컴퓨터";
 
     /** player 영역의 왼쪽 열 (보드 테두리의 왼쪽 열). */
     public static int leftOf(BattlePlayer player) {
@@ -94,12 +110,16 @@ public final class BattleRenderer {
         frame.outline(left, BOARD_TOP, BoardPainter.outerWidth(game.engine().board()[0].length), BOARD_OUTER_HEIGHT,
                 palette.playerStyle(player.ordinal()));
         board.drawNext(frame, game.engine().nextPiece(), left + BattleInfoPanel.INFO_OFFSET, BattleInfoPanel.NEXT_TITLE_ROW);
-        panel.draw(frame, left, label(player), palette.playerStyle(player.ordinal()), game.level(), game.score(), game.clearedLines(),
+        panel.draw(frame, left, nameOf(player), palette.playerStyle(player.ordinal()), game.level(), game.score(), game.clearedLines(),
                 game.doubleScoreClears(), game.engine().board()[0].length, pending);
         drawHelp(frame, player, left);
     }
 
     private void drawHelp(TextFrame frame, BattlePlayer player, int left) {
+        if (player == computerSide) {
+            drawControls(frame, palette, player.ordinal(), left, computerNote);
+            return;
+        }
         String text = controls(KeyNames.display(keys.keyFor(player, GameCommand.MOVE_LEFT)),
                 KeyNames.display(keys.keyFor(player, GameCommand.MOVE_RIGHT)),
                 KeyNames.display(keys.keyFor(player, GameCommand.ROTATE_CW)),
@@ -153,6 +173,11 @@ public final class BattleRenderer {
     /** 초를 m:ss로. */
     static String clock(long seconds) {
         return seconds / 60 + ":" + String.format(java.util.Locale.ROOT, "%02d", seconds % 60);
+    }
+
+    /** 화면에 쓰는 플레이어 이름. 컴퓨터가 조작하는 쪽은 "컴퓨터". */
+    public String nameOf(BattlePlayer player) {
+        return player == computerSide ? COMPUTER_LABEL : label(player);
     }
 
     static String label(BattlePlayer player) {
