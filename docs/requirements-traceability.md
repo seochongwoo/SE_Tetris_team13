@@ -4,8 +4,8 @@
 
 - 상태: ✅ 충족 / 🔄 진행 중 / ❌ 미구현 / ⚠️ 보완 필요
 - 경로는 `src/main/java/team/tetris/` 기준, 테스트는 `src/test/java/team/tetris/` 아래 클래스 이름입니다.
-- 마지막 확인: 2026-11-22, `release/v3.0.0` (`main` PR #66까지 + 카드 21·27 + 버전 3.0.0). 1·2차는 2026-10-23에 원문 PDF(1차 19쪽, 2차 12쪽)와 문장 단위로 대조한 뒤 3차 개발 후 다시 확인했고, 3차는 원문 PDF(14쪽)와 [3차 분석](requirements3-analysis.md)의 ID로 대조
-- 검증 수치: Windows 11·Java 21에서 `clean build jacocoTestReport packageZip` 성공, 테스트 880개 통과, 라인 커버리지 96.19% (5,551 / 5,771줄). `SETetris-3.0.0-windows.zip`을 풀어 `SETetris.exe` 실행 확인 (v2.0.0 때는 575개, 94.8%)
+- 마지막 확인: 2026-11-28, `release/v3.1.0` (`main` PR #71까지, 버전 3.1.0). 2026-11-22 `release/v3.0.0`에서 전체를 재점검했고, 3.1.0은 화면만 바꿔 요구사항 판정은 그대로다. 1·2차는 2026-10-23에 원문 PDF(1차 19쪽, 2차 12쪽)와 문장 단위로 대조한 뒤 3차 개발 후 다시 확인했고, 3차는 원문 PDF(14쪽)와 [3차 분석](requirements3-analysis.md)의 ID로 대조
+- 검증 수치: Windows 11·Java 21에서 `clean build jacocoTestReport packageZip` 성공, 테스트 884개 통과, 라인 커버리지 95.95% (5,655 / 5,894줄). `SETetris-3.1.0-windows.zip`을 풀어 `SETetris.exe` 실행 확인 (v3.0.0 때는 880개, 96.19%, v2.0.0 때는 575개, 94.8%)
 
 ## 1. 1차 요구사항
 
@@ -48,10 +48,10 @@
 | N1-02 | 산출물(코드, 문서, 논의) 추적 관리 (p4, p16) | GitHub 저장소, `docs/`, PR, [프로젝트 진행 기록](project-history.md) | - | ✅ |
 | N1-03 | 이슈와 해결 상황 기록 (p16) | GitHub Issues: 카드 #9~#22·#26, 버그 #27~#35 (`bug` 라벨, 고친 커밋·PR 연결) | - | ✅ |
 | N1-04 | 팀원별 업무 분담 기록 (p16) | 이슈 담당자, GitHub Projects 보드, [백로그 진행 현황](requirements2-backlog.md), [ADR 역할 분담](architecture-decision.md) | - | ✅ |
-| N1-05 | 단위 테스트, 라인 커버리지 50~70% 이상 (p17) | JUnit 5, JaCoCo. 70% 미만이면 build 실패 (`jacocoTestCoverageVerification`) | 전체 880개 | ✅ 96.19% |
+| N1-05 | 단위 테스트, 라인 커버리지 50~70% 이상 (p17) | JUnit 5, JaCoCo. 70% 미만이면 build 실패 (`jacocoTestCoverageVerification`) | 전체 884개 | ✅ 95.95% |
 | N1-06 | 비기능 요구사항 검증 테스트 1개 이상 (p17) | `test/performance` | `ResponsivenessTest` | ✅ |
 | N1-07 | 변경 시마다 테스트를 쉽게 실행하는 체계 (p17) | `gradlew build`(테스트·커버리지 검사 포함), GitHub Actions(`.github/workflows/ci.yml`) | - | ✅ |
-| N1-08 | 배포 패키지를 쉽게 만드는 체계, 아이콘 포함 실행 파일, 명령어 없이 실행 (p18) | `gradlew packageZip` (jpackage, JRE 포함 `SETetris.exe`). 2026-10-23 v2.0.0, 2026-11-01 v2.1.0, 2026-11-22 v3.0.0 생성·실행 확인 | - | ✅ v1.0.0, v2.0.0, v2.1.0, v3.0.0 (GitHub Releases) |
+| N1-08 | 배포 패키지를 쉽게 만드는 체계, 아이콘 포함 실행 파일, 명령어 없이 실행 (p18) | `gradlew packageZip` (jpackage, JRE 포함 `SETetris.exe`). 2026-10-23 v2.0.0, 2026-11-01 v2.1.0, 2026-11-22 v3.0.0, 2026-11-28 v3.1.0 생성·실행 확인 | - | ✅ v1.0.0, v2.0.0, v2.1.0, v3.0.0, v3.1.0 (GitHub Releases) |
 
 ## 2. 2차 요구사항
 
@@ -97,7 +97,7 @@
 | N2-01 | Trello 등으로 진척 상황·할 일 배정 관리, 팀원 생산성 확인 (p11) | GitHub Projects 보드, 이슈 담당자, [백로그 진행 현황](requirements2-backlog.md) | ✅ (평가 전 보드의 담당자·상태 최신화) |
 | N2-02 | Git·GitHub 버전 관리, 브랜치·PR 정책 (p11) | [프로젝트 관리 규칙](project-management.md), PR #1~#8, #23~#25 | ⚠️ PR #1~#8은 GitHub 리뷰 기록 없음. #23~#25부터 상대방 Review(Approve / Request changes → 수정 → Approve) 기록 |
 | N2-03 | 이슈를 GitHub Issue로 등록하고 해결 내역 추적 (p11) | GitHub Issues: 카드 #9~#22·#26 (PR 본문의 `Closes #번호`로 머지 시 자동 종료), 버그 #27~#35 (발견·원인·해결 커밋 기록) | ✅ |
-| N2-04 | 중간평가 라인 커버리지 50%, 기말 70% (p12) | JaCoCo, 70% 미만이면 build·CI 실패 | ✅ 96.19% (v3.0.0) |
+| N2-04 | 중간평가 라인 커버리지 50%, 기말 70% (p12) | JaCoCo, 70% 미만이면 build·CI 실패 | ✅ 95.95% (v3.1.0) |
 
 ## 3. 3차 요구사항
 
@@ -158,9 +158,9 @@
 | --- | --- | --- | --- |
 | U3-01 | 1·2차 비기능 요구사항 평가 강화, 단위 테스트로 충분히 검증 | 1·2장의 모든 항목을 v3.0.0 기준으로 다시 확인 (표의 클래스·테스트가 모두 존재하고 통과). 반응성 `ResponsivenessTest` | ✅ |
 | U3-02 | 기말 라인 커버리지 70% | JaCoCo, 70% 미만이면 build·CI 실패 | ✅ 위 검증 수치 |
-| U3-03 | 코드 리뷰, 리팩토링, 버전관리 | 카드마다 이슈·브랜치·PR(`Closes #번호`). 리팩토링은 별도 PR(#57 core 고정 지점, #60 `BoardPainter` 분리). 상대방 Review 기록: #57, #58, #60, #61, #62, #64, #65, #66 (수정 요청 → 반영 → 승인 포함) | ⚠️ #56, #59, #63, #67은 GitHub Review 없이 머지 (대면 확인) |
+| U3-03 | 코드 리뷰, 리팩토링, 버전관리 | 카드마다 이슈·브랜치·PR(`Closes #번호`). 리팩토링은 별도 PR(#57 core 고정 지점, #60 `BoardPainter` 분리). 상대방 Review 기록: #57, #58, #60, #61, #62, #64, #65, #66, #68, #69 (수정 요청 → 반영 → 승인 포함) | ⚠️ #56, #59, #63, #67, #70은 GitHub Review 없이 머지 (대면 확인) |
 | U3-04 | 팀 아이템 요구사항 명세서 작성 품질 | [아이템 명세서](item-specification.md)를 요구사항 명세 형식(ID, 우선순위, 수용 기준, 관련 테스트)으로 다시 씀 | ✅ 카드 27 (#54) |
-| U3-05 | 1·2·3차 요구사항 모두 평가, 3차 개발 후 재점검 | 이 추적표 (1·2·3장) | ✅ 카드 28 (#55) |
+| U3-05 | 1·2·3차 요구사항 모두 평가, 3차 개발 후 재점검 | 이 추적표 (1·2·3장) | ✅ 카드 28 (#55, PR #70), `v3.0.0` Release |
 
 ### 파생 요구사항과 설계 고려사항
 
